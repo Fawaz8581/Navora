@@ -210,6 +210,9 @@
             @endforeach
         </div>
         @if ($isCompleted)
+            @if ($roleLabel === 'Vendor')
+                <a class="auth-submit onboarding-finish-link" href="{{ route('vendor.verification.index') }}">Lengkapi verifikasi vendor <i class="bi bi-patch-check"></i></a>
+            @endif
             <a class="auth-submit onboarding-finish-link" href="{{ route('workspace') }}">Kembali ke ruang kerja <i class="bi bi-arrow-right"></i></a>
         @else
             <form action="{{ route('onboarding.update', ['step' => 3]) }}" method="post" class="auth-form onboarding-confirm-form">

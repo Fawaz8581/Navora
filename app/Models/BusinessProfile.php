@@ -32,6 +32,16 @@ class BusinessProfile extends Model
         'production_lead_time_days',
         'onboarding_step',
         'completed_at',
+        'nib',
+        'nib_document_path',
+        'work_sample_paths',
+        'production_photo_paths',
+        'certificate_paths',
+        'verification_status',
+        'verification_notes',
+        'verification_submitted_at',
+        'verification_reviewed_at',
+        'verified_by',
     ];
 
     public function user(): BelongsTo
@@ -51,6 +61,12 @@ class BusinessProfile extends Model
             'production_lead_time_days' => 'integer',
             'onboarding_step' => 'integer',
             'completed_at' => 'datetime',
+            'nib' => 'encrypted',
+            'work_sample_paths' => 'array',
+            'production_photo_paths' => 'array',
+            'certificate_paths' => 'array',
+            'verification_submitted_at' => 'datetime',
+            'verification_reviewed_at' => 'datetime',
         ];
     }
 }

@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
+use App\Http\Controllers\VendorVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -11,6 +13,10 @@ Route::get('/', function () {
 
 Route::get('/ruang-kerja', function () {
     $user = auth()->user();
+
+    if ($user?->role === 'admin') {
+        return redirect()->route('admin.vendor-verifications.index');
+    }
 
     if ($user && in_array($user->role, ['umkm', 'vendor'], true) && ! $user->businessProfile?->completed_at) {
         return redirect()->route('onboarding.index');
@@ -40,4 +46,21 @@ Route::middleware('auth')->group(function () {
         ->whereNumber('step')
         ->name('onboarding.update');
     Route::get('/profil-usaha', [BusinessProfileController::class, 'profile'])->name('business-profile.show');
+
+    Route::get('/vendor/verifikasi', [VendorVerificationController::class, 'index'])->name('vendor.verification.index');
+    Route::post('/vendor/verifikasi', [VendorVerificationController::class, 'submit'])
+        ->middleware('throttle:10,1')
+        ->name('vendor.verification.submit');
+
+    Route::prefix('admin/vendor-verifications')
+        ->name('admin.vendor-verifications.')
+        ->middleware('admin')
+        ->group(function () {
+            Route::get('/', [AdminVendorVerificationController::class, 'index'])->name('index');
+            Route::get('/{businessProfile}', [AdminVendorVerificationController::class, 'show'])->name('show');
+            Route::post('/{businessProfile}/review', [AdminVendorVerificationController::class, 'review'])->name('review');
+            Route::get('/{businessProfile}/documents/{type}/{index}', [AdminVendorVerificationController::class, 'download'])
+                ->whereNumber('index')
+                ->name('documents');
+        });
 });

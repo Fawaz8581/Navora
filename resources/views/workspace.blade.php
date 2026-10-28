@@ -230,7 +230,13 @@
 
             <section class="navora-page-panel" data-page-panel="listings" role="tabpanel" hidden>
                 <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Katalog saya</span></div><h1>Tampilkan layanan bisnismu</h1><p>Kelola contoh katalog dan profil vendor pada sesi demo ini.</p></div><button class="btn navora-app-primary" type="button" data-action="add-listing"><i class="bi bi-plus-lg"></i> Tambah katalog</button></div>
-                <div class="navora-vendor-setup"><span><i class="bi bi-patch-check"></i></span><div><strong>Lengkapi profil sebelum menerima permintaan</strong><p>Isi informasi bisnis dan dokumen yang diperlukan saat produk nyata tersedia. Status verifikasi berikut hanya demo.</p></div><button class="btn navora-app-outline" type="button" data-action="verify-profile">Lihat status <i class="bi bi-arrow-right"></i></button></div>
+                <div class="navora-vendor-setup"><span><i class="bi bi-patch-check"></i></span><div><strong>Lengkapi profil sebelum menerima permintaan</strong><p>Ajukan dokumen usaha untuk diperiksa admin Navora. Persetujuan verifikasi akan ditampilkan di profil vendor.</p></div>
+                    @if (auth()->check() && auth()->user()->role === 'vendor')
+                        <a class="btn navora-app-outline" href="{{ route('vendor.verification.index') }}">Verifikasi profil <i class="bi bi-arrow-right"></i></a>
+                    @else
+                        <button class="btn navora-app-outline" type="button" data-action="verify-profile">Lihat status demo <i class="bi bi-arrow-right"></i></button>
+                    @endif
+                </div>
                 <div class="navora-vendor-listings" data-vendor-listings>
                     <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-pouch"><i class="bi bi-bag"></i></span><div><h2>Standing pouch custom</h2><p>MOQ 500 pcs · Pouch laminasi · Sampel tersedia</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
                     <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-box"><i class="bi bi-box2"></i></span><div><h2>Box kemasan makanan</h2><p>MOQ 1.000 pcs · Kraft paper · Cetak satu warna</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
@@ -274,6 +280,8 @@
                             @if (Auth::user()->role === 'vendor')
                                 <div class="navora-account-row"><span>Jenis kemasan atau layanan</span><strong>{{ $businessProfile?->product_categories ?: 'Belum diisi' }}</strong></div>
                                 <div class="navora-account-row"><span>MOQ</span><strong>{{ $businessProfile?->minimum_order_quantity ? number_format($businessProfile->minimum_order_quantity, 0, ',', '.') . ' pcs' : 'Belum diisi' }}</strong></div>
+                                <div class="navora-account-row"><span>Verifikasi vendor</span><strong>{{ ['not_submitted' => 'Belum diajukan', 'pending' => 'Menunggu pemeriksaan', 'approved' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'][$businessProfile?->verification_status ?? 'not_submitted'] }}</strong></div>
+                                <a class="btn navora-app-outline" href="{{ route('vendor.verification.index') }}">Kelola dokumen verifikasi <i class="bi bi-arrow-right"></i></a>
                             @elseif (Auth::check())
                                 <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Akun mitra</span></div><h1>Ruang akun mitra</h1><p>Akun mitra yang sudah terdaftar tetap dapat mengakses ruang Navora.</p></div></div>
                                 <section class="navora-panel navora-account-details"><div class="navora-panel-heading"><h2>Informasi akun</h2></div><div class="navora-account-row"><span>Nama</span><strong>{{ Auth::user()->name }}</strong></div><div class="navora-account-row"><span>Email</span><strong>{{ Auth::user()->email }}</strong></div><div class="navora-account-row"><span>Peran</span><strong>Mitra (akun lama)</strong></div></section>
@@ -294,7 +302,7 @@
             <footer class="navora-app-footer">
                 <span>Navora · Prototype</span>
                 @if (Auth::check() && in_array(Auth::user()->role, ['umkm', 'vendor'], true))
-                    <span>Profil usaha tersimpan di akun; fitur transaksi dan verifikasi masih berupa simulasi.</span>
+                    <span>Profil usaha tersimpan di akun; pengajuan verifikasi vendor tersedia untuk pemeriksaan admin.</span>
                 @else
                     <span>Data dan tindakan demo disimpan lokal di browser; tidak ada transaksi, pembayaran, atau verifikasi nyata.</span>
                 @endif

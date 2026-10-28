@@ -61,10 +61,12 @@ class BusinessProfileController extends Controller
             ]);
 
             $profile->fill($validated);
+            $this->invalidateVendorVerificationIfDetailsChanged($profile, $request->user()->role);
         } elseif ($step === 2) {
             $validated = $request->validate($this->detailsRules($request->user()->role));
 
             $profile->fill($validated);
+            $this->invalidateVendorVerificationIfDetailsChanged($profile, $request->user()->role);
         } else {
             $request->validate([
                 'confirm_profile' => ['accepted'],
@@ -114,6 +116,36 @@ class BusinessProfileController extends Controller
     private function currentStep(BusinessProfile $profile): int
     {
         return max(1, min((int) $profile->onboarding_step, 3));
+    }
+
+    private function invalidateVendorVerificationIfDetailsChanged(BusinessProfile $profile, string $role): void
+    {
+        if ($role !== 'vendor' || ! in_array($profile->verification_status, ['pending', 'approved'], true)) {
+            return;
+        }
+
+        if (! $profile->isDirty([
+            'business_name',
+            'phone',
+            'category',
+            'location',
+            'description',
+            'product_categories',
+            'materials',
+            'minimum_order_quantity',
+            'monthly_capacity',
+            'production_lead_time_days',
+        ])) {
+            return;
+        }
+
+        $profile->forceFill([
+            'verification_status' => 'not_submitted',
+            'verification_notes' => null,
+            'verification_submitted_at' => null,
+            'verification_reviewed_at' => null,
+            'verified_by' => null,
+        ]);
     }
 
     /**

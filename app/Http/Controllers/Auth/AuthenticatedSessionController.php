@@ -40,6 +40,10 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if ($request->user()->role === 'admin') {
+            return redirect()->intended(route('admin.vendor-verifications.index'));
+        }
+
         if (in_array($request->user()->role, ['umkm', 'vendor'], true)
             && ! $request->user()->businessProfile?->completed_at) {
             return redirect()->route('onboarding.index');
