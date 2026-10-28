@@ -40,6 +40,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if (in_array($request->user()->role, ['umkm', 'vendor'], true)
+            && ! $request->user()->businessProfile?->completed_at) {
+            return redirect()->route('onboarding.index');
+        }
+
         return redirect()->intended(route('workspace'));
     }
 

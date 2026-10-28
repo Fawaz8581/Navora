@@ -72,7 +72,7 @@
                         <button class="navora-page-link" type="button" data-page="rfq" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-chat-square-text"></i> Permintaan penawaran</button>
                         <button class="navora-page-link" type="button" data-page="assistant" data-roles="umkm" role="tab" aria-selected="false"><i class="bi bi-stars"></i> Asisten kemasan</button>
                         <button class="navora-page-link" type="button" data-page="programs" data-roles="partner" role="tab" aria-selected="false"><i class="bi bi-buildings"></i> Program mitra</button>
-                        <button class="navora-page-link" type="button" data-page="account" data-roles="umkm,vendor,partner" role="tab" aria-selected="false"><i class="bi bi-person"></i> Profil demo</button>
+                        <button class="navora-page-link" type="button" data-page="account" data-roles="umkm,vendor,partner" role="tab" aria-selected="false"><i class="bi bi-person"></i> @auth Profil usaha @else Profil demo @endauth</button>
                     </div>
                     <a class="navora-back-home" href="{{ route('home') }}"><i class="bi bi-arrow-left"></i><span>Beranda</span></a>
                 </div>
@@ -249,13 +249,57 @@
             </section>
 
             <section class="navora-page-panel" data-page-panel="account" role="tabpanel" hidden>
-                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Profil demo</span></div><h1>Profil ruang Navora</h1><p>Pengaturan berikut hanya mengubah tampilan di browser ini.</p></div></div>
-                <div class="navora-account-layout">
-                    <section class="navora-panel navora-account-card"><div class="navora-account-avatar" data-account-avatar>U</div><div><span class="navora-panel-kicker">PROFIL LOKAL DEMO</span><h2 data-account-name>Usaha Kopi Nusantara</h2><p data-account-role-label>Brand UMKM · Bandung</p><span class="navora-status-pill status-waiting">Belum diverifikasi</span></div><button class="btn navora-app-outline" type="button" data-action="edit-profile">Edit profil</button></section>
-                    <section class="navora-panel navora-account-details"><div class="navora-panel-heading"><h2>Informasi akun</h2><span class="navora-demo-label"><i class="bi bi-circle-fill"></i> TERSIMPAN DI BROWSER</span></div><div class="navora-account-row"><span>Jenis akun</span><strong data-account-type>Brand UMKM</strong></div><div class="navora-account-row"><span>Lokasi</span><strong data-account-location>Bandung, Jawa Barat</strong></div><div class="navora-account-row"><span>Verifikasi identitas</span><strong>Belum tersedia dalam prototipe</strong></div><div class="navora-account-row"><span>Metode pembayaran</span><strong>Tidak terhubung</strong></div></section>
-                </div>
+                @if (Auth::check() && in_array(Auth::user()->role, ['umkm', 'vendor'], true))
+                    @php
+                        $businessProfile = Auth::user()->businessProfile;
+                    @endphp
+                    <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Profil usaha</span></div><h1>Profil usahamu</h1><p>Informasi usaha ini tersimpan di akun Navora dan dapat kamu perbarui.</p></div></div>
+                    <div class="navora-account-layout">
+                        <section class="navora-panel navora-account-card">
+                            <div class="navora-account-avatar">{{ mb_strtoupper(mb_substr(Auth::user()->name, 0, 1)) }}</div>
+                            <div>
+                                <span class="navora-panel-kicker">PROFIL TERSIMPAN</span>
+                                <h2>{{ $businessProfile?->business_name ?? Auth::user()->name }}</h2>
+                                <p>{{ $businessProfile?->category ?? 'Bidang usaha belum diisi' }} · {{ $businessProfile?->location ?? 'Lokasi belum diisi' }}</p>
+                                <span class="navora-status-pill status-waiting">Profil usaha · {{ Auth::user()->role === 'vendor' ? 'Vendor' : 'UMKM' }}</span>
+                            </div>
+                            <a class="btn navora-app-outline" href="{{ route('business-profile.show') }}">Ubah profil</a>
+                        </section>
+                        <section class="navora-panel navora-account-details">
+                            <div class="navora-panel-heading"><h2>Informasi usaha</h2><span class="navora-demo-label"><i class="bi bi-database-check"></i> TERSIMPAN DI AKUN</span></div>
+                            <div class="navora-account-row"><span>Jenis akun</span><strong>{{ Auth::user()->role === 'vendor' ? 'Vendor' : 'UMKM' }}</strong></div>
+                            <div class="navora-account-row"><span>Email akun</span><strong>{{ Auth::user()->email }}</strong></div>
+                            <div class="navora-account-row"><span>Nomor kontak</span><strong>{{ $businessProfile?->phone ?: 'Belum diisi' }}</strong></div>
+                            <div class="navora-account-row"><span>Tentang usaha</span><strong>{{ $businessProfile?->description ?: 'Belum diisi' }}</strong></div>
+                            @if (Auth::user()->role === 'vendor')
+                                <div class="navora-account-row"><span>Jenis kemasan atau layanan</span><strong>{{ $businessProfile?->product_categories ?: 'Belum diisi' }}</strong></div>
+                                <div class="navora-account-row"><span>MOQ</span><strong>{{ $businessProfile?->minimum_order_quantity ? number_format($businessProfile->minimum_order_quantity, 0, ',', '.') . ' pcs' : 'Belum diisi' }}</strong></div>
+                            @elseif (Auth::check())
+                                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Akun mitra</span></div><h1>Ruang akun mitra</h1><p>Akun mitra yang sudah terdaftar tetap dapat mengakses ruang Navora.</p></div></div>
+                                <section class="navora-panel navora-account-details"><div class="navora-panel-heading"><h2>Informasi akun</h2></div><div class="navora-account-row"><span>Nama</span><strong>{{ Auth::user()->name }}</strong></div><div class="navora-account-row"><span>Email</span><strong>{{ Auth::user()->email }}</strong></div><div class="navora-account-row"><span>Peran</span><strong>Mitra (akun lama)</strong></div></section>
+                            @else
+                                <div class="navora-account-row"><span>Produk</span><strong>{{ $businessProfile?->product_type ?: 'Belum diisi' }}</strong></div>
+                                <div class="navora-account-row"><span>Kebutuhan kemasan</span><strong>{{ $businessProfile?->packaging_type ?: 'Belum diisi' }}</strong></div>
+                            @endif
+                        </section>
+                    </div>
+                @else
+                    <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Profil demo</span></div><h1>Profil ruang Navora</h1><p>Pengaturan berikut hanya mengubah tampilan di browser ini.</p></div></div>
+                    <div class="navora-account-layout">
+                        <section class="navora-panel navora-account-card"><div class="navora-account-avatar" data-account-avatar>U</div><div><span class="navora-panel-kicker">PROFIL LOKAL DEMO</span><h2 data-account-name>Usaha Kopi Nusantara</h2><p data-account-role-label>Brand UMKM · Bandung</p><span class="navora-status-pill status-waiting">Belum diverifikasi</span></div><button class="btn navora-app-outline" type="button" data-action="edit-profile">Edit profil</button></section>
+                        <section class="navora-panel navora-account-details"><div class="navora-panel-heading"><h2>Informasi akun</h2><span class="navora-demo-label"><i class="bi bi-circle-fill"></i> TERSIMPAN DI BROWSER</span></div><div class="navora-account-row"><span>Jenis akun</span><strong data-account-type>Brand UMKM</strong></div><div class="navora-account-row"><span>Lokasi</span><strong data-account-location>Bandung, Jawa Barat</strong></div><div class="navora-account-row"><span>Verifikasi identitas</span><strong>Belum tersedia dalam prototipe</strong></div><div class="navora-account-row"><span>Metode pembayaran</span><strong>Tidak terhubung</strong></div></section>
+                    </div>
+                @endauth
             </section>
-            <footer class="navora-app-footer"><span>Navora · Prototype</span><span>Semua data dan tindakan disimpan lokal di browser; tidak ada transaksi, pembayaran, atau verifikasi nyata.</span><a href="{{ route('home') }}">Kembali ke beranda <i class="bi bi-arrow-up-right"></i></a></footer>
+            <footer class="navora-app-footer">
+                <span>Navora · Prototype</span>
+                @if (Auth::check() && in_array(Auth::user()->role, ['umkm', 'vendor'], true))
+                    <span>Profil usaha tersimpan di akun; fitur transaksi dan verifikasi masih berupa simulasi.</span>
+                @else
+                    <span>Data dan tindakan demo disimpan lokal di browser; tidak ada transaksi, pembayaran, atau verifikasi nyata.</span>
+                @endif
+                <a href="{{ route('home') }}">Kembali ke beranda <i class="bi bi-arrow-up-right"></i></a>
+            </footer>
         </main>
     </div>
 

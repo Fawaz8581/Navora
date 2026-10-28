@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BusinessProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -26,6 +27,7 @@ test('a signed-in user sees the workspace for their saved role without the demo 
         'name' => 'Vendor Navora',
         'role' => 'vendor',
     ]);
+    BusinessProfile::factory()->for($vendor)->create();
 
     $this->actingAs($vendor)
         ->get(route('workspace'))

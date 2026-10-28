@@ -495,6 +495,188 @@ body.navora-auth-body {
     font-size: 13px;
 }
 
+.onboarding-heading {
+    margin-bottom: 18px;
+}
+
+.onboarding-progress {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: -4px 0 20px;
+}
+
+.onboarding-progress-step {
+    display: grid;
+    min-width: 0;
+    justify-items: center;
+    gap: 6px;
+    color: #97a5ae;
+    text-align: center;
+}
+
+.onboarding-progress-step > span {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    border: 1px solid #dfe7ec;
+    border-radius: 50%;
+    background: #fff;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.onboarding-progress-step > small {
+    font-size: 8px;
+    font-weight: 700;
+}
+
+.onboarding-progress-step.is-current {
+    color: var(--auth-blue);
+}
+
+.onboarding-progress-step.is-current > span,
+.onboarding-progress-step.is-done > span {
+    border-color: var(--auth-blue);
+    background: var(--auth-blue);
+    color: #fff;
+}
+
+.onboarding-progress-step.is-done {
+    color: #658f82;
+}
+
+.onboarding-progress-step.is-done > span {
+    border-color: #75ad9b;
+    background: #75ad9b;
+}
+
+.onboarding-optional {
+    margin-left: 4px;
+    color: #97a3aa;
+    font-size: 9px;
+    font-weight: 500;
+}
+
+.onboarding-textarea {
+    display: block;
+    width: 100%;
+    min-height: 76px;
+    padding: 10px 12px;
+    border: 1px solid #e1e8ed;
+    border-radius: 7px;
+    outline: 0;
+    background: #fff;
+    color: #344f64;
+    font: inherit;
+    font-size: 10px;
+    resize: vertical;
+    transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.onboarding-textarea:focus {
+    border-color: #82aaca;
+    box-shadow: 0 0 0 3px rgba(29, 91, 148, .1);
+}
+
+.onboarding-review {
+    display: grid;
+    gap: 12px;
+}
+
+.onboarding-review-section {
+    padding: 13px 14px;
+    border: 1px solid #e7edf1;
+    border-radius: 9px;
+    background: #fff;
+}
+
+.onboarding-review-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.onboarding-review-heading h3 {
+    margin: 0;
+    color: var(--auth-ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.onboarding-review-heading a {
+    color: var(--auth-blue);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.onboarding-review-row {
+    display: grid;
+    grid-template-columns: minmax(95px, .75fr) minmax(0, 1.25fr);
+    gap: 8px;
+    padding: 7px 0;
+    border-top: 1px solid #f0f3f5;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+.onboarding-review-row > span {
+    color: #83929c;
+}
+
+.onboarding-review-row > strong {
+    overflow-wrap: anywhere;
+    color: #40586a;
+    font-weight: 700;
+}
+
+.onboarding-confirm-form {
+    margin-top: 14px;
+}
+
+.onboarding-confirm {
+    align-items: flex-start;
+    font-size: 9px;
+    line-height: 1.55;
+}
+
+.onboarding-confirm input {
+    flex: none;
+    margin-top: 1px;
+}
+
+.onboarding-finish-link {
+    margin-top: 15px;
+}
+
+.onboarding-back-link,
+.onboarding-logout button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 15px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #718493;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.onboarding-back-link:hover,
+.onboarding-logout button:hover {
+    color: var(--auth-blue);
+}
+
+.onboarding-logout {
+    text-align: center;
+}
+
 @media (max-width: 991.98px) {
     .auth-layout {
         zoom: 1;

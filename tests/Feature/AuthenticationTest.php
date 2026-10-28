@@ -18,7 +18,7 @@ test('guests can view the login and registration pages', function () {
         ->assertSee('Buat akun Navora')
         ->assertSee('Pemilik brand / UMKM')
         ->assertSee('Vendor kemasan atau maklon')
-        ->assertSee('Mitra pendukung UMKM')
+        ->assertDontSee('Mitra pendukung UMKM')
         ->assertDontSee('Daftar dengan Google');
 });
 
@@ -40,9 +40,10 @@ test('a visitor can register and is authenticated with their selected account ty
 
     $user = User::where('email', 'seller@gmail.com')->firstOrFail();
 
-    $response->assertRedirect(route('workspace'));
+    $response->assertRedirect(route('onboarding.index'));
 
     expect($user->role)->toBe('vendor')
+        ->and($user->businessProfile)->not->toBeNull()
         ->and(Hash::check('secure-password-123', $user->password))->toBeTrue()
         ->and(auth()->id())->toBe($user->id);
 });
@@ -75,7 +76,7 @@ test('a registered user can log in and log out', function () {
         'password' => 'secure-password-123',
         'remember' => '1',
     ])
-        ->assertRedirect(route('workspace'));
+        ->assertRedirect(route('onboarding.index'));
 
     $this->assertAuthenticatedAs($user);
 

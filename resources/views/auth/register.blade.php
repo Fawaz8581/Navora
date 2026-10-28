@@ -1,13 +1,13 @@
 @extends('auth.partials.layout')
 
 @section('title', 'Buat akun')
-@section('meta-description', 'Buat akun Navora untuk mulai menjelajahi vendor kemasan dan peluang kolaborasi bagi UMKM.')
+@section('meta-description', 'Buat akun Navora sebagai UMKM atau vendor, lalu siapkan profil usahamu.')
 
 @section('auth-form')
     <div class="auth-form-heading">
         <span class="auth-form-eyebrow"><span></span> MULAI LANGKAH BARUMU</span>
         <h2>Buat akun Navora</h2>
-        <p>Daftar untuk terhubung dengan ekosistem kemasan UMKM.</p>
+        <p>Pilih peranmu dan siapkan profil usaha agar pengalaman Navora lebih sesuai.</p>
     </div>
 
     @if (session('status'))
@@ -37,7 +37,6 @@
                 <select id="role" name="role" required aria-describedby="@error('role') role-error @enderror">
                     <option value="umkm" @selected(old('role', request('role', 'umkm')) === 'umkm')>Pemilik brand / UMKM</option>
                     <option value="vendor" @selected(old('role', request('role')) === 'vendor')>Vendor kemasan atau maklon</option>
-                    <option value="partner" @selected(old('role', request('role')) === 'partner')>Mitra pendukung UMKM</option>
                 </select>
                 <i class="bi bi-chevron-down auth-select-chevron" aria-hidden="true"></i>
             </div>
