@@ -34,6 +34,7 @@ body.navora-auth-body {
     display: grid;
     min-height: 100vh;
     grid-template-columns: minmax(0, 1fr) minmax(360px, .92fr);
+    zoom: 1.25;
 }
 
 .auth-panel {
@@ -492,6 +493,12 @@ body.navora-auth-body {
 
 .auth-aside-mark i {
     font-size: 13px;
+}
+
+@media (max-width: 991.98px) {
+    .auth-layout {
+        zoom: 1;
+    }
 }
 
 @media (max-width: 900px) {
