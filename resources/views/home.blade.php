@@ -36,8 +36,16 @@
                         <li class="nav-item"><a class="nav-link" href="#untuk-siapa">Untuk siapa</a></li>
                     </ul>
                     <div class="d-flex flex-column flex-xl-row gap-2 navora-nav-actions">
-                        <a class="navora-nav-login" href="{{ route('workspace') }}">Masuk demo</a>
-                        <a class="btn navora-button navora-button-primary" href="{{ route('workspace') }}">Mulai jelajah <i class="bi bi-arrow-right"></i></a>
+                        @auth
+                            <span class="navora-nav-login">Hai, {{ Auth::user()->name }}</span>
+                            <form action="{{ route('logout') }}" method="post">
+                                @csrf
+                                <button class="navora-nav-login navora-nav-logout" type="submit">Keluar</button>
+                            </form>
+                        @else
+                            <a class="navora-nav-login" href="{{ route('login') }}">Masuk</a>
+                            <a class="btn navora-button navora-button-primary" href="{{ route('register') }}">Daftar gratis <i class="bi bi-arrow-right"></i></a>
+                        @endauth
                     </div>
                 </div>
             </div>

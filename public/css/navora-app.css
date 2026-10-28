@@ -177,6 +177,55 @@ body.navora-app-body {
     gap: 17px;
 }
 
+.navora-auth-user {
+    max-width: 115px;
+    overflow: hidden;
+    color: #536d80;
+    font-size: 9px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navora-account-role {
+    padding: 6px 9px;
+    border: 1px solid #e1ebf2;
+    border-radius: 999px;
+    background: #f4f8fb;
+    color: #426d8d;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.navora-logout-form {
+    display: flex;
+}
+
+.navora-logout-button {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 1px solid #e8edf1;
+    border-radius: 8px;
+    background: #fff;
+    color: #718696;
+    cursor: pointer;
+}
+
+.navora-logout-button:hover {
+    border-color: #efdbd8;
+    background: #fff8f7;
+    color: #a5534a;
+}
+
+.navora-guest-login {
+    color: #527b98;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .navora-demo-label {
     display: inline-flex;
     align-items: center;
@@ -2229,6 +2278,11 @@ body.navora-app-body {
 
     .navora-demo-label {
         display: none;
+    }
+
+    .navora-auth-user {
+        max-width: 75px;
+        font-size: 8px;
     }
 
     .navora-role-select {

@@ -12,7 +12,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/navora-app.css') }}" rel="stylesheet">
 </head>
-<body class="navora-app-body">
+<body class="navora-app-body"
+    data-auth-role="{{ auth()->user()->role ?? '' }}"
+    data-auth-name="{{ auth()->user()->name ?? '' }}"
+    data-auth-user-id="{{ auth()->id() ?? '' }}">
     <a class="navora-skip-link" href="#app-content">Lewati ke konten utama</a>
     <div class="navora-app-shell">
         <header class="navora-app-header">
@@ -29,12 +32,33 @@
                 <div class="navora-header-actions">
                     <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> MODE DEMO</span>
                     <button class="navora-icon-button" type="button" aria-label="Notifikasi demo"><i class="bi bi-bell"></i><span></span></button>
-                    <label class="visually-hidden" for="navora-role">Pilih peran demo</label>
-                    <select class="navora-role-select" id="navora-role" data-role-select aria-label="Pilih peran demo">
-                        <option value="umkm">UMKM</option>
-                        <option value="vendor">Vendor</option>
-                        <option value="partner">Mitra</option>
-                    </select>
+                    @auth
+                        <span class="navora-auth-user" title="{{ Auth::user()->email }}">{{ Auth::user()->name }}</span>
+                        <form class="navora-logout-form" action="{{ route('logout') }}" method="post">
+                            @csrf
+                            <button class="navora-logout-button" type="submit" aria-label="Keluar dari akun"><i class="bi bi-box-arrow-right"></i></button>
+                        </form>
+                    @else
+                        <a class="navora-guest-login" href="{{ route('login') }}">Masuk</a>
+                    @endauth
+                    @auth
+                        <span class="navora-account-role">
+                            @if (Auth::user()->role === 'vendor')
+                                Vendor
+                            @elseif (Auth::user()->role === 'partner')
+                                Mitra
+                            @else
+                                UMKM
+                            @endif
+                        </span>
+                    @else
+                        <label class="visually-hidden" for="navora-role">Pilih peran demo</label>
+                        <select class="navora-role-select" id="navora-role" data-role-select aria-label="Pilih peran demo">
+                            <option value="umkm">UMKM</option>
+                            <option value="vendor">Vendor</option>
+                            <option value="partner">Mitra</option>
+                        </select>
+                    @endauth
                 </div>
             </div>
             <nav class="navora-app-nav" aria-label="Navigasi ruang Navora">

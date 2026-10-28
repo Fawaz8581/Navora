@@ -2704,10 +2704,23 @@ h3 {
 }
 
 .navora-nav-login {
+    display: inline-flex;
+    align-items: center;
+    border: 0;
+    background: transparent;
     padding: 10px 12px;
     color: var(--navora-ink);
+    font-family: var(--sr-body);
     font-size: 13px;
     font-weight: 700;
+}
+
+.navora-nav-actions form {
+    display: flex;
+}
+
+.navora-nav-logout {
+    cursor: pointer;
 }
 
 .navora-button {

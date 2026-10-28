@@ -1,7 +1,12 @@
 (() => {
     'use strict';
 
-    const storageKey = 'navora-prototype-v1';
+    const authenticatedRole = document.body.dataset.authRole;
+    const authenticatedName = document.body.dataset.authName;
+    const authenticatedUserId = document.body.dataset.authUserId;
+    const storageKey = authenticatedUserId
+        ? `navora-prototype-v1:user-${authenticatedUserId}`
+        : 'navora-prototype-v1';
     const modal = document.querySelector('[data-modal]');
     const modalForm = document.querySelector('[data-modal-form]');
     const modalFields = document.querySelector('[data-modal-fields]');
@@ -61,6 +66,14 @@
     };
 
     let state = loadState();
+
+    if (knownRoles.includes(authenticatedRole || '')) {
+        state.role = authenticatedRole;
+    }
+
+    if (authenticatedName) {
+        state.profile.name = authenticatedName;
+    }
 
     function showToast(message) {
         if (!toast) {
@@ -1080,6 +1093,10 @@
     });
 
     document.querySelector('[data-role-select]')?.addEventListener('change', (event) => {
+        if (knownRoles.includes(authenticatedRole || '')) {
+            return;
+        }
+
         const select = event.currentTarget;
         state.role = select.value;
         saveState();
@@ -1142,7 +1159,10 @@
     renderStoredRfqs();
 
     const requestedRole = urlParams.get('role');
-    state.role = knownRoles.includes(requestedRole || '') ? requestedRole : state.role;
+
+    if (!authenticatedRole && knownRoles.includes(requestedRole || '')) {
+        state.role = requestedRole;
+    }
     updateRoleContent();
 
     const requestedPage = urlParams.get('tab');
