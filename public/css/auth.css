@@ -138,67 +138,6 @@ body.navora-auth-body {
     line-height: 1.7;
 }
 
-.auth-google-button {
-    position: relative;
-    display: flex;
-    width: 100%;
-    min-height: 45px;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    border: 1px solid #e1e8ed;
-    border-radius: 8px;
-    background: #fff;
-    color: #455e72;
-    font-family: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    text-decoration: none;
-    cursor: pointer;
-    transition: border-color .16s ease, background .16s ease, color .16s ease;
-}
-
-.auth-google-button > i {
-    color: #4b7ca0;
-    font-size: 14px;
-}
-
-.auth-google-button:hover {
-    border-color: #b7cddd;
-    background: #f8fbfd;
-    color: var(--auth-blue);
-}
-
-.auth-google-button:focus-visible {
-    outline: 3px solid rgba(29, 91, 148, .2);
-    outline-offset: 2px;
-}
-
-.auth-google-note {
-    margin: 8px 0 0;
-    color: #84939d;
-    font-size: 9px;
-    line-height: 1.55;
-}
-
-.auth-divider {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    margin: 17px 0;
-    color: #9aa6ad;
-    font-size: 9px;
-    white-space: nowrap;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-    height: 1px;
-    flex: 1;
-    background: #e9eef1;
-    content: "";
-}
-
 .auth-form {
     display: grid;
     gap: 14px;

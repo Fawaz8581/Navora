@@ -28,12 +28,6 @@
         </div>
     @endif
 
-    <a class="auth-google-button" href="{{ route('auth.google.redirect') }}" aria-describedby="google-login-note">
-        <i class="bi bi-google" aria-hidden="true"></i> Masuk dengan Google
-    </a>
-    <p class="auth-google-note" id="google-login-note">Gunakan akun Google dengan email terverifikasi. Akun baru akan dibuat sebagai UMKM; pilih role saat mendaftar jika ingin role berbeda.</p>
-    <div class="auth-divider"><span>atau lanjutkan dengan email</span></div>
-
     <form action="{{ route('login.store') }}" method="post" class="auth-form">
         @csrf
         <div class="auth-field">

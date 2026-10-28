@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
@@ -10,15 +11,22 @@ test('guests can view the login and registration pages', function () {
     $this->get(route('login'))
         ->assertOk()
         ->assertSee('Masuk ke Navora')
-        ->assertSee('Masuk dengan Google')
-        ->assertSee(route('auth.google.redirect'), false);
+        ->assertDontSee('Masuk dengan Google');
 
     $this->get(route('register'))
         ->assertOk()
         ->assertSee('Buat akun Navora')
         ->assertSee('Pemilik brand / UMKM')
         ->assertSee('Vendor kemasan atau maklon')
-        ->assertSee('Mitra pendukung UMKM');
+        ->assertSee('Mitra pendukung UMKM')
+        ->assertDontSee('Daftar dengan Google');
+});
+
+test('google authentication routes and user column are removed', function () {
+    $this->get('/auth/google/redirect')->assertNotFound();
+    $this->get('/auth/google/callback')->assertNotFound();
+
+    expect(Schema::hasColumn('users', 'google_id'))->toBeFalse();
 });
 
 test('a visitor can register and is authenticated with their selected account type', function () {

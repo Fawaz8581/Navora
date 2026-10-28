@@ -43,11 +43,6 @@
             </div>
             @error('role')<span class="auth-field-error" id="role-error">{{ $message }}</span>@enderror
         </div>
-        <a class="auth-google-button" href="{{ route('auth.google.redirect', ['role' => old('role', request('role', 'umkm'))]) }}" data-google-auth-link aria-describedby="google-register-note">
-            <i class="bi bi-google" aria-hidden="true"></i> Daftar dengan Google
-        </a>
-        <p class="auth-google-note" id="google-register-note">Role pilihanmu akan dipakai untuk akun baru. Akun Google harus memiliki email terverifikasi.</p>
-        <div class="auth-divider"><span>atau daftar dengan email</span></div>
         <div class="auth-field">
             <label for="name">Nama lengkap atau nama usaha</label>
             <div class="auth-input-wrap">
@@ -84,5 +79,4 @@
     </form>
 
     <p class="auth-switch">Sudah punya akun? <a href="{{ route('login') }}">Masuk</a></p>
-    <script src="{{ asset('js/auth.js') }}" defer></script>
 @endsection
