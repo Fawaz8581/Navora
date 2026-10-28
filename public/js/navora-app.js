@@ -1,0 +1,1171 @@
+(() => {
+    'use strict';
+
+    const storageKey = 'navora-prototype-v1';
+    const modal = document.querySelector('[data-modal]');
+    const modalForm = document.querySelector('[data-modal-form]');
+    const modalFields = document.querySelector('[data-modal-fields]');
+    const toast = document.querySelector('[data-toast]');
+    const urlParams = new URLSearchParams(window.location.search);
+    const knownRoles = ['umkm', 'vendor', 'partner'];
+    const knownPages = ['overview', 'vendors', 'listings', 'groups', 'rfq', 'assistant', 'programs', 'account'];
+    let activeModalHandler = null;
+    let toastTimer = 0;
+    let lastFocusedElement = null;
+
+    const emptyState = () => ({
+        role: 'umkm',
+        groups: {},
+        createdGroups: [],
+        rfqs: [],
+        quotes: [],
+        listings: [],
+        interests: [],
+        profile: {},
+        verificationRequested: false,
+    });
+
+    const reportStorageError = (error) => {
+        console.error('Navora demo could not access local storage.', error);
+        showToast('Penyimpanan lokal tidak tersedia. Perubahan hanya berlaku selama halaman ini terbuka.');
+    };
+
+    const loadState = () => {
+        try {
+            const rawState = window.localStorage.getItem(storageKey);
+
+            if (!rawState) {
+                return emptyState();
+            }
+
+            const parsedState = JSON.parse(rawState);
+
+            if (!parsedState || typeof parsedState !== 'object' || Array.isArray(parsedState)) {
+                throw new TypeError('The stored Navora state must be an object.');
+            }
+
+            const state = { ...emptyState(), ...parsedState };
+            state.groups = state.groups && typeof state.groups === 'object' ? state.groups : {};
+            state.createdGroups = Array.isArray(state.createdGroups) ? state.createdGroups : [];
+            state.rfqs = Array.isArray(state.rfqs) ? state.rfqs : [];
+            state.quotes = Array.isArray(state.quotes) ? state.quotes : [];
+            state.listings = Array.isArray(state.listings) ? state.listings : [];
+            state.interests = Array.isArray(state.interests) ? state.interests : [];
+            state.profile = state.profile && typeof state.profile === 'object' ? state.profile : {};
+
+            return state;
+        } catch (error) {
+            reportStorageError(error);
+            return emptyState();
+        }
+    };
+
+    let state = loadState();
+
+    function showToast(message) {
+        if (!toast) {
+            return;
+        }
+
+        toast.textContent = message;
+        toast.classList.add('is-visible');
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => {
+            toast.classList.remove('is-visible');
+        }, 3300);
+    }
+
+    const saveState = () => {
+        try {
+            window.localStorage.setItem(storageKey, JSON.stringify(state));
+        } catch (error) {
+            reportStorageError(error);
+        }
+    };
+
+    const textElement = (tagName, className, text) => {
+        const element = document.createElement(tagName);
+
+        if (className) {
+            element.className = className;
+        }
+
+        element.textContent = text;
+
+        return element;
+    };
+
+    const setText = (selector, value) => {
+        const element = document.querySelector(selector);
+
+        if (element) {
+            element.textContent = value;
+        }
+    };
+
+    const roleLabel = (role) => ({
+        umkm: 'Brand UMKM',
+        vendor: 'Vendor kemasan',
+        partner: 'Mitra ekosistem',
+    })[role] ?? 'Brand UMKM';
+
+    const updateRoleContent = () => {
+        const role = knownRoles.includes(state.role) ? state.role : 'umkm';
+        state.role = role;
+        const roleSelect = document.querySelector('[data-role-select]');
+
+        if (roleSelect) {
+            roleSelect.value = role;
+        }
+
+        document.querySelectorAll('[data-roles]').forEach((item) => {
+            const availableRoles = item.dataset.roles.split(',');
+            item.hidden = !availableRoles.includes(role);
+        });
+
+        document.querySelectorAll('[data-role-content]').forEach((item) => {
+            item.hidden = item.dataset.roleContent !== role;
+        });
+
+        document.querySelectorAll('[data-role-select]').forEach((item) => {
+            item.setAttribute('aria-label', `Peran demo: ${roleLabel(role)}`);
+        });
+
+        document.querySelectorAll('[data-role-caption]').forEach((item) => {
+            item.textContent = `Ruang ${role === 'umkm' ? 'UMKM' : role === 'vendor' ? 'vendor' : 'mitra'}`;
+        });
+
+        document.querySelectorAll('[data-welcome-title]').forEach((item) => {
+            item.textContent = role === 'vendor'
+                ? 'Selamat datang, mitra vendor!'
+                : role === 'partner'
+                    ? 'Selamat datang, mitra ekosistem!'
+                    : `Selamat datang${state.profile.name ? `, ${state.profile.name}` : ', pemilik brand'}!`;
+        });
+
+        document.querySelectorAll('[data-welcome-copy]').forEach((item) => {
+            item.textContent = role === 'vendor'
+                ? 'Kelola contoh katalog dan lihat permintaan brand yang mungkin sesuai dengan layananmu.'
+                : role === 'partner'
+                    ? 'Jelajahi ide program dan peluang kolaborasi untuk mendukung perkembangan UMKM.'
+                    : 'Temukan vendor kemasan yang sesuai dan lihat peluang pemesanan bersama.';
+        });
+
+        document.querySelectorAll('[data-primary-action]').forEach((item) => {
+            const page = role === 'vendor' ? 'listings' : role === 'partner' ? 'programs' : 'vendors';
+            const icon = role === 'vendor' ? 'bi-box-seam' : role === 'partner' ? 'bi-buildings' : 'bi-search';
+            const label = role === 'vendor' ? 'Kelola katalog' : role === 'partner' ? 'Lihat program' : 'Jelajahi vendor';
+
+            item.dataset.openPage = page;
+            item.innerHTML = `<i class="bi ${icon}" aria-hidden="true"></i> ${label}`;
+        });
+
+        document.querySelectorAll('[data-rfq-heading]').forEach((item) => {
+            item.textContent = role === 'vendor' ? 'Tinjau permintaan dari brand' : 'Bandingkan penawaran vendor';
+        });
+
+        document.querySelectorAll('[data-rfq-description]').forEach((item) => {
+            item.textContent = role === 'vendor'
+                ? 'Lihat contoh kebutuhan brand dan siapkan tanggapan yang sesuai kapasitasmu.'
+                : 'Kirim kebutuhanmu dan tinjau respons vendor dalam satu ruang.';
+        });
+
+        const buyerList = document.querySelector('[data-rfq-list]');
+        const vendorInbox = document.querySelector('[data-vendor-inbox]');
+
+        if (buyerList) {
+            buyerList.hidden = role === 'vendor';
+        }
+
+        if (vendorInbox) {
+            vendorInbox.hidden = role !== 'vendor';
+        }
+
+        const createRequestButton = document.querySelector('[data-action="create-rfq"]');
+
+        if (createRequestButton) {
+            createRequestButton.hidden = role === 'vendor';
+            createRequestButton.innerHTML = role === 'vendor'
+                ? '<i class="bi bi-plus-lg" aria-hidden="true"></i> Buat permintaan'
+                : '<i class="bi bi-plus-lg" aria-hidden="true"></i> Buat permintaan';
+        }
+
+        const accountName = state.profile.name || (role === 'vendor' ? 'PouchKita Studio' : role === 'partner' ? 'Mitra UMKM Nusantara' : 'Usaha Kopi Nusantara');
+        const accountLocation = state.profile.location || (role === 'vendor' ? 'Bandung, Jawa Barat' : role === 'partner' ? 'Indonesia' : 'Bandung, Jawa Barat');
+        setText('[data-account-name]', accountName);
+        setText('[data-account-role-label]', `${roleLabel(role)} · ${accountLocation.split(',')[0]}`);
+        setText('[data-account-type]', roleLabel(role));
+        setText('[data-account-location]', accountLocation);
+        setText('[data-account-avatar]', accountName.trim().charAt(0).toUpperCase() || 'N');
+        setText('[data-stat-listings]', String(3 + state.listings.length));
+        setText('[data-stat-incoming]', String(2 + state.quotes.length));
+        setText('[data-verification-summary]', state.verificationRequested ? 'Demo dikirim' : 'Draft');
+
+        document.querySelectorAll('[data-page-panel]').forEach((panel) => {
+            const page = panel.dataset.pagePanel;
+            const rolePageAllowed = page === 'overview' || page === 'account'
+                || (role === 'umkm' && ['vendors', 'groups', 'rfq', 'assistant'].includes(page))
+                || (role === 'vendor' && ['listings', 'groups', 'rfq'].includes(page))
+                || (role === 'partner' && page === 'programs');
+            const tab = document.querySelector(`[data-page="${page}"]`);
+
+            if (tab) {
+                tab.hidden = !rolePageAllowed;
+            }
+
+            if (!rolePageAllowed && panel.classList.contains('is-active')) {
+                showPage('overview');
+            }
+        });
+
+        saveState();
+    };
+
+    const showPage = (page) => {
+        if (!knownPages.includes(page)) {
+            return;
+        }
+
+        const matchingTab = document.querySelector(`[data-page="${page}"]`);
+
+        if (!matchingTab || matchingTab.hidden) {
+            return;
+        }
+
+        document.querySelectorAll('[data-page-panel]').forEach((panel) => {
+            const isActive = panel.dataset.pagePanel === page;
+            panel.classList.toggle('is-active', isActive);
+            panel.hidden = !isActive;
+        });
+
+        document.querySelectorAll('[data-page]').forEach((tab) => {
+            const isActive = tab.dataset.page === page;
+            tab.classList.toggle('is-active', isActive);
+            tab.setAttribute('aria-selected', String(isActive));
+        });
+
+        setText('[data-breadcrumb-current]', matchingTab.textContent.trim());
+        window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    };
+
+    const createModalField = (field) => {
+        const wrapper = textElement('div', 'navora-modal-field', '');
+        const label = textElement('label', 'navora-form-label', field.label);
+        const input = document.createElement(field.type === 'textarea' ? 'textarea' : field.type === 'select' ? 'select' : 'input');
+        input.name = field.name;
+        input.required = Boolean(field.required);
+        input.id = `modal-${field.name}`;
+        label.htmlFor = input.id;
+
+        if (field.type === 'select') {
+            field.options.forEach((option) => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.value;
+                optionElement.textContent = option.label;
+                input.append(optionElement);
+            });
+        } else if (field.type !== 'textarea') {
+            input.type = field.type || 'text';
+        }
+
+        if (field.placeholder) {
+            input.placeholder = field.placeholder;
+        }
+
+        if (field.value !== undefined) {
+            input.value = field.value;
+        }
+
+        if (field.min !== undefined) {
+            input.min = String(field.min);
+        }
+
+        if (field.max !== undefined) {
+            input.max = String(field.max);
+        }
+
+        if (field.step !== undefined) {
+            input.step = String(field.step);
+        }
+
+        if (field.rows !== undefined && input instanceof HTMLTextAreaElement) {
+            input.rows = field.rows;
+        }
+
+        input.classList.add('form-control');
+        wrapper.append(label, input);
+
+        return wrapper;
+    };
+
+    const openModal = ({ title, description, fields = [], submit = 'Simpan di demo', icon = 'bi-stars', onSubmit = () => true }) => {
+        if (!modal || !modalForm || !modalFields) {
+            showToast('Dialog demo belum tersedia. Muat ulang halaman untuk mencoba kembali.');
+            return;
+        }
+
+        lastFocusedElement = document.activeElement;
+        setText('[data-modal-title]', title);
+        setText('[data-modal-description]', description);
+        setText('[data-modal-submit]', submit);
+
+        const iconElement = document.querySelector('[data-modal-icon]');
+
+        if (iconElement) {
+            iconElement.className = `bi ${icon}`;
+        }
+
+        modalFields.replaceChildren(...fields.map(createModalField));
+        activeModalHandler = onSubmit;
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        window.requestAnimationFrame(() => {
+            const firstInput = modalFields.querySelector('input, select, textarea');
+            (firstInput || modal.querySelector('[data-close-modal]'))?.focus();
+        });
+    };
+
+    const closeModal = () => {
+        if (!modal) {
+            return;
+        }
+
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        activeModalHandler = null;
+
+        if (lastFocusedElement instanceof HTMLElement) {
+            lastFocusedElement.focus();
+        }
+    };
+
+    const readFormValues = (formData) => Object.fromEntries(formData.entries());
+
+    const groupCardById = (id) => document.querySelector(`[data-group-card][data-id="${CSS.escape(id)}"]`);
+
+    const updateGroupCard = (card) => {
+        if (!card) {
+            return;
+        }
+
+        const baseTotal = Number(card.dataset.total);
+        const baseJoined = Number(card.dataset.joined);
+        const contribution = Number(state.groups[card.dataset.id]?.quantity || 0);
+        const currentJoined = baseJoined + contribution;
+        const percentage = Math.min(100, Math.round((currentJoined / baseTotal) * 100));
+        const joinedText = card.querySelector('[data-group-joined]');
+        const percentageText = card.querySelector('[data-group-percent]');
+        const progress = card.querySelector('[data-group-progress]');
+        const joinButton = card.querySelector('[data-action="join-group"]');
+
+        if (joinedText) {
+            joinedText.textContent = currentJoined.toLocaleString('id-ID');
+        }
+
+        if (percentageText) {
+            percentageText.textContent = `${percentage}%`;
+        }
+
+        if (progress) {
+            progress.style.width = `${percentage}%`;
+        }
+
+        if (joinButton) {
+            const isJoined = contribution > 0;
+            joinButton.classList.toggle('is-joined', isJoined);
+            joinButton.setAttribute('aria-pressed', String(isJoined));
+            joinButton.innerHTML = isJoined
+                ? 'Partisipasi demo tersimpan <i class="bi bi-check2" aria-hidden="true"></i>'
+                : 'Ikut patungan <i class="bi bi-arrow-right" aria-hidden="true"></i>';
+        }
+    };
+
+    const updateGroupCards = () => {
+        document.querySelectorAll('[data-group-card]').forEach(updateGroupCard);
+        const numberOfGroups = document.querySelectorAll('[data-group-card]').length;
+        setText('[data-stat-groups]', String(numberOfGroups));
+    };
+
+    const updateVendorFilters = () => {
+        const search = document.querySelector('[data-vendor-filter="search"]');
+        const category = document.querySelector('[data-vendor-filter="category"]');
+        const moq = document.querySelector('[data-vendor-filter="moq"]');
+        const material = document.querySelector('[data-vendor-filter="material"]');
+        const location = document.querySelector('[data-vendor-filter="location"]');
+        const sample = document.querySelector('[data-vendor-filter="sample"]');
+        const verified = document.querySelector('[data-vendor-filter="verified"]');
+        const query = search?.value.trim().toLocaleLowerCase('id') || '';
+        let visibleCount = 0;
+
+        document.querySelectorAll('[data-vendor-card]').forEach((card) => {
+            const searchable = `${card.dataset.name} ${card.dataset.product} ${card.dataset.tags} ${card.dataset.location}`.toLocaleLowerCase('id');
+            const validQuery = !query || searchable.includes(query);
+            const validCategory = !category?.value || card.dataset.category === category.value;
+            const validMoq = !moq?.value || Number(card.dataset.moq) <= Number(moq.value);
+            const validMaterial = !material?.value || card.dataset.material.split(' ').includes(material.value);
+            const validLocation = !location?.value || card.dataset.location === location.value;
+            const validSample = !sample?.checked || card.dataset.sample === 'true';
+            const validVerification = !verified?.checked || card.dataset.verified === 'true';
+            const visible = validQuery && validCategory && validMoq && validMaterial && validLocation && validSample && validVerification;
+
+            card.hidden = !visible;
+
+            if (visible) {
+                visibleCount += 1;
+            }
+        });
+
+        setText('[data-vendor-result-count]', String(visibleCount));
+        const emptyStateElement = document.querySelector('[data-vendor-empty]');
+
+        if (emptyStateElement) {
+            emptyStateElement.hidden = visibleCount > 0;
+        }
+    };
+
+    const sortVendorCards = () => {
+        const sortSelect = document.querySelector('[data-vendor-sort]');
+        const grid = document.querySelector('[data-vendor-grid]');
+
+        if (!sortSelect || !grid) {
+            return;
+        }
+
+        const cards = Array.from(grid.querySelectorAll('[data-vendor-card]'));
+        const sortKey = sortSelect.value;
+
+        cards.sort((left, right) => {
+            if (sortKey === 'price') {
+                return Number(left.dataset.price) - Number(right.dataset.price);
+            }
+
+            if (sortKey === 'moq') {
+                return Number(left.dataset.moq) - Number(right.dataset.moq);
+            }
+
+            return left.dataset.id.localeCompare(right.dataset.id);
+        });
+
+        cards.forEach((card) => grid.append(card));
+    };
+
+    const renderMiniVendors = () => {
+        const container = document.querySelector('[data-mini-vendor-list]');
+
+        if (!container) {
+            return;
+        }
+
+        const vendors = [
+            { name: 'PouchKita Studio', detail: 'Pouch custom · MOQ 500 pcs · Bandung', rating: '4,9', icon: 'bi-bag', color: '' },
+            { name: 'Kemas Prima', detail: 'Botol PET · MOQ 1.000 pcs · Jakarta', rating: '4,8', icon: 'bi-cup-straw', color: 'mini-green' },
+            { name: 'Cetak Bumi', detail: 'Box kraft · MOQ 300 pcs · Yogyakarta', rating: '4,7', icon: 'bi-box2', color: '' },
+        ];
+
+        container.replaceChildren(...vendors.map((vendor) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'navora-mini-vendor';
+            item.dataset.openPage = 'vendors';
+            const icon = textElement('span', `navora-mini-vendor-icon ${vendor.color}`, '');
+            const iconElement = textElement('i', `bi ${vendor.icon}`, '');
+            iconElement.setAttribute('aria-hidden', 'true');
+            icon.append(iconElement);
+            const copy = textElement('span', 'navora-mini-vendor-copy', '');
+            copy.append(textElement('strong', '', vendor.name), textElement('small', '', vendor.detail));
+            const rating = textElement('span', 'navora-mini-vendor-rating', '');
+            const star = textElement('i', 'bi bi-star-fill', '');
+            star.setAttribute('aria-hidden', 'true');
+            rating.append(star, document.createTextNode(` ${vendor.rating}`));
+            item.append(icon, copy, rating);
+            return item;
+        }));
+    };
+
+    const renderStoredListings = () => {
+        const container = document.querySelector('[data-vendor-listings]');
+
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[data-stored-listing]').forEach((card) => card.remove());
+        state.listings.forEach((listing) => {
+            const card = document.createElement('article');
+            card.className = 'navora-listing-card';
+            card.dataset.storedListing = 'true';
+            const art = textElement('span', `navora-listing-art ${listing.category === 'printing' ? 'art-box' : listing.category === 'maklon' ? 'art-maklon' : 'art-pouch'}`, '');
+            const icon = textElement('i', listing.category === 'printing' ? 'bi bi-box2' : listing.category === 'maklon' ? 'bi bi-cup-hot' : 'bi bi-bag', '');
+            icon.setAttribute('aria-hidden', 'true');
+            art.append(icon);
+            const content = textElement('div', '', '');
+            content.append(
+                textElement('h2', '', listing.name),
+                textElement('p', '', `MOQ ${Number(listing.moq).toLocaleString('id-ID')} pcs · ${listing.material} · ${listing.description}`),
+                textElement('small', '', 'Tersimpan lokal · belum dipublikasikan'),
+            );
+            card.append(art, content, textElement('span', 'navora-status-pill status-waiting', 'Draft'));
+            container.prepend(card);
+        });
+
+        setText('[data-stat-listings]', String(3 + state.listings.length));
+    };
+
+    const renderStoredRfqs = () => {
+        const container = document.querySelector('[data-rfq-list]');
+
+        if (container) {
+            container.querySelectorAll('[data-stored-rfq]').forEach((card) => card.remove());
+            state.rfqs.forEach((rfq) => {
+                const card = document.createElement('article');
+                card.className = 'navora-rfq-card';
+                card.dataset.storedRfq = 'true';
+                card.dataset.id = rfq.id;
+                const header = document.createElement('div');
+                header.className = 'navora-rfq-card-head';
+                const icon = textElement('span', 'navora-rfq-icon', '');
+                const iconElement = textElement('i', 'bi bi-send', '');
+                iconElement.setAttribute('aria-hidden', 'true');
+                icon.append(iconElement);
+                const title = document.createElement('div');
+                title.append(
+                    textElement('h2', '', rfq.title),
+                    textElement('span', '', `${rfq.vendor || 'Terbuka untuk vendor'} · Dibuat di demo`),
+                );
+                header.append(icon, title, textElement('span', 'navora-status-pill status-waiting', rfq.quote ? '1 respons demo' : 'Menunggu respons'));
+                const details = document.createElement('div');
+                details.className = 'navora-rfq-details';
+                [
+                    ['Jenis', rfq.category],
+                    ['Jumlah target', `${Number(rfq.quantity).toLocaleString('id-ID')} pcs`],
+                    ['Material', rfq.material],
+                    ['Lokasi', rfq.location],
+                ].forEach(([label, value]) => {
+                    const item = document.createElement('span');
+                    item.append(textElement('small', '', value ? label : ''), textElement('strong', '', value || 'Belum diisi'));
+                    details.append(item);
+                });
+                card.append(header, details);
+
+                if (rfq.quote) {
+                    const quote = document.createElement('div');
+                    quote.className = 'navora-quote-row';
+                    const vendor = document.createElement('div');
+                    vendor.className = 'navora-quote-vendor';
+                    vendor.append(
+                        textElement('span', 'navora-vendor-avatar avatar-green', 'VD'),
+                        textElement('span', '', ''),
+                    );
+                    const quoteText = vendor.querySelector('span:last-child');
+                    quoteText.append(
+                        textElement('strong', '', rfq.quote.vendor),
+                        textElement('small', '', `${rfq.quote.price} · MOQ ${rfq.quote.moq} pcs · indikatif`),
+                    );
+                    quote.append(vendor);
+                    card.append(quote);
+                }
+
+                container.prepend(card);
+            });
+        }
+
+        renderVendorInbox();
+
+        setText('[data-rfq-count]', String(2 + state.rfqs.length));
+        setText('[data-rfq-quotes]', String(3 + state.quotes.length));
+        setText('[data-stat-rfqs]', String(2 + state.rfqs.length));
+    };
+
+    const renderVendorInbox = () => {
+        const container = document.querySelector('[data-vendor-inbox]');
+
+        if (!container) {
+            return;
+        }
+
+        container.querySelectorAll('[data-stored-incoming]').forEach((item) => item.remove());
+        state.rfqs.forEach((rfq) => {
+            const item = document.createElement('article');
+            item.className = 'navora-incoming-rfq';
+            item.dataset.storedIncoming = 'true';
+            const icon = textElement('span', 'navora-rfq-icon', '');
+            const iconElement = textElement('i', 'bi bi-box-seam', '');
+            iconElement.setAttribute('aria-hidden', 'true');
+            icon.append(iconElement);
+            const copy = textElement('div', 'navora-incoming-copy', '');
+            copy.append(
+                textElement('h3', '', rfq.title),
+                textElement('p', '', `${Number(rfq.quantity).toLocaleString('id-ID')} pcs · ${rfq.material} · ${rfq.location}`),
+                textElement('span', '', 'Permintaan demo lokal · belum dikirim'),
+            );
+            const button = textElement('button', 'btn navora-app-primary', rfq.quote ? 'Respons tersimpan' : 'Buat penawaran');
+            button.type = 'button';
+            button.dataset.action = 'respond-rfq';
+            button.dataset.rfq = rfq.id;
+            button.disabled = Boolean(rfq.quote);
+            item.append(icon, copy, button);
+            container.append(item);
+        });
+    };
+
+    const renderStoredGroups = () => {
+        const grid = document.querySelector('[data-group-grid]');
+
+        if (!grid) {
+            return;
+        }
+
+        grid.querySelectorAll('[data-stored-group]').forEach((card) => card.remove());
+        state.createdGroups.forEach((group) => {
+            const card = document.createElement('article');
+            card.className = 'navora-group-card';
+            card.dataset.groupCard = 'true';
+            card.dataset.storedGroup = 'true';
+            card.dataset.id = group.id;
+            card.dataset.name = group.name;
+            card.dataset.total = String(group.total);
+            card.dataset.joined = '0';
+            const top = document.createElement('div');
+            top.className = 'navora-group-card-top';
+            top.append(textElement('span', 'navora-group-category', group.category), textElement('span', 'navora-group-status', 'Patungan baru'));
+            card.append(top, textElement('h2', '', group.name), textElement('p', '', `Dibuat di demo oleh ${state.profile.name || 'UMKM'}. Rincian akhir perlu dikonfirmasi dengan vendor.`));
+            const vendorRow = document.createElement('div');
+            vendorRow.className = 'navora-group-vendor';
+            vendorRow.append(
+                textElement('span', 'navora-vendor-avatar avatar-blue', state.profile.name?.charAt(0).toUpperCase() || 'U'),
+                textElement('span', '', ''),
+            );
+            const nameArea = vendorRow.querySelector('span:last-child');
+            nameArea.append(textElement('strong', '', 'Penyelenggara demo'), textElement('small', '', 'Informasi vendor belum dipilih'));
+            card.append(vendorRow);
+            const progressLabel = document.createElement('div');
+            progressLabel.className = 'navora-group-progress-label';
+            const progressAmount = textElement('strong', '', '');
+            progressAmount.append(document.createTextNode('0 / '), textElement('span', '', Number(group.total).toLocaleString('id-ID')), document.createTextNode(' pcs'));
+            progressLabel.append(textElement('span', '', 'Progres patungan'), progressAmount);
+            const progress = document.createElement('div');
+            progress.className = 'progress navora-progress';
+            const bar = document.createElement('div');
+            bar.className = 'progress-bar';
+            bar.dataset.groupProgress = 'true';
+            bar.style.width = '0%';
+            progress.append(bar);
+            card.append(progressLabel, progress);
+            const footer = document.createElement('div');
+            footer.className = 'navora-group-foot';
+            footer.append(textElement('span', '', '0% terkumpul'), textElement('span', '', 'Baru dibuat'));
+            const join = document.createElement('button');
+            join.className = 'btn navora-app-primary navora-group-join';
+            join.type = 'button';
+            join.dataset.action = 'join-group';
+            join.dataset.group = group.id;
+            join.innerHTML = 'Ikut patungan <i class="bi bi-arrow-right" aria-hidden="true"></i>';
+            card.append(footer, join);
+            grid.prepend(card);
+        });
+    };
+
+    const modalTextField = (name, label, placeholder, required = true, type = 'text') => ({
+        name, label, placeholder, required, type,
+    });
+
+    const createRfq = (vendor = '') => {
+        openModal({
+            title: 'Buat permintaan penawaran',
+            description: 'Catat kebutuhan produk. Dalam demo ini, permintaan hanya tersimpan di browser dan tidak dikirim kepada vendor.',
+            icon: 'bi-chat-square-text',
+            submit: 'Simpan permintaan demo',
+            fields: [
+                modalTextField('title', 'Produk atau kemasan', 'Contoh: standing pouch kopi 200 g'),
+                { name: 'quantity', label: 'Jumlah target (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: 1, required: true },
+                modalTextField('material', 'Material atau kebutuhan', 'Contoh: kraft + laminasi, butuh sampel'),
+                modalTextField('location', 'Kota tujuan', 'Contoh: Bandung'),
+                { name: 'vendor', label: 'Vendor tujuan (opsional)', placeholder: 'Pilih vendor yang dituju', type: 'select', required: false, options: [{ value: vendor, label: vendor || 'Terbuka untuk vendor' }, { value: '', label: 'Terbuka untuk vendor lain' }, { value: 'PouchKita Studio', label: 'PouchKita Studio' }, { value: 'Kemas Prima', label: 'Kemas Prima' }, { value: 'Cetak Bumi', label: 'Cetak Bumi' }, { value: 'Rasa Racik Maklon', label: 'Rasa Racik Maklon' }] },
+                { name: 'note', label: 'Catatan (opsional)', placeholder: 'Spesifikasi atau pertanyaan untuk vendor', type: 'textarea', required: false, rows: 3 },
+            ],
+            onSubmit: (values) => {
+                const rfq = {
+                    id: `rfq-${Date.now()}`,
+                    title: values.title.trim(),
+                    quantity: Number(values.quantity),
+                    material: values.material.trim() || 'Belum ditentukan',
+                    location: values.location.trim() || 'Belum ditentukan',
+                    category: values.title.toLowerCase().includes('label') ? 'Label & percetakan' : 'Kemasan',
+                    vendor: values.vendor || '',
+                    note: values.note || '',
+                    createdAt: new Date().toISOString(),
+                };
+                state.rfqs.unshift(rfq);
+                saveState();
+                renderStoredRfqs();
+                showToast('Permintaan tersimpan di browser demo. Belum dikirim kepada vendor.');
+                return true;
+            },
+        });
+    };
+
+    const createGroup = () => {
+        openModal({
+            title: 'Buat patungan MOQ',
+            description: 'Buat papan minat lokal untuk mengumpulkan kebutuhan. Ini tidak membuat pesanan atau komitmen pembayaran.',
+            icon: 'bi-people',
+            submit: 'Buat patungan demo',
+            fields: [
+                modalTextField('name', 'Nama kebutuhan', 'Contoh: pouch sambal 150 g'),
+                { name: 'category', label: 'Jenis kemasan', placeholder: 'Pilih jenis', type: 'select', required: true, options: [{ value: 'Pouch', label: 'Pouch' }, { value: 'Botol', label: 'Botol' }, { value: 'Box', label: 'Box / karton' }, { value: 'Lainnya', label: 'Lainnya' }] },
+                { name: 'total', label: 'Target jumlah minimum (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: 2, required: true },
+            ],
+            onSubmit: (values) => {
+                const total = Number(values.total);
+
+                if (!Number.isSafeInteger(total) || total < 2) {
+                    showToast('Masukkan target jumlah yang valid (minimal 2 pcs).');
+                    return false;
+                }
+
+                const id = `group-${Date.now()}`;
+                state.createdGroups.unshift({
+                    id,
+                    name: values.name.trim(),
+                    total,
+                    category: values.category,
+                });
+                saveState();
+                renderStoredGroups();
+                updateGroupCards();
+                showToast('Papan patungan demo dibuat lokal. Vendor dan pesanan belum dikonfirmasi.');
+                return true;
+            },
+        });
+    };
+
+    const joinGroup = (groupId) => {
+        const card = groupCardById(groupId);
+
+        if (!card) {
+            showToast('Patungan ini tidak ditemukan. Muat ulang halaman lalu coba kembali.');
+            return;
+        }
+
+        const existingQuantity = Number(state.groups[groupId]?.quantity || 0);
+
+        if (existingQuantity > 0) {
+            openModal({
+                title: 'Batalkan partisipasi demo?',
+                description: `Status lokalmu saat ini ${existingQuantity.toLocaleString('id-ID')} pcs. Membatalkan hanya mengubah tampilan di browser ini.`,
+                icon: 'bi-arrow-counterclockwise',
+                submit: 'Batalkan partisipasi',
+                onSubmit: () => {
+                    delete state.groups[groupId];
+                    saveState();
+                    updateGroupCard(card);
+                    showToast('Partisipasi demo dibatalkan. Tidak ada pembayaran yang dibuat.');
+                    return true;
+                },
+            });
+            return;
+        }
+
+        const remaining = Math.max(0, Number(card.dataset.total) - Number(card.dataset.joined));
+
+        openModal({
+            title: 'Ikut patungan (demo)',
+            description: `Masukkan jumlah minat hingga ${remaining.toLocaleString('id-ID')} pcs. Ini bukan pesanan final dan tidak ada pembayaran.`,
+            icon: 'bi-people',
+            submit: 'Simpan minat demo',
+            fields: [
+                { name: 'quantity', label: 'Jumlah minat (pcs)', placeholder: 'Contoh: 100', type: 'number', min: 1, max: remaining, required: true },
+            ],
+            onSubmit: (values) => {
+                const quantity = Number(values.quantity);
+
+                if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > remaining) {
+                    showToast(`Jumlah minat harus antara 1 dan ${remaining.toLocaleString('id-ID')} pcs.`);
+                    return false;
+                }
+
+                state.groups[groupId] = { quantity };
+                saveState();
+                updateGroupCard(card);
+                showToast('Minat patungan disimpan lokal. Tidak ada pesanan atau pembayaran.');
+                return true;
+            },
+        });
+    };
+
+    const createListing = () => {
+        openModal({
+            title: 'Tambahkan item katalog',
+            description: 'Informasi akan disimpan lokal sebagai draft dan tidak dipublikasikan ke marketplace.',
+            icon: 'bi-box-seam',
+            submit: 'Simpan draft demo',
+            fields: [
+                modalTextField('name', 'Nama layanan atau produk', 'Contoh: pouch kopi cetak'),
+                { name: 'category', label: 'Jenis layanan', type: 'select', required: true, options: [{ value: 'packaging', label: 'Kemasan' }, { value: 'printing', label: 'Percetakan' }, { value: 'maklon', label: 'Maklon' }] },
+                modalTextField('material', 'Material', 'Contoh: kraft laminasi'),
+                { name: 'moq', label: 'MOQ indikatif (pcs)', placeholder: 'Contoh: 500', type: 'number', min: 1, required: true },
+                { name: 'description', label: 'Deskripsi singkat', placeholder: 'Jelaskan opsi atau kapasitas layanan', type: 'textarea', required: true, rows: 3 },
+            ],
+            onSubmit: (values) => {
+                state.listings.unshift({
+                    id: `listing-${Date.now()}`,
+                    name: values.name.trim(),
+                    category: values.category,
+                    material: values.material.trim() || 'Belum ditentukan',
+                    moq: Number(values.moq),
+                    description: values.description.trim(),
+                });
+                saveState();
+                renderStoredListings();
+                showToast('Draft katalog tersimpan di browser. Belum dipublikasikan.');
+                return true;
+            },
+        });
+    };
+
+    const createVendorQuote = (rfqId) => {
+        const rfq = state.rfqs.find((item) => item.id === rfqId);
+        const defaultName = rfq?.title || 'Standing pouch kopi 200 g';
+
+        openModal({
+            title: 'Buat tanggapan penawaran',
+            description: `Isi tanggapan contoh untuk "${defaultName}". Ini tidak dikirim kepada calon pembeli.`,
+            icon: 'bi-chat-square-text',
+            submit: 'Simpan respons demo',
+            fields: [
+                { name: 'vendor', label: 'Nama vendor', placeholder: 'Nama usaha', required: true, value: state.profile.name || 'PouchKita Studio' },
+                { name: 'price', label: 'Harga indikatif per pcs', placeholder: 'Contoh: Rp1.250', required: true },
+                { name: 'moq', label: 'MOQ vendor (pcs)', placeholder: 'Contoh: 500', type: 'number', min: 1, required: true },
+                { name: 'leadTime', label: 'Estimasi produksi', placeholder: 'Contoh: 14–21 hari', required: true },
+                { name: 'note', label: 'Catatan vendor (opsional)', placeholder: 'Syarat, sampel, atau opsi material', type: 'textarea', required: false, rows: 3 },
+            ],
+            onSubmit: (values) => {
+                const quote = {
+                    id: `quote-${Date.now()}`,
+                    rfqId,
+                    vendor: values.vendor.trim(),
+                    price: values.price.trim(),
+                    moq: Number(values.moq),
+                    leadTime: values.leadTime.trim(),
+                    note: values.note || '',
+                };
+                state.quotes.unshift(quote);
+
+                if (rfq) {
+                    rfq.quote = quote;
+                }
+
+                saveState();
+                renderStoredRfqs();
+                showToast('Respons contoh disimpan lokal. Pembeli tidak menerima notifikasi.');
+                return true;
+            },
+        });
+    };
+
+    const showAssistantResult = (values) => {
+        const product = values.product.trim();
+        const lowerProduct = product.toLocaleLowerCase('id');
+        const liquid = /minuman|sambal|saus|sabun cair|minyak|sirup|jus/.test(lowerProduct);
+        const food = /kopi|teh|snack|makanan|camilan|rempah|bumbu/.test(lowerProduct);
+        const packaging = liquid
+            ? ['Botol PET atau kaca dapat dieksplorasi; konfirmasi kompatibilitas produk dengan vendor.']
+            : food
+                ? ['Pouch dengan zipper dapat dipertimbangkan; tanyakan opsi lapisan dan sampel.']
+                : ['Bandingkan pouch, box, atau botol berdasarkan bentuk produk dan cara distribusinya.'];
+        const material = liquid
+            ? ['Tanyakan material yang sesuai kontak produk dan uji kompatibilitas sebelum produksi.']
+            : food
+                ? ['Tanyakan spesifikasi food-contact, lapisan pelindung, dan bukti yang relevan kepada vendor.']
+                : ['Minta informasi komposisi material, ketahanan, dan opsi sampel dari vendor.'];
+        const volumeNote = values.volume === 'small'
+            ? 'Mulai dengan meminta sampel dan menanyakan opsi batch kecil atau patungan.'
+            : values.volume === 'medium'
+                ? 'Bandingkan MOQ, harga bertingkat, waktu produksi, dan ongkos pengiriman.'
+                : 'Tanyakan kapasitas produksi, konsistensi kualitas, serta jadwal pengiriman bertahap.';
+        const vendors = liquid
+            ? ['Kemas Prima', 'Rasa Racik Maklon']
+            : food
+                ? ['PouchKita Studio', 'Cetak Bumi']
+                : ['PouchKita Studio', 'Kemas Prima', 'Cetak Bumi'];
+        const result = document.querySelector('[data-assistant-result]');
+
+        if (!result) {
+            return;
+        }
+
+        const content = document.createElement('div');
+        content.className = 'navora-result-content';
+        content.append(
+            textElement('span', 'navora-panel-kicker', 'IDE AWAL UNTUK DISKUSI'),
+            textElement('h2', '', `Pilihan awal untuk ${product}`),
+            textElement('p', '', `${values.size ? `Kebutuhan ${values.size}. ` : ''}${volumeNote}`),
+        );
+
+        const packageBlock = document.createElement('div');
+        packageBlock.className = 'navora-result-block';
+        packageBlock.append(textElement('strong', '', 'Format yang bisa ditanyakan'));
+        const packageList = document.createElement('ul');
+        packaging.forEach((recommendation) => packageList.append(textElement('li', '', recommendation)));
+        packageBlock.append(packageList);
+
+        const materialBlock = document.createElement('div');
+        materialBlock.className = 'navora-result-block';
+        materialBlock.append(textElement('strong', '', 'Hal yang perlu dikonfirmasi'));
+        const materialList = document.createElement('ul');
+        [...material, ...(values.preference ? [`Sampaikan preferensi: ${values.preference.trim()}.`] : [])]
+            .forEach((recommendation) => materialList.append(textElement('li', '', recommendation)));
+        materialBlock.append(materialList);
+
+        const vendorList = document.createElement('div');
+        vendorList.className = 'navora-result-vendors';
+        vendors.forEach((name) => vendorList.append(textElement('span', '', name)));
+        content.append(packageBlock, materialBlock, textElement('strong', 'navora-panel-kicker', 'VENDOR DEMO UNTUK DITELUSURI'), vendorList);
+        content.append(textElement('p', 'navora-result-warning', 'Simulasi berbasis kata kunci, bukan AI atau saran ahli. Material, keamanan pangan, klaim sertifikasi, biaya, dan kecocokan wajib dikonfirmasi dengan pihak yang kompeten.'));
+        result.replaceChildren(content);
+    };
+
+    const createProfileEdit = () => {
+        const role = state.role;
+        const defaultName = state.profile.name || (role === 'vendor' ? 'PouchKita Studio' : role === 'partner' ? 'Mitra UMKM Nusantara' : 'Usaha Kopi Nusantara');
+
+        openModal({
+            title: 'Perbarui profil demo',
+            description: 'Nama dan lokasi ini hanya disimpan di browser pada perangkat ini.',
+            icon: 'bi-person',
+            submit: 'Simpan profil lokal',
+            fields: [
+                { name: 'name', label: role === 'umkm' ? 'Nama usaha' : role === 'vendor' ? 'Nama vendor' : 'Nama mitra', placeholder: 'Nama tampilan', required: true, value: defaultName },
+                { name: 'location', label: 'Lokasi', placeholder: 'Kota, provinsi', required: true, value: state.profile.location || (role === 'partner' ? 'Indonesia' : 'Bandung, Jawa Barat') },
+            ],
+            onSubmit: (values) => {
+                state.profile = { name: values.name.trim(), location: values.location.trim() };
+                saveState();
+                updateRoleContent();
+                showToast('Profil demo diperbarui di browser ini.');
+                return true;
+            },
+        });
+    };
+
+    const openInfo = (title, description, icon = 'bi-info-circle') => {
+        openModal({
+            title,
+            description,
+            icon,
+            submit: 'Mengerti',
+        });
+    };
+
+    const handleAction = (button) => {
+        const action = button.dataset.action;
+
+        if (action === 'rfq') {
+            createRfq(button.dataset.vendor || '');
+        } else if (action === 'create-rfq') {
+            createRfq();
+        } else if (action === 'join-group') {
+            joinGroup(button.dataset.group || '');
+        } else if (action === 'create-group') {
+            createGroup();
+        } else if (action === 'add-listing') {
+            createListing();
+        } else if (action === 'respond-rfq') {
+            createVendorQuote(button.dataset.rfq || 'rfq-demo-1');
+        } else if (action === 'quote-detail') {
+            openInfo(
+                `Respons dari ${button.dataset.vendor || 'vendor demo'}`,
+                'Harga dan kapasitas yang ditampilkan bersifat indikatif dan belum dikonfirmasi. Hubungi vendor secara langsung pada produk nyata untuk menyepakati spesifikasi, pajak, pengiriman, dan syarat pembayaran.',
+                'bi-chat-square-text',
+            );
+        } else if (action === 'vendor-detail') {
+            openInfo(
+                button.dataset.vendor || 'Vendor demo',
+                'Halaman ini hanya menampilkan ringkasan katalog contoh. Detail usaha, kapasitas, sertifikat, sampel, jadwal, harga final, dan identitas vendor belum diverifikasi.',
+                'bi-box-seam',
+            );
+        } else if (action === 'verify-profile') {
+            openModal({
+                title: 'Status profil vendor demo',
+                description: state.verificationRequested
+                    ? 'Permintaan simulasi sudah tercatat di browser. Ini tidak berarti dokumen atau identitas bisnis telah diperiksa.'
+                    : 'Prototipe belum memiliki proses unggah atau pemeriksaan dokumen. Kamu bisa menandai bahwa profil demo siap ditinjau.',
+                icon: 'bi-patch-check',
+                submit: state.verificationRequested ? 'Tutup' : 'Tandai siap ditinjau',
+                onSubmit: () => {
+                    state.verificationRequested = true;
+                    saveState();
+                    setText('[data-verification-summary]', 'Demo dikirim');
+                    showToast('Status demo diperbarui. Tidak ada dokumen yang ditinjau.');
+                    return true;
+                },
+            });
+        } else if (action === 'program-interest') {
+            const name = button.dataset.program || 'program demo';
+            const alreadyInterested = state.interests.includes(name);
+            if (!alreadyInterested) {
+                state.interests.push(name);
+                saveState();
+            }
+            showToast(alreadyInterested ? 'Minat pada program ini sudah tersimpan lokal.' : 'Minat program dicatat lokal. Belum ada pendaftaran nyata.');
+            button.textContent = alreadyInterested ? 'Minat tersimpan' : 'Minat dicatat di demo';
+            button.disabled = true;
+        } else if (action === 'edit-profile') {
+            createProfileEdit();
+        }
+    };
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        const tab = target.closest('[data-page]');
+
+        if (tab instanceof HTMLButtonElement) {
+            showPage(tab.dataset.page || 'overview');
+            return;
+        }
+
+        const pageLink = target.closest('[data-open-page]');
+
+        if (pageLink instanceof HTMLElement) {
+            showPage(pageLink.dataset.openPage || 'overview');
+            return;
+        }
+
+        const actionButton = target.closest('[data-action]');
+
+        if (actionButton instanceof HTMLButtonElement) {
+            handleAction(actionButton);
+            return;
+        }
+
+        if (target.closest('[data-close-modal]')) {
+            closeModal();
+        }
+    });
+
+    modalForm?.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        if (!activeModalHandler || !modalForm.reportValidity()) {
+            return;
+        }
+
+        const shouldClose = activeModalHandler(readFormValues(new FormData(modalForm)));
+
+        if (shouldClose !== false) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal && !modal.hidden) {
+            closeModal();
+        }
+
+        if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            const target = event.target;
+
+            if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+                return;
+            }
+
+            event.preventDefault();
+            document.querySelector('[data-global-search]')?.focus();
+        }
+    });
+
+    document.querySelector('[data-role-select]')?.addEventListener('change', (event) => {
+        const select = event.currentTarget;
+        state.role = select.value;
+        saveState();
+        updateRoleContent();
+        showPage('overview');
+    });
+
+    document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
+        filter.addEventListener('input', updateVendorFilters);
+        filter.addEventListener('change', updateVendorFilters);
+    });
+
+    document.querySelector('[data-vendor-sort]')?.addEventListener('change', sortVendorCards);
+
+    document.querySelector('[data-reset-filters]')?.addEventListener('click', () => {
+        document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
+            if (filter instanceof HTMLInputElement && filter.type === 'checkbox') {
+                filter.checked = false;
+            } else {
+                filter.value = '';
+            }
+        });
+        updateVendorFilters();
+        showToast('Filter vendor direset.');
+    });
+
+    document.querySelector('[data-global-search]')?.addEventListener('input', (event) => {
+        const searchInput = event.currentTarget;
+        const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
+
+        if (vendorSearch instanceof HTMLInputElement) {
+            vendorSearch.value = searchInput.value;
+            updateVendorFilters();
+        }
+    });
+
+    document.querySelector('[data-global-search]')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && state.role === 'umkm') {
+            event.preventDefault();
+            showPage('vendors');
+        }
+    });
+
+    document.querySelector('[data-assistant-form]')?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+
+        if (!(form instanceof HTMLFormElement) || !form.reportValidity()) {
+            return;
+        }
+
+        showAssistantResult(Object.fromEntries(new FormData(form).entries()));
+    });
+
+    document.querySelectorAll('[data-group-card]').forEach(updateGroupCard);
+    renderMiniVendors();
+    renderStoredListings();
+    renderStoredGroups();
+    updateGroupCards();
+    renderStoredRfqs();
+
+    const requestedRole = urlParams.get('role');
+    state.role = knownRoles.includes(requestedRole || '') ? requestedRole : state.role;
+    updateRoleContent();
+
+    const requestedPage = urlParams.get('tab');
+    const requestedSearch = urlParams.get('q');
+
+    if (requestedSearch) {
+        const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
+        const globalSearch = document.querySelector('[data-global-search]');
+
+        if (vendorSearch instanceof HTMLInputElement) {
+            vendorSearch.value = requestedSearch;
+        }
+
+        if (globalSearch instanceof HTMLInputElement) {
+            globalSearch.value = requestedSearch;
+        }
+
+        updateVendorFilters();
+    }
+
+    if (requestedPage && knownPages.includes(requestedPage)) {
+        showPage(requestedPage);
+    } else if (requestedSearch && state.role === 'umkm') {
+        showPage('vendors');
+    }
+})();
