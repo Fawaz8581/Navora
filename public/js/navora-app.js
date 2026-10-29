@@ -1061,6 +1061,16 @@
         }
     });
 
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+
+        if (form instanceof HTMLFormElement
+            && form.dataset.confirmSubmit
+            && !window.confirm(form.dataset.confirmSubmit)) {
+            event.preventDefault();
+        }
+    });
+
     modalForm?.addEventListener('submit', (event) => {
         event.preventDefault();
 

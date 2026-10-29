@@ -2005,6 +2005,72 @@ body.navora-app-body {
     text-align: right;
 }
 
+.navora-account-danger {
+    display: grid;
+    gap: 12px;
+    margin-top: 14px;
+    border-color: #f0d7d5;
+}
+
+.navora-account-danger h2 {
+    margin: 3px 0 5px;
+    color: #8d3b39;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.navora-account-danger p {
+    margin: 0;
+    color: #806b6a;
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+.navora-account-danger form {
+    display: grid;
+    max-width: 360px;
+    gap: 8px;
+}
+
+.navora-account-password-label {
+    color: #526d80;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.navora-account-password {
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 1px solid #dfe7ed;
+    border-radius: 7px;
+    color: var(--navora-app-ink);
+    font: inherit;
+}
+
+.navora-account-error {
+    color: #a33d39 !important;
+}
+
+.navora-account-delete-button {
+    justify-self: start;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid #a8423e;
+    border-radius: 7px;
+    background: #a8423e;
+    color: #fff;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.navora-account-delete-button:hover,
+.navora-account-delete-button:focus-visible {
+    border-color: #863531;
+    background: #863531;
+}
+
 .navora-modal {
     position: fixed;
     z-index: 1000;

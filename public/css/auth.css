@@ -355,6 +355,36 @@ body.navora-auth-body {
     padding-left: 14px;
 }
 
+.account-delete-section {
+    margin-top: 24px;
+    padding-top: 17px;
+    border-top: 1px solid #efdada;
+}
+
+.account-delete-section h3 {
+    margin: 0 0 6px;
+    color: #8d3b39;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.account-delete-section > p {
+    margin: 0 0 12px;
+    color: #806b6a;
+    font-size: 9px;
+    line-height: 1.6;
+}
+
+.account-delete-submit {
+    background: #a8423e;
+}
+
+.account-delete-submit:hover,
+.account-delete-submit:focus-visible {
+    background: #863531;
+}
+
 .auth-footer {
     display: flex;
     justify-content: space-between;

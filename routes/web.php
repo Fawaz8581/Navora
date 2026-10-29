@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -38,6 +39,10 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
+    Route::delete('/akun', AccountController::class)
+        ->middleware('throttle:6,1')
+        ->name('account.destroy');
+
     Route::get('/onboarding', [BusinessProfileController::class, 'index'])->name('onboarding.index');
     Route::get('/onboarding/{step}', [BusinessProfileController::class, 'show'])
         ->whereNumber('step')

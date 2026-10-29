@@ -291,6 +291,33 @@
                             @endif
                         </section>
                     </div>
+                    <section class="navora-panel navora-account-danger">
+                        <div>
+                            <span class="navora-panel-kicker">TINDAKAN PERMANEN</span>
+                            <h2>Hapus akun</h2>
+                            <p>Akun dan seluruh profil usaha akan dihapus permanen. Dokumen verifikasi yang tersimpan juga akan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
+                        </div>
+                        @if ($errors->has('account'))
+                            <p class="navora-account-error" role="alert">{{ $errors->first('account') }}</p>
+                        @endif
+                        <form action="{{ route('account.destroy') }}" method="POST" data-confirm-submit="Yakin ingin menghapus akun Navora secara permanen? Tindakan ini tidak dapat dibatalkan.">
+                            @csrf
+                            @method('DELETE')
+                            <label class="navora-account-password-label" for="delete-account-password">Konfirmasi dengan kata sandi saat ini</label>
+                            <input
+                                class="navora-account-password"
+                                id="delete-account-password"
+                                name="password"
+                                type="password"
+                                autocomplete="current-password"
+                                required
+                            >
+                            @if ($errors->has('password'))
+                                <p class="navora-account-error" role="alert">{{ $errors->first('password') }}</p>
+                            @endif
+                            <button class="navora-account-delete-button" type="submit">Hapus akun secara permanen</button>
+                        </form>
+                    </section>
                 @else
                     <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Profil demo</span></div><h1>Profil ruang Navora</h1><p>Pengaturan berikut hanya mengubah tampilan di browser ini.</p></div></div>
                     <div class="navora-account-layout">

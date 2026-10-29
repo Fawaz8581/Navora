@@ -231,4 +231,23 @@
             <button type="submit">Keluar dari akun ini</button>
         </form>
     @endif
+
+    @if (! $isCompleted)
+        <section class="account-delete-section">
+            <h3>Hapus akun Navora</h3>
+            <p>Akun dan profil usaha akan dihapus permanen. Masukkan kata sandi untuk mengonfirmasi tindakan ini.</p>
+            <form action="{{ route('account.destroy') }}" method="POST" class="auth-form">
+                @csrf
+                @method('DELETE')
+                <div class="auth-field">
+                    <label for="delete-account-password">Kata sandi saat ini</label>
+                    <div class="auth-input-wrap">
+                        <i class="bi bi-lock" aria-hidden="true"></i>
+                        <input id="delete-account-password" name="password" type="password" autocomplete="current-password" required>
+                    </div>
+                </div>
+                <button class="auth-submit account-delete-submit" type="submit">Hapus akun secara permanen</button>
+            </form>
+        </section>
+    @endif
 @endsection
