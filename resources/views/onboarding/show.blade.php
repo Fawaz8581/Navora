@@ -250,4 +250,5 @@
             </form>
         </section>
     @endif
+    <p class="auth-switch">Punya masukan tentang Navora atau vendor? <a href="{{ route('feedback.create') }}">Kirim masukan</a></p>
 @endsection

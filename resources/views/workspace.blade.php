@@ -74,6 +74,7 @@
                         <button class="navora-page-link" type="button" data-page="programs" data-roles="partner" role="tab" aria-selected="false"><i class="bi bi-buildings"></i> Program mitra</button>
                         <button class="navora-page-link" type="button" data-page="account" data-roles="umkm,vendor,partner" role="tab" aria-selected="false"><i class="bi bi-person"></i> @auth Profil usaha @else Profil demo @endauth</button>
                     </div>
+                    <a class="navora-back-home" href="{{ route('feedback.create') }}"><i class="bi bi-chat-square-heart"></i><span>Kirim masukan</span></a>
                     <a class="navora-back-home" href="{{ route('home') }}"><i class="bi bi-arrow-left"></i><span>Beranda</span></a>
                 </div>
             </nav>

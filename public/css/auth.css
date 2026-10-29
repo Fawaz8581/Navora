@@ -385,6 +385,15 @@ body.navora-auth-body {
     background: #863531;
 }
 
+.feedback-message {
+    margin: 12px 0 0;
+    color: #536d80;
+    font-size: 11px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
 .auth-footer {
     display: flex;
     justify-content: space-between;

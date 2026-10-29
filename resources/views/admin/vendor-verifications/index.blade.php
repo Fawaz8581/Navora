@@ -10,6 +10,8 @@
         <p>Periksa dokumen dan data vendor sebelum menyetujui profilnya.</p>
     </div>
 
+    <p class="auth-switch"><a href="{{ route('admin.feedback.index') }}">Lihat masukan pengguna</a></p>
+
     <nav class="onboarding-progress" aria-label="Filter status verifikasi">
         @foreach (['pending' => 'Menunggu', 'approved' => 'Disetujui', 'rejected' => 'Perlu perbaikan', 'all' => 'Semua'] as $value => $label)
             <a class="onboarding-progress-step {{ $status === $value ? 'is-current' : '' }}" href="{{ route('admin.vendor-verifications.index', ['status' => $value]) }}" @if ($status === $value) aria-current="page" @endif>

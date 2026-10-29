@@ -1,12 +1,19 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\VendorVerificationController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/masukan', [FeedbackController::class, 'create'])->name('feedback.create');
+Route::post('/masukan', [FeedbackController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('feedback.store');
 
 Route::get('/', function () {
     return view('home');
@@ -68,4 +75,8 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('index')
                 ->name('documents');
         });
+
+    Route::get('/admin/feedback', [AdminFeedbackController::class, 'index'])
+        ->middleware('admin')
+        ->name('admin.feedback.index');
 });
