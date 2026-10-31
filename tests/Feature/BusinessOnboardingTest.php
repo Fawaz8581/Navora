@@ -6,59 +6,47 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('new accounts can only choose UMKM or vendor and start onboarding', function () {
+test('registration does not create an account until all required profile details are confirmed', function () {
     $this->get(route('register'))
         ->assertOk()
-        ->assertSee('Pemilik brand / UMKM')
-        ->assertSee('Vendor kemasan atau maklon')
-        ->assertDontSee('Mitra pendukung UMKM');
+        ->assertSee('Profil usaha')
+        ->assertSee('Kebutuhan bisnis')
+        ->assertSee('Tinjau kembali informasi sebelum membuat akun.')
+        ->assertDontSee('Hapus akun Navora');
 
     $this->post(route('register.store'), [
-        'name' => 'Navora Mitra',
-        'email' => 'partner@example.com',
-        'role' => 'partner',
+        'name' => 'Navora UMKM',
+        'email' => 'umkm@example.com',
+        'role' => 'umkm',
         'password' => 'secure-password-123',
         'password_confirmation' => 'secure-password-123',
-    ])->assertSessionHasErrors('role');
+    ])->assertSessionHasErrors(['business_name', 'category', 'location', 'product_type', 'confirm_profile']);
 
-    expect(User::count())->toBe(0);
+    expect(User::count())->toBe(0)
+        ->and(BusinessProfile::count())->toBe(0);
 
-    $this->post(route('register.store'), [
-        'name' => 'Vendor Navora',
-        'email' => 'vendor@example.com',
-        'role' => 'vendor',
-        'password' => 'secure-password-123',
-        'password_confirmation' => 'secure-password-123',
-    ])->assertRedirect(route('onboarding.index'));
-
-    $user = User::where('email', 'vendor@example.com')->firstOrFail();
-
-    expect($user->businessProfile)->not->toBeNull()
-        ->and($user->businessProfile->onboarding_step)->toBe(1)
-        ->and($user->businessProfile->completed_at)->toBeNull();
+    $this->assertGuest();
 });
 
-test('business onboarding is authenticated and cannot skip a required step', function () {
+test('business onboarding is authenticated and presented on one page', function () {
     $this->get(route('onboarding.index'))->assertRedirect(route('login'));
 
     $user = User::factory()->create(['role' => 'umkm']);
     $user->businessProfile()->create([]);
 
     $this->actingAs($user)
-        ->get(route('onboarding.step', ['step' => 3]))
-        ->assertRedirect(route('onboarding.step', ['step' => 1]));
-});
-
-test('onboarding falls back to the first step when the saved step is invalid', function () {
-    $user = User::factory()->create(['role' => 'umkm']);
-    $user->businessProfile()->create(['onboarding_step' => 0]);
-
-    $this->actingAs($user)
         ->get(route('onboarding.index'))
-        ->assertRedirect(route('onboarding.step', ['step' => 1]));
+        ->assertOk()
+        ->assertSee('Profil usaha')
+        ->assertSee('Kebutuhan bisnis')
+        ->assertSee('Tinjau profil')
+        ->assertDontSee('Hapus akun Navora');
+
+    $this->get(route('onboarding.step', ['step' => 3]))
+        ->assertRedirect(route('onboarding.index'));
 });
 
-test('UMKM can save their business and packaging needs and resume onboarding', function () {
+test('UMKM can complete their business and packaging needs in one submission', function () {
     $user = User::factory()->create(['role' => 'umkm']);
     $user->businessProfile()->create([]);
 
@@ -69,28 +57,20 @@ test('UMKM can save their business and packaging needs and resume onboarding', f
             'category' => 'Makanan dan minuman',
             'location' => 'Bandung',
             'description' => 'Produsen kopi lokal.',
+            'product_type' => 'Kopi bubuk',
+            'packaging_type' => 'Standing pouch',
+            'preferred_material' => 'Kraft',
+            'monthly_quantity' => '1500',
+            'confirm_profile' => '1',
         ])
-        ->assertRedirect(route('onboarding.step', ['step' => 2]));
-
-    $this->get(route('onboarding.index'))
-        ->assertRedirect(route('onboarding.step', ['step' => 2]));
-
-    $this->post(route('onboarding.update', ['step' => 2]), [
-        'product_type' => 'Kopi bubuk',
-        'packaging_type' => 'Standing pouch',
-        'preferred_material' => 'Kraft',
-        'monthly_quantity' => '1500',
-    ])->assertRedirect(route('onboarding.step', ['step' => 3]));
-
-    $this->post(route('onboarding.update', ['step' => 3]), [
-        'confirm_profile' => '1',
-    ])->assertRedirect(route('business-profile.show'));
+        ->assertRedirect(route('business-profile.show'));
 
     $profile = $user->fresh()->businessProfile;
 
     expect($profile->business_name)->toBe('Kopi Nusantara')
         ->and($profile->product_type)->toBe('Kopi bubuk')
         ->and($profile->monthly_quantity)->toBe(1500)
+        ->and($profile->onboarding_step)->toBe(3)
         ->and($profile->completed_at)->not->toBeNull();
 
     $this->get(route('workspace'))
@@ -100,47 +80,63 @@ test('UMKM can save their business and packaging needs and resume onboarding', f
 
     $this->get(route('business-profile.show'))
         ->assertOk()
-        ->assertSee('Profil usahamu');
+        ->assertSee('Profil usahamu')
+        ->assertSee('Hapus akun Navora');
 
     $this->get(route('onboarding.step', ['step' => 1]))
         ->assertOk()
         ->assertSee('value="Kopi Nusantara"', false);
 });
 
-test('vendors must provide MOQ and can save vendor details', function () {
-    $user = User::factory()->create(['role' => 'vendor']);
-    $user->businessProfile()->create([]);
+test('UMKM cannot finish onboarding without confirming a complete profile', function () {
+    $user = User::factory()->create(['role' => 'umkm']);
+    $profile = $user->businessProfile()->create([]);
 
     $this->actingAs($user)
         ->post(route('onboarding.update', ['step' => 1]), [
-            'business_name' => 'Kemasan Prima',
-            'category' => 'Manufaktur kemasan',
-            'location' => 'Jakarta',
+            'business_name' => 'Kopi Nusantara',
+            'category' => 'Makanan dan minuman',
+            'location' => 'Bandung',
+            'product_type' => 'Kopi bubuk',
         ])
-        ->assertRedirect(route('onboarding.step', ['step' => 2]));
+        ->assertSessionHasErrors('confirm_profile');
 
-    $this->from(route('onboarding.step', ['step' => 2]))
-        ->post(route('onboarding.update', ['step' => 2]), [
-            'product_categories' => 'Pouch dan botol',
-            'minimum_order_quantity' => '0',
-        ])
-        ->assertRedirect(route('onboarding.step', ['step' => 2]))
-        ->assertSessionHasErrors('minimum_order_quantity');
+    expect($profile->fresh()->completed_at)->toBeNull();
+});
 
-    $this->post(route('onboarding.update', ['step' => 2]), [
+test('vendors must provide MOQ and can complete their profile in one submission', function () {
+    $user = User::factory()->create(['role' => 'vendor']);
+    $profile = $user->businessProfile()->create([]);
+    $profileData = [
+        'business_name' => 'Kemasan Prima',
+        'category' => 'Manufaktur kemasan',
+        'location' => 'Jakarta',
         'product_categories' => 'Pouch dan botol',
-        'materials' => 'Kraft, PET',
         'minimum_order_quantity' => '500',
+        'materials' => 'Kraft, PET',
         'monthly_capacity' => '12000',
         'production_lead_time_days' => '14',
-    ])->assertRedirect(route('onboarding.step', ['step' => 3]));
+        'confirm_profile' => '1',
+    ];
+
+    $this->actingAs($user)
+        ->post(route('onboarding.update', ['step' => 1]), array_merge($profileData, [
+            'minimum_order_quantity' => '0',
+        ]))
+        ->assertSessionHasErrors('minimum_order_quantity');
+
+    expect($profile->fresh()->completed_at)->toBeNull();
+
+    $this->post(route('onboarding.update', ['step' => 1]), $profileData)
+        ->assertRedirect(route('business-profile.show'));
 
     $profile = $user->fresh()->businessProfile;
 
     expect($profile->product_categories)->toBe('Pouch dan botol')
         ->and($profile->minimum_order_quantity)->toBe(500)
         ->and($profile->monthly_capacity)->toBe(12000)
-        ->and($profile->production_lead_time_days)->toBe(14);
+        ->and($profile->production_lead_time_days)->toBe(14)
+        ->and($profile->completed_at)->not->toBeNull();
 });
 
 test('existing partner accounts remain able to log in and access the workspace', function () {

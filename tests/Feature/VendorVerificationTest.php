@@ -161,6 +161,12 @@ test('changing verified vendor details returns verification to the submission st
             'category' => $profile->category,
             'location' => $profile->location,
             'description' => $profile->description,
+            'product_categories' => $profile->product_categories,
+            'materials' => $profile->materials,
+            'minimum_order_quantity' => $profile->minimum_order_quantity,
+            'monthly_capacity' => $profile->monthly_capacity,
+            'production_lead_time_days' => $profile->production_lead_time_days,
+            'confirm_profile' => '1',
         ])
         ->assertRedirect(route('business-profile.show'));
 

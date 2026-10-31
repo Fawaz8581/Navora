@@ -18,6 +18,13 @@ test('guests can view the login and registration pages', function () {
         ->assertSee('Buat akun Navora')
         ->assertSee('Pemilik brand / UMKM')
         ->assertSee('Vendor kemasan atau maklon')
+        ->assertSee('Profil usaha dan kebutuhan bisnis')
+        ->assertSee('data-register-title>Buat akun Navora', false)
+        ->assertSee('data-register-next', false)
+        ->assertSee('data-register-step="2" hidden disabled', false)
+        ->assertSee('class="onboarding-form-subheading">Profil usaha</h4>', false)
+        ->assertSee('Kebutuhan bisnis')
+        ->assertSee('Tinjau kembali informasi sebelum membuat akun.')
         ->assertDontSee('Mitra pendukung UMKM')
         ->assertDontSee('Daftar dengan Google');
 });
@@ -36,14 +43,21 @@ test('a visitor can register and is authenticated with their selected account ty
         'role' => 'vendor',
         'password' => 'secure-password-123',
         'password_confirmation' => 'secure-password-123',
+        'business_name' => 'Navora Seller',
+        'category' => 'Kemasan',
+        'location' => 'Jakarta',
+        'product_categories' => 'Pouch',
+        'minimum_order_quantity' => '500',
+        'confirm_profile' => '1',
     ]);
 
     $user = User::where('email', 'seller@gmail.com')->firstOrFail();
 
-    $response->assertRedirect(route('onboarding.index'));
+    $response->assertRedirect(route('business-profile.show'));
 
     expect($user->role)->toBe('vendor')
         ->and($user->businessProfile)->not->toBeNull()
+        ->and($user->businessProfile->completed_at)->not->toBeNull()
         ->and(Hash::check('secure-password-123', $user->password))->toBeTrue()
         ->and(auth()->id())->toBe($user->id);
 });

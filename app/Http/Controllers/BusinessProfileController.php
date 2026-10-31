@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\BusinessProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\View\View;
 
 class BusinessProfileController extends Controller
 {
-    public function index(Request $request): RedirectResponse
+    public function index(Request $request): View|RedirectResponse
     {
         $profile = $this->profileFor($request);
 
@@ -17,7 +18,12 @@ class BusinessProfileController extends Controller
             return redirect()->route('business-profile.show');
         }
 
-        return redirect()->route('onboarding.step', ['step' => $this->currentStep($profile)]);
+        return view('onboarding.show', [
+            'profile' => $profile,
+            'isCompleted' => false,
+            'isEditing' => true,
+            'role' => $request->user()->role,
+        ]);
     }
 
     public function show(Request $request, int $step): View|RedirectResponse
@@ -26,16 +32,15 @@ class BusinessProfileController extends Controller
 
         $profile = $this->profileFor($request);
 
-        $currentStep = $this->currentStep($profile);
-
-        if (! $profile->completed_at && $step > $currentStep) {
-            return redirect()->route('onboarding.step', ['step' => $currentStep]);
+        if (! $profile->completed_at) {
+            return redirect()->route('onboarding.index');
         }
 
         return view('onboarding.show', [
             'profile' => $profile,
-            'step' => $step,
             'isCompleted' => (bool) $profile->completed_at,
+            'isEditing' => true,
+            'role' => $request->user()->role,
         ]);
     }
 
@@ -44,51 +49,26 @@ class BusinessProfileController extends Controller
         abort_if($step < 1 || $step > 3, 404);
 
         $profile = $this->profileFor($request);
+        $validated = $request->validate(array_merge([
+            'business_name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'category' => ['required', 'string', 'max:255'],
+            'location' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'confirm_profile' => ['accepted'],
+        ], $this->detailsRules($request->user()->role)), [
+            'confirm_profile.accepted' => 'Tinjau dan konfirmasi profil sebelum menyimpannya.',
+        ]);
 
-        $currentStep = $this->currentStep($profile);
-
-        if (! $profile->completed_at && $step > $currentStep) {
-            return redirect()->route('onboarding.step', ['step' => $currentStep]);
-        }
-
-        if ($step === 1) {
-            $validated = $request->validate([
-                'business_name' => ['required', 'string', 'max:255'],
-                'phone' => ['nullable', 'string', 'max:40'],
-                'category' => ['required', 'string', 'max:255'],
-                'location' => ['required', 'string', 'max:255'],
-                'description' => ['nullable', 'string', 'max:2000'],
-            ]);
-
-            $profile->fill($validated);
-            $this->invalidateVendorVerificationIfDetailsChanged($profile, $request->user()->role);
-        } elseif ($step === 2) {
-            $validated = $request->validate($this->detailsRules($request->user()->role));
-
-            $profile->fill($validated);
-            $this->invalidateVendorVerificationIfDetailsChanged($profile, $request->user()->role);
-        } else {
-            $request->validate([
-                'confirm_profile' => ['accepted'],
-            ], [
-                'confirm_profile.accepted' => 'Konfirmasi data profil sebelum menyelesaikan onboarding.',
-            ]);
-
-            $profile->completed_at = now();
-        }
-
-        $profile->onboarding_step = max($this->currentStep($profile), min($step + 1, 3));
+        $profile->fill(Arr::except($validated, ['confirm_profile']));
+        $this->invalidateVendorVerificationIfDetailsChanged($profile, $request->user()->role);
+        $profile->completed_at = $profile->completed_at ?? now();
+        $profile->onboarding_step = 3;
         $profile->save();
 
-        if ($profile->completed_at) {
-            return redirect()
-                ->route('business-profile.show')
-                ->with('status', 'Profil usaha berhasil disimpan.');
-        }
-
         return redirect()
-            ->route('onboarding.step', ['step' => $profile->onboarding_step])
-            ->with('status', 'Perubahan profil berhasil disimpan.');
+            ->route('business-profile.show')
+            ->with('status', 'Profil usaha berhasil disimpan.');
     }
 
     public function profile(Request $request): View|RedirectResponse
@@ -101,8 +81,9 @@ class BusinessProfileController extends Controller
 
         return view('onboarding.show', [
             'profile' => $profile,
-            'step' => 3,
             'isCompleted' => true,
+            'isEditing' => false,
+            'role' => $request->user()->role,
         ]);
     }
 
@@ -111,11 +92,6 @@ class BusinessProfileController extends Controller
         abort_unless(in_array($request->user()->role, ['umkm', 'vendor'], true), 403);
 
         return $request->user()->businessProfile()->firstOrCreate();
-    }
-
-    private function currentStep(BusinessProfile $profile): int
-    {
-        return max(1, min((int) $profile->onboarding_step, 3));
     }
 
     private function invalidateVendorVerificationIfDetailsChanged(BusinessProfile $profile, string $role): void

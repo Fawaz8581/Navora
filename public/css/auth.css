@@ -100,6 +100,10 @@ body.navora-auth-body {
     padding: 43px 0;
 }
 
+.onboarding-form-wrap {
+    width: min(100%, 520px);
+}
+
 .auth-form-heading {
     margin-bottom: 22px;
 }
@@ -536,6 +540,92 @@ body.navora-auth-body {
 
 .onboarding-heading {
     margin-bottom: 18px;
+}
+
+.onboarding-register-progress {
+    margin: -5px 0 16px;
+    color: #63839b;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.onboarding-register-step {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.onboarding-register-step[hidden] {
+    display: none;
+}
+
+.onboarding-register-actions {
+    display: grid;
+    gap: 12px;
+}
+
+.onboarding-register-back {
+    justify-self: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #718493;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.onboarding-register-back:hover {
+    color: var(--auth-blue);
+}
+
+.onboarding-form-section + .onboarding-form-section {
+    margin-top: 5px;
+    padding-top: 16px;
+    border-top: 1px solid #e7edf1;
+}
+
+.onboarding-form-section h3 {
+    margin: 0 0 13px;
+    color: var(--auth-ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.onboarding-form-section h3 > span {
+    margin-right: 7px;
+    color: var(--auth-green);
+    font-size: 10px;
+}
+
+.onboarding-form-subheading {
+    margin: 0 0 12px;
+    color: #63839b;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.onboarding-form-subheading:not(:first-of-type) {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #eef2f4;
+}
+
+.onboarding-role-fields {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.onboarding-review-confirm p {
+    margin: -5px 0 12px;
+    color: var(--auth-muted);
+    font-size: 10px;
+    line-height: 1.6;
 }
 
 .onboarding-progress {

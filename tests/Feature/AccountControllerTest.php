@@ -21,14 +21,27 @@ it('shows password-confirmed account deletion in account settings', function () 
         ->assertSee('Hapus akun secara permanen');
 });
 
-it('offers account deletion before onboarding is complete', function () {
+it('keeps account deletion off the onboarding form until the profile is complete', function () {
     $user = User::factory()->create();
     BusinessProfile::factory()->for($user)->create([
         'completed_at' => null,
     ]);
 
     $this->actingAs($user)
-        ->get(route('onboarding.step', ['step' => 1]))
+        ->get(route('onboarding.index'))
+        ->assertOk()
+        ->assertDontSee(route('account.destroy'), false)
+        ->assertDontSee('Hapus akun Navora');
+});
+
+it('offers account deletion on the completed business profile', function () {
+    $user = User::factory()->create();
+    BusinessProfile::factory()->for($user)->create([
+        'completed_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('business-profile.show'))
         ->assertOk()
         ->assertSee(route('account.destroy'), false)
         ->assertSee('name="password"', false)

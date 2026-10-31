@@ -22,7 +22,7 @@
                 </a>
                 <a class="auth-back-link" href="{{ route('home') }}"><i class="bi bi-arrow-left"></i> Beranda</a>
             </header>
-            <div class="auth-form-wrap">
+            <div class="auth-form-wrap @yield('auth-form-class')">
                 @yield('auth-form')
             </div>
             <footer class="auth-footer">
