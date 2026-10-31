@@ -101,6 +101,30 @@
             @error('minimum_order_quantity')<span class="auth-field-error">{{ $message }}</span>@enderror
         </div>
         <div class="auth-field">
+            <label for="indicative_price_per_unit">Harga indikatif per pcs <span class="onboarding-optional">Opsional</span></label>
+            <div class="auth-input-wrap">
+                <i class="bi bi-cash" aria-hidden="true"></i>
+                <input id="indicative_price_per_unit" name="indicative_price_per_unit" type="number" value="{{ old('indicative_price_per_unit', $profile->indicative_price_per_unit) }}" min="0.01" max="1000000000" step="0.01" placeholder="Harga awal, bukan penawaran final">
+            </div>
+            @error('indicative_price_per_unit')<span class="auth-field-error">{{ $message }}</span>@enderror
+        </div>
+        <div class="auth-field">
+            <label>Titik lokasi usaha <span class="onboarding-optional">Opsional untuk estimasi jarak</span></label>
+            <div class="auth-form-grid">
+                <div>
+                    <label class="visually-hidden" for="latitude">Latitude</label>
+                    <input class="form-control" id="latitude" name="latitude" type="number" value="{{ old('latitude', $profile->latitude) }}" min="-90" max="90" step="0.0000001" placeholder="Latitude">
+                    @error('latitude')<span class="auth-field-error">{{ $message }}</span>@enderror
+                </div>
+                <div>
+                    <label class="visually-hidden" for="longitude">Longitude</label>
+                    <input class="form-control" id="longitude" name="longitude" type="number" value="{{ old('longitude', $profile->longitude) }}" min="-180" max="180" step="0.0000001" placeholder="Longitude">
+                    @error('longitude')<span class="auth-field-error">{{ $message }}</span>@enderror
+                </div>
+            </div>
+            <small>Koordinat digunakan untuk memperkirakan jarak garis lurus dalam pencarian vendor.</small>
+        </div>
+        <div class="auth-field">
             <label for="monthly_capacity">Kapasitas produksi per bulan <span class="onboarding-optional">Opsional</span></label>
             <div class="auth-input-wrap">
                 <i class="bi bi-speedometer2" aria-hidden="true"></i>

@@ -954,6 +954,11 @@ body.navora-app-body {
     line-height: 1.5;
 }
 
+.navora-location-button {
+    width: 100%;
+    margin-top: 9px;
+}
+
 .navora-results-heading {
     display: flex;
     min-height: 37px;
@@ -2699,6 +2704,333 @@ body.navora-app-body {
 
     .navora-account-row strong {
         text-align: left;
+    }
+}
+
+.navora-order-create-actions,
+.navora-order-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.navora-order-list {
+    display: grid;
+    gap: 13px;
+}
+
+.navora-order-card {
+    padding: 17px;
+    border: 1px solid #e3eaef;
+    border-radius: 11px;
+    background: #fff;
+    box-shadow: 0 5px 16px rgba(32, 63, 81, .035);
+}
+
+.navora-order-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #edf1f3;
+}
+
+.navora-order-card-head h2 {
+    margin: 3px 0;
+    color: #355269;
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.navora-order-card-head small {
+    color: #83939d;
+    font-size: 9px;
+}
+
+.navora-order-status-wrap {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+}
+
+.navora-simulation-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: #fff3dc;
+    color: #8d6427;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .04em;
+}
+
+.navora-simulation-notice {
+    margin: 11px 0 0;
+    padding: 9px 11px;
+    border-radius: 7px;
+    background: #fff9eb;
+    color: #806735;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+.navora-order-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid #edf1f3;
+}
+
+.navora-order-details > div {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+}
+
+.navora-order-details small {
+    color: #8b9aa3;
+    font-size: 9px;
+}
+
+.navora-order-details strong {
+    overflow-wrap: anywhere;
+    color: #526e82;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.navora-order-group,
+.navora-order-tracking {
+    padding: 13px 0;
+    border-bottom: 1px solid #edf1f3;
+}
+
+.navora-order-progress-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    color: #526e82;
+    font-size: 10px;
+}
+
+.navora-order-progress {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #edf2f4;
+}
+
+.navora-order-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #5f9a88, #79b99d);
+    transition: width .2s ease;
+}
+
+.navora-order-participants {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 9px 0 0;
+    padding: 0;
+    color: #728590;
+    font-size: 9px;
+    list-style: none;
+}
+
+.navora-order-tracking h3 {
+    margin: 12px 0 8px;
+    color: #476276;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.navora-order-tracking h3:first-child {
+    margin-top: 0;
+}
+
+.navora-order-steps {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.navora-order-steps li {
+    position: relative;
+    padding-top: 14px;
+    color: #9aa8b0;
+    font-size: 8px;
+}
+
+.navora-order-steps li::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    border: 2px solid #d6e0e5;
+    border-radius: 50%;
+    background: #fff;
+    content: "";
+}
+
+.navora-order-steps li.is-complete,
+.navora-order-steps li.is-current {
+    color: #477d68;
+    font-weight: 700;
+}
+
+.navora-order-steps li.is-complete::before,
+.navora-order-steps li.is-current::before {
+    border-color: #5b9b80;
+    background: #5b9b80;
+}
+
+.navora-order-history {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+    padding: 0 0 0 15px;
+    color: #607989;
+    font-size: 9px;
+}
+
+.navora-order-history li {
+    padding-left: 2px;
+}
+
+.navora-order-history li::marker {
+    color: #6a9c87;
+}
+
+.navora-order-history strong,
+.navora-order-history span {
+    display: block;
+}
+
+.navora-order-history span {
+    margin-top: 2px;
+    color: #8797a0;
+}
+
+.navora-order-history p {
+    margin: 3px 0 0;
+    color: #687f8e;
+}
+
+.navora-order-cancelled,
+.navora-order-unknown {
+    margin: 0;
+    color: #8b625e;
+    font-size: 9px;
+}
+
+.navora-order-unknown {
+    color: #8a7042;
+}
+
+.navora-order-actions {
+    padding-top: 12px;
+}
+
+.navora-order-actions .btn,
+.navora-order-create-actions .btn {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 9px;
+}
+
+.navora-order-cancel {
+    border: 1px solid #eddcda;
+    border-radius: 7px;
+    background: #fff;
+    color: #a25a55;
+    font-weight: 700;
+}
+
+.navora-order-cancel:hover {
+    border-color: #d7aaa6;
+    background: #fbf3f2;
+}
+
+.status-processing {
+    background: #eaf1f8;
+    color: #4a7396;
+}
+
+.status-production {
+    background: #f0edf8;
+    color: #77659b;
+}
+
+.status-shipped {
+    background: #e9f4f3;
+    color: #397f78;
+}
+
+.status-received {
+    background: #eaf4ef;
+    color: #4d896f;
+}
+
+.status-cancelled,
+.status-unknown {
+    background: #f5eded;
+    color: #95625d;
+}
+
+.navora-order-error {
+    margin-bottom: 12px;
+    padding: 11px 13px;
+    border: 1px solid #ecd3d0;
+    border-radius: 8px;
+    background: #fff7f6;
+    color: #925b56;
+    font-size: 10px;
+}
+
+@media (max-width: 767.98px) {
+    .navora-order-create-actions {
+        width: 100%;
+    }
+
+    .navora-order-create-actions .btn {
+        flex: 1;
+    }
+
+    .navora-order-card {
+        padding: 13px;
+    }
+
+    .navora-order-card-head {
+        flex-direction: column;
+    }
+
+    .navora-order-status-wrap {
+        justify-items: start;
+    }
+
+    .navora-order-steps {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .navora-order-steps li {
+        min-height: 20px;
+        padding: 0 0 0 15px;
+    }
+
+    .navora-order-steps li::before {
+        top: 1px;
     }
 }
 

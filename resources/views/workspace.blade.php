@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="Demo marketplace Navora untuk mencari vendor kemasan, membandingkan penawaran, dan bergabung dalam patungan MOQ.">
     <title>Ruang Navora — Marketplace kemasan UMKM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,7 +16,14 @@
 <body class="navora-app-body"
     data-auth-role="{{ auth()->user()->role ?? '' }}"
     data-auth-name="{{ auth()->user()->name ?? '' }}"
-    data-auth-user-id="{{ auth()->id() ?? '' }}">
+    data-auth-user-id="{{ auth()->id() ?? '' }}"
+    data-vendor-catalog-url="{{ route('vendors.catalog') }}"
+    data-orders-url="{{ route('orders.index') }}"
+    data-orders-store-url="{{ route('orders.store') }}"
+    data-orders-quote-url="{{ route('orders.quote') }}"
+    data-orders-show-template="{{ route('orders.show', ['order' => '__ORDER__']) }}"
+    data-orders-join-template="{{ route('orders.join', ['order' => '__ORDER__']) }}"
+    data-orders-status-template="{{ route('orders.status', ['order' => '__ORDER__']) }}">
     <a class="navora-skip-link" href="#app-content">Lewati ke konten utama</a>
     <div class="navora-app-shell">
         <header class="navora-app-header">
@@ -30,7 +38,11 @@
                     <kbd>/</kbd>
                 </div>
                 <div class="navora-header-actions">
-                    <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> MODE DEMO</span>
+                    @auth
+                        <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> AKUN TERHUBUNG</span>
+                    @else
+                        <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> MODE DEMO</span>
+                    @endauth
                     <button class="navora-icon-button" type="button" aria-label="Notifikasi demo"><i class="bi bi-bell"></i><span></span></button>
                     @auth
                         <span class="navora-auth-user" title="{{ Auth::user()->email }}">{{ Auth::user()->name }}</span>
@@ -69,6 +81,7 @@
                         <button class="navora-page-link" type="button" data-page="vendors" data-roles="umkm" role="tab" aria-selected="false"><i class="bi bi-search"></i> Cari vendor</button>
                         <button class="navora-page-link" type="button" data-page="listings" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-box-seam"></i> Katalog saya</button>
                         <button class="navora-page-link" type="button" data-page="groups" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-people"></i> Patungan MOQ</button>
+                        <button class="navora-page-link" type="button" data-page="orders" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-box-seam"></i> Pesanan</button>
                         <button class="navora-page-link" type="button" data-page="rfq" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-chat-square-text"></i> Permintaan penawaran</button>
                         <button class="navora-page-link" type="button" data-page="assistant" data-roles="umkm" role="tab" aria-selected="false"><i class="bi bi-stars"></i> Asisten kemasan</button>
                         <button class="navora-page-link" type="button" data-page="programs" data-roles="partner" role="tab" aria-selected="false"><i class="bi bi-buildings"></i> Program mitra</button>
@@ -94,7 +107,7 @@
 
                 <div class="navora-overview-stats" data-role-content="umkm">
                     <article><span class="navora-stat-icon stat-blue"><i class="bi bi-box-seam"></i></span><div><span>Vendor demo</span><strong>12</strong><small>Contoh katalog</small></div></article>
-                    <article><span class="navora-stat-icon stat-teal"><i class="bi bi-people"></i></span><div><span>Patungan terbuka</span><strong data-stat-groups>3</strong><small>Masih mencari peserta</small></div></article>
+                    <article><span class="navora-stat-icon stat-teal"><i class="bi bi-people"></i></span><div><span>Patungan menunggu peserta</span><strong data-stat-groups>0</strong><small>Pesanan nyata di akun</small></div></article>
                     <article><span class="navora-stat-icon stat-gold"><i class="bi bi-chat-square-text"></i></span><div><span>Permintaan saya</span><strong data-stat-rfqs>2</strong><small>Contoh untuk perbandingan</small></div></article>
                     <article><span class="navora-stat-icon stat-lilac"><i class="bi bi-lightbulb"></i></span><div><span>Ide kemasan</span><strong>Siap</strong><small>Asisten berbasis demo</small></div></article>
                 </div>
@@ -119,7 +132,7 @@
                     <section class="navora-panel navora-discover-panel" data-role-content="vendor" hidden>
                         <div class="navora-panel-heading"><div><span class="navora-panel-kicker">AKTIVITAS VENDOR</span><h2>Peluang untuk bisnismu</h2></div><button class="navora-text-action" type="button" data-open-page="rfq">Lihat permintaan <i class="bi bi-arrow-right"></i></button></div>
                         <div class="navora-vendor-opportunity"><span><i class="bi bi-chat-square-heart"></i></span><div><strong>Brand kopi mencari pouch</strong><p>Butuh pouch kopi dengan opsi cetak dan sampel awal.</p><small>Target MOQ 500 pcs · Bandung</small></div><button type="button" class="btn navora-app-outline" data-action="respond-rfq" data-rfq="rfq-demo-1">Tinjau</button></div>
-                        <div class="navora-vendor-opportunity"><span><i class="bi bi-people"></i></span><div><strong>Patungan kemasan makanan</strong><p>Beberapa usaha sedang mencari vendor box kraft.</p><small>Sudah terkumpul 68% dari target</small></div><button type="button" class="btn navora-app-outline" data-open-page="groups">Lihat</button></div>
+                        <div class="navora-vendor-opportunity"><span><i class="bi bi-people"></i></span><div><strong>Contoh patungan (demo)</strong><p>Jelajahi pesanan bersama yang dibuat oleh pengguna.</p><small>Data contoh tidak termasuk dalam jumlah pesanan nyata.</small></div><button type="button" class="btn navora-app-outline" data-open-page="orders">Lihat pesanan</button></div>
                     </section>
                     <section class="navora-panel navora-discover-panel" data-role-content="partner" hidden>
                         <div class="navora-panel-heading"><div><span class="navora-panel-kicker">EKOSISTEM</span><h2>Peluang dampak bersama</h2></div><button class="navora-text-action" type="button" data-open-page="programs">Lihat program <i class="bi bi-arrow-right"></i></button></div>
@@ -141,17 +154,23 @@
                     <aside class="navora-panel navora-filter-panel">
                         <div class="navora-panel-heading"><h2><i class="bi bi-sliders me-2"></i>Filter vendor</h2><button class="navora-text-action" type="button" data-reset-filters>Reset</button></div>
                         <label class="navora-form-label" for="filter-search">Kata kunci</label><div class="navora-input-icon"><i class="bi bi-search"></i><input id="filter-search" type="search" placeholder="Cari produk atau vendor" data-vendor-filter="search"></div>
-                        <label class="navora-form-label" for="filter-category">Jenis layanan</label><select class="form-select navora-form-control" id="filter-category" data-vendor-filter="category"><option value="">Semua jenis</option><option value="packaging">Kemasan</option><option value="printing">Percetakan</option><option value="maklon">Maklon</option></select>
+                        <label class="navora-form-label" for="filter-category">Jenis kemasan atau layanan</label><select class="form-select navora-form-control" id="filter-category" data-vendor-filter="category"><option value="">Semua jenis</option><option value="pouch">Pouch</option><option value="botol">Botol</option><option value="box">Box / karton</option><option value="maklon">Maklon</option></select>
                         <label class="navora-form-label" for="filter-moq">MOQ maksimum</label><select class="form-select navora-form-control" id="filter-moq" data-vendor-filter="moq"><option value="">Semua MOQ</option><option value="500">≤ 500 pcs</option><option value="1000">≤ 1.000 pcs</option><option value="5000">≤ 5.000 pcs</option></select>
                         <label class="navora-form-label" for="filter-material">Bahan</label><select class="form-select navora-form-control" id="filter-material" data-vendor-filter="material"><option value="">Semua bahan</option><option value="kraft">Kraft paper</option><option value="pet">PET</option><option value="pouch">Laminasi pouch</option><option value="carton">Karton</option></select>
                         <label class="navora-form-label" for="filter-location">Lokasi</label><select class="form-select navora-form-control" id="filter-location" data-vendor-filter="location"><option value="">Semua lokasi</option><option value="bandung">Bandung</option><option value="jakarta">Jakarta</option><option value="surabaya">Surabaya</option><option value="yogyakarta">Yogyakarta</option></select>
+                        <label class="navora-form-label" for="filter-price">Harga indikatif maksimal / pcs</label><input class="form-control navora-form-control" id="filter-price" type="number" min="1" step="100" placeholder="Opsional" data-vendor-filter="price">
                         <label class="navora-checkbox"><input type="checkbox" data-vendor-filter="sample"><span>Tersedia opsi sampel</span></label>
-                        <label class="navora-checkbox"><input type="checkbox" data-vendor-filter="verified"><span>Profil bertanda terverifikasi*</span></label>
-                        <p class="navora-filter-footnote">*Label status hanya contoh pada prototipe.</p>
+                        <label class="navora-checkbox"><input type="checkbox" data-vendor-filter="certificate"><span>Memiliki sertifikat</span></label>
+                        <label class="navora-form-label" for="filter-distance">Radius jarak (km)</label><select class="form-select navora-form-control" id="filter-distance" data-vendor-filter="distance"><option value="">Tidak dibatasi</option><option value="25">≤ 25 km</option><option value="50">≤ 50 km</option><option value="100">≤ 100 km</option><option value="250">≤ 250 km</option></select>
+                        <button class="btn navora-app-outline navora-location-button" type="button" data-action="use-current-location"><i class="bi bi-crosshair"></i> Gunakan lokasi saya</button>
+                        <p class="navora-filter-footnote" data-catalog-note>Harga dan jarak hanya ditampilkan jika profil vendor menyediakan data harga dan koordinat.</p>
                     </aside>
                     <div class="navora-vendor-results">
-                        <div class="navora-results-heading"><span><strong data-vendor-result-count>4</strong> pilihan untuk dieksplorasi</span><label for="vendor-sort" class="visually-hidden">Urutkan vendor</label><select id="vendor-sort" class="form-select navora-sort-select" data-vendor-sort><option value="recommended">Rekomendasi</option><option value="price">Harga indikatif terendah</option><option value="moq">MOQ terkecil</option></select></div>
+                        <div class="navora-results-heading"><span><strong data-vendor-result-count>0</strong> pilihan untuk dieksplorasi</span><label for="vendor-sort" class="visually-hidden">Urutkan vendor</label><select id="vendor-sort" class="form-select navora-sort-select" data-vendor-sort><option value="recommended">Rekomendasi</option><option value="price">Harga indikatif terendah</option><option value="moq">MOQ terkecil</option><option value="distance">Jarak terdekat</option></select></div>
+                        <div class="navora-empty-state" data-vendor-loading hidden><i class="bi bi-arrow-repeat"></i><strong>Memuat vendor</strong><span>Memeriksa katalog vendor terverifikasi.</span></div>
+                        <div class="navora-order-error" data-vendor-error role="alert" hidden></div>
                         <div class="navora-vendor-grid" data-vendor-grid>
+                            @guest
                             <article class="navora-vendor-card" data-vendor-card data-id="pouchkita" data-name="PouchKita Studio" data-category="packaging" data-product="Standing pouch kopi" data-moq="500" data-material="pouch kraft" data-location="bandung" data-price="1250" data-sample="true" data-verified="true" data-tags="pouch kopi standing pouch cetak">
                                 <div class="navora-vendor-art art-pouch"><span><i class="bi bi-bag"></i></span><small>FOTO PRODUK DEMO</small><span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Profil demo</span></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>PouchKita Studio</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Bandung</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,9 <small>(demo)</small></span></div><p>Standing pouch custom untuk kopi, snack, dan produk kering.</p><div class="navora-vendor-tags"><span>Pouch laminasi</span><span>Kraft</span><span>Sampel tersedia</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>500 pcs</strong></span><span>Harga indikatif<strong>Rp1.250 / pcs</strong></span><span>Estimasi produksi<strong>14–21 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="PouchKita Studio">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="PouchKita Studio">Minta penawaran</button></div></div>
@@ -168,25 +187,35 @@
                                 <div class="navora-vendor-art art-maklon"><span><i class="bi bi-cup-hot"></i></span><small>FOTO PRODUK DEMO</small></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>Rasa Racik Maklon</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Surabaya</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,8 <small>(demo)</small></span></div><p>Jasa maklon minuman serbuk dengan diskusi formula awal.</p><div class="navora-vendor-tags"><span>Maklon</span><span>Minuman serbuk</span><span>Konsultasi</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>5.000 pcs</strong></span><span>Harga indikatif<strong>Rp3.200 / pcs</strong></span><span>Estimasi produksi<strong>21–35 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="Rasa Racik Maklon">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="Rasa Racik Maklon">Minta penawaran</button></div></div>
                             </article>
+                            @endguest
                         </div>
                         <div class="navora-empty-state" data-vendor-empty hidden><i class="bi bi-search"></i><strong>Belum ada vendor yang cocok</strong><span>Coba ubah kata kunci atau longgarkan filternya.</span></div>
                     </div>
                 </div>
-                <div class="navora-note"><i class="bi bi-info-circle"></i><span>Profil, peringkat, MOQ, harga, dan estimasi pada katalog adalah contoh untuk demo. Verifikasi dokumen belum dilakukan.</span></div>
+                <div class="navora-note" data-vendor-demo-note><i class="bi bi-info-circle"></i><span>Profil katalog pada akun tamu adalah contoh demo, bukan penawaran vendor nyata. Akun masuk hanya melihat vendor yang sudah terverifikasi.</span></div>
             </section>
 
             <section class="navora-page-panel" data-page-panel="groups" role="tabpanel" hidden>
                 <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Kolaborasi</span><i class="bi bi-chevron-right"></i><span>Patungan MOQ</span></div><h1>Pesan bersama, mulai lebih ringan</h1><p>Jelajahi contoh kebutuhan yang bisa digabungkan untuk memenuhi jumlah minimum vendor.</p></div><button class="btn navora-app-primary" type="button" data-action="create-group"><i class="bi bi-plus-lg"></i> Buat patungan</button></div>
-                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Perhatikan syarat sebelum bergabung</strong><p>Jumlah peserta, spesifikasi, pembagian barang, jadwal, dan mekanisme pembayaran nyata perlu disepakati dengan jelas. Tombol di demo ini hanya menyimpan status partisipasi lokal.</p></div></div>
-                <div class="navora-group-grid" data-group-grid>
-                    <article class="navora-group-card" data-group-card data-id="group-coffee" data-name="Pouch kopi kraft 200 g" data-total="1000" data-joined="720" data-category="Pouch" data-vendor="PouchKita Studio" data-due="5 hari lagi">
-                        <div class="navora-group-card-top"><span class="navora-group-category"><i class="bi bi-bag"></i> Pouch kopi</span><span class="navora-group-status"><i></i> Mencari peserta</span></div><h2>Pouch kopi kraft 200 g</h2><p>Standing pouch dengan zipper · desain dibicarakan setelah MOQ tercapai.</p><div class="navora-group-vendor"><span class="navora-vendor-avatar">PK</span><span><strong>PouchKita Studio</strong><small>Vendor demo · Bandung</small></span><button type="button" class="navora-more-button" aria-label="Info vendor"><i class="bi bi-three-dots"></i></button></div><div class="navora-group-progress-label"><span>Progres patungan</span><strong><span data-group-joined>720</span> / 1.000 pcs</strong></div><div class="progress navora-progress"><div class="progress-bar" data-group-progress style="width:72%"></div></div><div class="navora-group-foot"><span><i class="bi bi-people"></i> <b data-group-percent>72%</b> terkumpul</span><span><i class="bi bi-clock"></i> 5 hari lagi</span></div><button class="btn navora-app-primary navora-group-join" type="button" data-action="join-group" data-group="group-coffee">Ikut patungan <i class="bi bi-arrow-right"></i></button></article>
-                    <article class="navora-group-card" data-group-card data-id="group-box" data-name="Box kraft snack" data-total="2000" data-joined="1360" data-category="Box kraft" data-vendor="Cetak Bumi" data-due="8 hari lagi">
-                        <div class="navora-group-card-top"><span class="navora-group-category"><i class="bi bi-box2"></i> Box makanan</span><span class="navora-group-status"><i></i> Mencari peserta</span></div><h2>Box kraft snack</h2><p>Box kertas food-grade, opsi cetak satu warna sesuai diskusi vendor.</p><div class="navora-group-vendor"><span class="navora-vendor-avatar avatar-green">CB</span><span><strong>Cetak Bumi</strong><small>Vendor demo · Yogyakarta</small></span><button type="button" class="navora-more-button" aria-label="Info vendor"><i class="bi bi-three-dots"></i></button></div><div class="navora-group-progress-label"><span>Progres patungan</span><strong><span data-group-joined>1.360</span> / 2.000 pcs</strong></div><div class="progress navora-progress"><div class="progress-bar" data-group-progress style="width:68%"></div></div><div class="navora-group-foot"><span><i class="bi bi-people"></i> <b data-group-percent>68%</b> terkumpul</span><span><i class="bi bi-clock"></i> 8 hari lagi</span></div><button class="btn navora-app-primary navora-group-join" type="button" data-action="join-group" data-group="group-box">Ikut patungan <i class="bi bi-arrow-right"></i></button></article>
-                    <article class="navora-group-card" data-group-card data-id="group-bottle" data-name="Botol minuman 250 ml" data-total="1500" data-joined="840" data-category="Botol PET" data-vendor="Kemas Prima" data-due="11 hari lagi">
-                        <div class="navora-group-card-top"><span class="navora-group-category"><i class="bi bi-cup-straw"></i> Botol PET</span><span class="navora-group-status"><i></i> Mencari peserta</span></div><h2>Botol minuman 250 ml</h2><p>Botol PET bening dengan tutup ulir; warna dan tutup dikonfirmasi vendor.</p><div class="navora-group-vendor"><span class="navora-vendor-avatar avatar-blue">KP</span><span><strong>Kemas Prima</strong><small>Vendor demo · Jakarta</small></span><button type="button" class="navora-more-button" aria-label="Info vendor"><i class="bi bi-three-dots"></i></button></div><div class="navora-group-progress-label"><span>Progres patungan</span><strong><span data-group-joined>840</span> / 1.500 pcs</strong></div><div class="progress navora-progress"><div class="progress-bar" data-group-progress style="width:56%"></div></div><div class="navora-group-foot"><span><i class="bi bi-people"></i> <b data-group-percent>56%</b> terkumpul</span><span><i class="bi bi-clock"></i> 11 hari lagi</span></div><button class="btn navora-app-primary navora-group-join" type="button" data-action="join-group" data-group="group-bottle">Ikut patungan <i class="bi bi-arrow-right"></i></button></article>
+                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Pesanan patungan tersimpan di akun</strong><p>Buat kebutuhan kemasan standar atau gabung ke pesanan yang masih menerima peserta. Jumlah dan status hanya berubah setelah server menyimpan pembaruan.</p></div></div>
+                <div class="navora-empty-state"><i class="bi bi-people"></i><strong>Lihat pesanan patungan yang tersedia</strong><span>Daftar peserta, target jumlah, dan status pesanan tersedia di halaman Pesanan.</span><button class="btn navora-app-primary" type="button" data-open-page="orders">Buka pesanan <i class="bi bi-arrow-right"></i></button></div>
+            </section>
+
+            <section class="navora-page-panel" data-page-panel="orders" role="tabpanel" hidden>
+                <div class="navora-page-title-row">
+                    <div><div class="navora-breadcrumb"><span>Kolaborasi</span><i class="bi bi-chevron-right"></i><span>Pesanan</span></div><h1>Pesanan dan pelacakan</h1><p>Kelola pesanan langsung atau patungan dan pantau setiap pembaruan status.</p></div>
+                    <div class="navora-order-create-actions" data-order-create-actions>
+                        <button class="btn navora-app-outline" type="button" data-action="create-order" data-order-type="langsung"><i class="bi bi-plus-lg"></i> Pesanan langsung</button>
+                        <button class="btn navora-app-primary" type="button" data-action="create-order" data-order-type="patungan"><i class="bi bi-people"></i> Buat patungan</button>
+                    </div>
                 </div>
-                <div class="navora-note"><i class="bi bi-exclamation-circle"></i><span>Tidak ada uang yang ditagih atau pesanan yang dibuat. Pengelolaan pembayaran, pembatalan, pengembalian dana, dan penyelesaian sengketa belum tersedia di demo ini.</span></div>
+                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur status pesanan</strong><p>Menunggu konfirmasi → Diproses → Dalam produksi → Dikirim → Diterima. Pembuat atau vendor cukup mengonfirmasi pesanan satu kali; tahap berikutnya bergerak otomatis tiap 20 detik sebagai simulasi dan memerlukan worker antrean aktif. Status simulasi bukan konfirmasi produksi, kurir, atau penerimaan nyata. Pesanan patungan menunggu target terpenuhi sebelum dapat dikonfirmasi.</p></div></div>
+                <div class="navora-empty-state" data-orders-loading aria-live="polite"><i class="bi bi-arrow-repeat"></i><strong>Memuat pesanan</strong><span>Data diambil dari akunmu.</span></div>
+                <div class="navora-empty-state" data-orders-guest hidden><i class="bi bi-person-lock"></i><strong>Masuk untuk melihat pesanan</strong><span>Pesanan dan pelacakan hanya tersedia untuk akun yang terdaftar.</span><a class="btn navora-app-primary" href="{{ route('login') }}">Masuk ke Navora</a></div>
+                <div class="navora-order-error" data-orders-error role="alert" hidden></div>
+                <div class="navora-empty-state" data-orders-empty hidden><i class="bi bi-box-seam"></i><strong>Belum ada pesanan</strong><span>Buat pesanan langsung atau mulai pesanan patungan untuk produk kemasan standar.</span></div>
+                <div class="navora-order-list" data-orders-list aria-live="polite"></div>
+                <button class="btn navora-app-outline navora-order-more" type="button" data-action="load-more-orders" data-orders-more hidden>Muat pesanan lainnya</button>
             </section>
 
             <section class="navora-page-panel" data-page-panel="rfq" role="tabpanel" hidden>
@@ -330,7 +359,7 @@
             <footer class="navora-app-footer">
                 <span>Navora · Prototype</span>
                 @if (Auth::check() && in_array(Auth::user()->role, ['umkm', 'vendor'], true))
-                    <span>Profil usaha tersimpan di akun; pengajuan verifikasi vendor tersedia untuk pemeriksaan admin.</span>
+                    <span>Pesanan tersimpan di akun; halaman lain masih memiliki konten demo.</span>
                 @else
                     <span>Data dan tindakan demo disimpan lokal di browser; tidak ada transaksi, pembayaran, atau verifikasi nyata.</span>
                 @endif

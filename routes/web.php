@@ -9,6 +9,8 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,6 +62,22 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/katalog/vendor', VendorCatalogController::class)->name('vendors.catalog');
+    Route::get('/pesanan', [OrderController::class, 'index'])->name('orders.index');
+    Route::post('/pesanan', [OrderController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('orders.store');
+    Route::post('/pesanan/penawaran', [OrderController::class, 'storeQuote'])
+        ->middleware('throttle:20,1')
+        ->name('orders.quote');
+    Route::get('/pesanan/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::post('/pesanan/{order}/peserta', [OrderController::class, 'join'])
+        ->middleware('throttle:20,1')
+        ->name('orders.join');
+    Route::patch('/pesanan/{order}/status', [OrderController::class, 'updateStatus'])
+        ->middleware('throttle:30,1')
+        ->name('orders.status');
+
     Route::delete('/akun', AccountController::class)
         ->middleware('throttle:6,1')
         ->name('account.destroy');

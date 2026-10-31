@@ -111,6 +111,9 @@ class BusinessProfileController extends Controller
             'minimum_order_quantity',
             'monthly_capacity',
             'production_lead_time_days',
+            'indicative_price_per_unit',
+            'latitude',
+            'longitude',
         ])) {
             return;
         }
@@ -136,6 +139,9 @@ class BusinessProfileController extends Controller
                 'minimum_order_quantity' => ['required', 'integer', 'min:1', 'max:100000000'],
                 'monthly_capacity' => ['nullable', 'integer', 'min:1', 'max:100000000'],
                 'production_lead_time_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+                'indicative_price_per_unit' => ['nullable', 'numeric', 'gt:0', 'max:1000000000'],
+                'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+                'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             ];
         }
 

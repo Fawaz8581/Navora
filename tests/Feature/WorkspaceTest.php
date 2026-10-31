@@ -12,6 +12,8 @@ test('the workspace route renders the Navora marketplace demo and its assets', f
         ->assertSee('Ruang Navora — Marketplace kemasan UMKM', false)
         ->assertSee('Cari vendor')
         ->assertSee('Patungan MOQ')
+        ->assertSee('Pesanan dan pelacakan')
+        ->assertSee(route('orders.index'), false)
         ->assertSee('Permintaan penawaran')
         ->assertSee('Asisten kemasan')
         ->assertSee('PouchKita Studio')
