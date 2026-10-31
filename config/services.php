@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'navora_admin' => [
+        'email' => env('NAVORA_ADMIN_EMAIL', 'Navora@gmail.com'),
+        'password' => env('NAVORA_ADMIN_PASSWORD'),
+    ],
+
 ];

@@ -41,7 +41,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         if ($request->user()->role === 'admin') {
-            return redirect()->intended(route('admin.vendor-verifications.index'));
+            return redirect()->intended(route('admin.dashboard'));
         }
 
         if (in_array($request->user()->role, ['umkm', 'vendor'], true)

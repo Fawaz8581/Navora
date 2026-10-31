@@ -15,8 +15,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(AdminUserSeeder::class, false, ['resetExisting' => false]);
-
         // User::factory(10)->create();
 
         User::factory()->create([

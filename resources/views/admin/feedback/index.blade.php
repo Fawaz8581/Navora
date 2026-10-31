@@ -1,9 +1,9 @@
-@extends('auth.partials.layout')
+@extends('admin.layout')
 
 @section('title', 'Masukan pengguna')
 @section('meta-description', 'Masukan pengguna tentang platform Navora dan vendor.')
 
-@section('auth-form')
+@section('admin-content')
     <div class="auth-form-heading">
         <span class="auth-form-eyebrow"><span></span> ADMIN NAVORA</span>
         <h2>Masukan pengguna</h2>
@@ -35,9 +35,4 @@
         {{ $feedback->links() }}
     @endif
 
-    <p class="auth-switch"><a href="{{ route('admin.vendor-verifications.index') }}">Kembali ke pemeriksaan vendor</a></p>
-    <form class="onboarding-logout" action="{{ route('logout') }}" method="post">
-        @csrf
-        <button type="submit">Keluar dari akun admin</button>
-    </form>
 @endsection

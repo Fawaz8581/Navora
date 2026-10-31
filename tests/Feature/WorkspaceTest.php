@@ -28,7 +28,9 @@ test('a signed-in user sees the workspace for their saved role without the demo 
         'name' => 'Vendor Navora',
         'role' => 'vendor',
     ]);
-    BusinessProfile::factory()->for($vendor)->create();
+    BusinessProfile::factory()->for($vendor)->create([
+        'verification_status' => 'approved',
+    ]);
 
     $this->actingAs($vendor)
         ->get(route('workspace'))
@@ -37,4 +39,22 @@ test('a signed-in user sees the workspace for their saved role without the demo 
         ->assertSee('data-auth-name="Vendor Navora"', false)
         ->assertSee('Vendor')
         ->assertDontSee('data-role-select', false);
+});
+
+test('vendors without approved verification can only continue through the verification flow', function () {
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    BusinessProfile::factory()->for($vendor)->create([
+        'verification_status' => 'rejected',
+        'verification_notes' => 'Perbarui foto tempat produksi.',
+    ]);
+
+    $this->actingAs($vendor)
+        ->get(route('workspace'))
+        ->assertRedirect(route('vendor.verification.index'));
+
+    $this->actingAs($vendor)
+        ->get(route('vendor.verification.index'))
+        ->assertOk()
+        ->assertSee('Perbarui foto tempat produksi.')
+        ->assertSee('Kirim ulang verifikasi');
 });

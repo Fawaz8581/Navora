@@ -1,16 +1,14 @@
-@extends('auth.partials.layout')
+@extends('admin.layout')
 
 @section('title', 'Pemeriksaan vendor')
 @section('meta-description', 'Kelola pemeriksaan dokumen vendor Navora.')
 
-@section('auth-form')
+@section('admin-content')
     <div class="auth-form-heading">
         <span class="auth-form-eyebrow"><span></span> ADMIN NAVORA</span>
         <h2>Pemeriksaan vendor</h2>
         <p>Periksa dokumen dan data vendor sebelum menyetujui profilnya.</p>
     </div>
-
-    <p class="auth-switch"><a href="{{ route('admin.feedback.index') }}">Lihat masukan pengguna</a></p>
 
     <nav class="onboarding-progress" aria-label="Filter status verifikasi">
         @foreach (['pending' => 'Menunggu', 'approved' => 'Disetujui', 'rejected' => 'Perlu perbaikan', 'all' => 'Semua'] as $value => $label)
@@ -42,9 +40,4 @@
         </div>
         {{ $profiles->links() }}
     @endif
-
-    <form class="onboarding-logout" action="{{ route('logout') }}" method="post">
-        @csrf
-        <button type="submit">Keluar dari akun admin</button>
-    </form>
 @endsection

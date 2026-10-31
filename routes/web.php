@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin\AdminAccountSetupController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -23,11 +25,19 @@ Route::get('/ruang-kerja', function () {
     $user = auth()->user();
 
     if ($user?->role === 'admin') {
-        return redirect()->route('admin.vendor-verifications.index');
+        return redirect()->route('admin.dashboard');
     }
 
-    if ($user && in_array($user->role, ['umkm', 'vendor'], true) && ! $user->businessProfile?->completed_at) {
-        return redirect()->route('onboarding.index');
+    if ($user && in_array($user->role, ['umkm', 'vendor'], true)) {
+        $profile = $user->businessProfile;
+
+        if (! $profile?->completed_at) {
+            return redirect()->route('onboarding.index');
+        }
+
+        if ($user->role === 'vendor' && $profile->verification_status !== 'approved') {
+            return redirect()->route('vendor.verification.index');
+        }
     }
 
     return view('workspace');
@@ -40,6 +50,10 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:6,1')->name('login.store');
 });
+
+Route::get('/adminaccountcreate', [AdminAccountSetupController::class, 'create'])
+    ->middleware('throttle:5,1')
+    ->name('admin-account-setup.create');
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
@@ -75,6 +89,10 @@ Route::middleware('auth')->group(function () {
                 ->whereNumber('index')
                 ->name('documents');
         });
+
+    Route::get('/admin', AdminDashboardController::class)
+        ->middleware('admin')
+        ->name('admin.dashboard');
 
     Route::get('/admin/feedback', [AdminFeedbackController::class, 'index'])
         ->middleware('admin')

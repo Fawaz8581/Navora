@@ -2,7 +2,6 @@
 
 use App\Models\BusinessProfile;
 use App\Models\User;
-use Database\Seeders\AdminUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +51,20 @@ test('vendors can submit their NIB and verification documents for admin review',
     Storage::disk('local')->assertExists($profile->work_sample_paths[0]);
     Storage::disk('local')->assertExists($profile->production_photo_paths[0]);
     Storage::disk('local')->assertExists($profile->certificate_paths[0]);
+
+    $this->actingAs($vendor)
+        ->get(route('vendor.verification.index'))
+        ->assertOk()
+        ->assertSee('Menunggu pemeriksaan')
+        ->assertDontSee('name="work_samples[]"', false);
+
+    $this->actingAs($vendor)
+        ->get(route('workspace'))
+        ->assertRedirect(route('vendor.verification.index'));
+
+    $this->actingAs($vendor)
+        ->post(route('vendor.verification.submit'), [])
+        ->assertStatus(409);
 });
 
 test('verification documents are only downloadable by an admin and admins can approve a vendor', function () {
@@ -96,6 +109,20 @@ test('verification documents are only downloadable by an admin and admins can ap
     expect($profile->fresh()->verification_status)->toBe('approved')
         ->and($profile->fresh()->verified_by)->toBe($admin->id)
         ->and($profile->fresh()->verification_reviewed_at)->not->toBeNull();
+
+    $this->actingAs($vendor)
+        ->get(route('workspace'))
+        ->assertOk();
+
+    $this->actingAs($vendor)
+        ->get(route('vendor.verification.index'))
+        ->assertOk()
+        ->assertSee('Terverifikasi')
+        ->assertDontSee('name="work_samples[]"', false);
+
+    $this->actingAs($vendor)
+        ->post(route('vendor.verification.submit'), [])
+        ->assertStatus(409);
 });
 
 test('admin rejection requires a reason and vendors can resubmit after review', function () {
@@ -104,8 +131,27 @@ test('admin rejection requires a reason and vendors can resubmit after review', 
     $profile = BusinessProfile::factory()->for($vendor)->create([
         'verification_status' => 'pending',
         'nib_document_path' => 'vendor-verification/nib.pdf',
-        'work_sample_paths' => ['vendor-verification/sample.png'],
-        'production_photo_paths' => ['vendor-verification/production.png'],
+        'work_sample_paths' => [
+            'vendor-verification/sample-1.png',
+            'vendor-verification/sample-2.png',
+            'vendor-verification/sample-3.png',
+            'vendor-verification/sample-4.png',
+            'vendor-verification/sample-5.png',
+        ],
+        'production_photo_paths' => [
+            'vendor-verification/production-1.png',
+            'vendor-verification/production-2.png',
+            'vendor-verification/production-3.png',
+            'vendor-verification/production-4.png',
+            'vendor-verification/production-5.png',
+        ],
+        'certificate_paths' => [
+            'vendor-verification/certificate-1.pdf',
+            'vendor-verification/certificate-2.pdf',
+            'vendor-verification/certificate-3.pdf',
+            'vendor-verification/certificate-4.pdf',
+            'vendor-verification/certificate-5.pdf',
+        ],
     ]);
     $admin = User::factory()->create(['role' => 'admin']);
 
@@ -128,19 +174,44 @@ test('admin rejection requires a reason and vendors can resubmit after review', 
     $this->actingAs($vendor)
         ->get(route('vendor.verification.index'))
         ->assertOk()
+        ->assertSee('Akun vendor belum terverifikasi.')
+        ->assertSee('Alasan penolakan')
         ->assertSee('Foto tempat produksi belum terlihat jelas.');
+
+    $this->actingAs($vendor)
+        ->get(route('business-profile.show'))
+        ->assertOk()
+        ->assertSee($profile->business_name);
+
+    $this->actingAs($vendor)
+        ->get(route('workspace'))
+        ->assertRedirect(route('vendor.verification.index'));
 
     $this->actingAs($vendor)
         ->post(route('vendor.verification.submit'), [
             'nib' => '1234567890123',
+        ])
+        ->assertSessionHasErrors('documents');
+
+    expect($profile->fresh()->verification_status)->toBe('rejected');
+
+    $this->actingAs($vendor)
+        ->post(route('vendor.verification.submit'), [
+            'nib' => '1234567890123',
+            'nib_document' => UploadedFile::fake()->create('nib-updated.pdf', 20, 'application/pdf'),
             'work_samples' => [fakePngUpload('sample-2.png')],
             'production_photos' => [fakePngUpload('production-2.png')],
+            'certificates' => [UploadedFile::fake()->create('certificate-updated.pdf', 20, 'application/pdf')],
         ])
         ->assertRedirect(route('vendor.verification.index'));
 
-    expect($profile->fresh()->verification_status)->toBe('pending')
-        ->and($profile->fresh()->verification_notes)->toBeNull()
-        ->and(count($profile->fresh()->work_sample_paths))->toBe(2);
+    $profile = $profile->fresh();
+
+    expect($profile->verification_status)->toBe('pending')
+        ->and($profile->verification_notes)->toBeNull()
+        ->and(count($profile->work_sample_paths))->toBe(1)
+        ->and(count($profile->production_photo_paths))->toBe(1)
+        ->and(count($profile->certificate_paths))->toBe(1);
 });
 
 test('changing verified vendor details returns verification to the submission state', function () {
@@ -196,7 +267,7 @@ test('verification routes enforce user roles and required document data', functi
         ->assertSessionHasErrors(['nib', 'nib_document', 'work_samples', 'production_photos']);
 });
 
-test('admin login opens the vendor verification dashboard', function () {
+test('admin login opens the admin dashboard', function () {
     $admin = User::factory()->create([
         'email' => 'navora-admin@example.com',
         'role' => 'admin',
@@ -206,23 +277,5 @@ test('admin login opens the vendor verification dashboard', function () {
     $this->post(route('login.store'), [
         'email' => $admin->email,
         'password' => 'secure-admin-password',
-    ])->assertRedirect(route('admin.vendor-verifications.index'));
-});
-
-test('admin seeder creates the Navora account and can reset its generated password', function () {
-    $this->seed(AdminUserSeeder::class);
-    $admin = User::where('email', 'admin@navora.local')->firstOrFail();
-    $passwordHash = $admin->password;
-
-    app(AdminUserSeeder::class)->run(false);
-
-    expect($admin->fresh()->password)->toBe($passwordHash);
-
-    $this->seed(AdminUserSeeder::class);
-
-    expect($admin->name)->toBe('Navora')
-        ->and($admin->role)->toBe('admin')
-        ->and(Hash::needsRehash($admin->password))->toBeFalse()
-        ->and($admin->fresh()->password)->not->toBe($passwordHash)
-        ->and(User::where('email', 'admin@navora.local')->count())->toBe(1);
+    ])->assertRedirect(route('admin.dashboard'));
 });

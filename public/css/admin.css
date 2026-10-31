@@ -1,0 +1,542 @@
+.navora-admin-body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: #f5f8fa;
+    color: #17314b;
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.navora-admin-header {
+    position: sticky;
+    z-index: 5;
+    top: 0;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(27, 55, 75, .06);
+}
+
+.navora-admin-top,
+.navora-admin-nav {
+    display: flex;
+    width: min(100% - 48px, 1180px);
+    margin: 0 auto;
+}
+
+.navora-admin-top {
+    min-height: 76px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.navora-admin-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #17314b;
+    font-family: 'Manrope', sans-serif;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.06em;
+    text-decoration: none;
+}
+
+.navora-admin-brand:hover {
+    color: #17314b;
+}
+
+.navora-admin-brand > span:last-child {
+    display: grid;
+}
+
+.navora-admin-brand small,
+.navora-admin-account small {
+    color: #81919d;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+}
+
+.navora-admin-account {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.navora-admin-account > span {
+    display: grid;
+    gap: 3px;
+    text-align: right;
+}
+
+.navora-admin-account strong {
+    font-size: 11px;
+}
+
+.navora-admin-account small {
+    font-size: 9px;
+    letter-spacing: 0;
+}
+
+.navora-admin-logout {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border: 1px solid #e6edf1;
+    border-radius: 9px;
+    background: #fff;
+    color: #607789;
+}
+
+.navora-admin-logout:hover {
+    border-color: #c9d9e3;
+    color: #1d5b94;
+}
+
+.navora-admin-nav {
+    gap: 8px;
+    overflow-x: auto;
+    border-top: 1px solid #eff3f5;
+}
+
+.navora-admin-nav a {
+    display: inline-flex;
+    min-height: 46px;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border-bottom: 2px solid transparent;
+    color: #718493;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.navora-admin-nav a:hover,
+.navora-admin-nav a.is-active {
+    border-bottom-color: #1d5b94;
+    color: #1d5b94;
+}
+
+.navora-admin-main {
+    width: min(100% - 48px, 1180px);
+    margin: 0 auto;
+    padding: 36px 0 56px;
+}
+
+.admin-welcome {
+    display: flex;
+    min-height: 190px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 30px 36px;
+    overflow: hidden;
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 90% 15%, rgba(119, 181, 178, .2), transparent 25%),
+        linear-gradient(120deg, #173e60, #102d49);
+    color: #fff;
+}
+
+.admin-eyebrow {
+    color: #729781;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .14em;
+}
+
+.admin-welcome .admin-eyebrow {
+    color: #9ac4b2;
+}
+
+.admin-welcome h1 {
+    margin: 9px 0 7px;
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 800;
+    letter-spacing: -.055em;
+}
+
+.admin-welcome p {
+    max-width: 520px;
+    margin: 0;
+    color: rgba(235, 244, 249, .75);
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.admin-welcome-icon {
+    display: grid;
+    width: 88px;
+    height: 88px;
+    flex: none;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 25px;
+    background: rgba(255, 255, 255, .08);
+    color: #b7d6d6;
+    font-size: 37px;
+}
+
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.admin-stat-card,
+.admin-panel {
+    border: 1px solid #e7edf1;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 5px 16px rgba(31, 57, 75, .035);
+}
+
+.admin-stat-card {
+    display: flex;
+    min-height: 104px;
+    align-items: center;
+    gap: 13px;
+    padding: 18px;
+}
+
+.admin-stat-icon {
+    display: grid;
+    width: 39px;
+    height: 39px;
+    flex: none;
+    place-items: center;
+    border-radius: 11px;
+    font-size: 16px;
+}
+
+.admin-stat-blue {
+    background: #eaf2f8;
+    color: #39719b;
+}
+
+.admin-stat-teal {
+    background: #eaf5f2;
+    color: #538f80;
+}
+
+.admin-stat-gold {
+    background: #fbf3e5;
+    color: #a57c35;
+}
+
+.admin-stat-purple {
+    background: #f1eef9;
+    color: #806bb1;
+}
+
+.admin-stat-card > div {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.admin-stat-card > div > span {
+    color: #778a98;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.admin-stat-card strong {
+    color: #17314b;
+    font-family: 'Manrope', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.admin-dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, .8fr);
+    align-items: start;
+    gap: 18px;
+    margin-top: 20px;
+}
+
+.admin-panel {
+    min-width: 0;
+    padding: 22px;
+}
+
+.admin-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 17px;
+}
+
+.admin-panel-heading h2,
+.admin-quick-links h2 {
+    margin: 5px 0 0;
+    color: #17314b;
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -.035em;
+}
+
+.admin-panel-heading > a {
+    flex: none;
+    color: #1d5b94;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.admin-table-wrap {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+}
+
+.admin-table th {
+    padding: 10px 9px;
+    border-bottom: 1px solid #e9eef1;
+    color: #83929c;
+    font-size: 9px;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.admin-table td {
+    padding: 12px 9px;
+    border-bottom: 1px solid #f0f3f5;
+    color: #506679;
+    white-space: nowrap;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.admin-table td:first-child {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-table td:first-child strong {
+    color: #29455a;
+    font-size: 10px;
+}
+
+.admin-table td:first-child small {
+    color: #8a9aa5;
+    font-size: 9px;
+}
+
+.admin-table-action {
+    display: inline-flex;
+    padding: 6px 9px;
+    border-radius: 6px;
+    background: #edf4f9;
+    color: #1d5b94;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.admin-empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 7px;
+    padding: 32px 12px 24px;
+    color: #7d8e99;
+    text-align: center;
+}
+
+.admin-empty-state > i {
+    color: #75ad9b;
+    font-size: 26px;
+}
+
+.admin-empty-state strong {
+    color: #40586a;
+    font-size: 11px;
+}
+
+.admin-empty-state span {
+    font-size: 10px;
+}
+
+.admin-quick-links > h2 {
+    margin-bottom: 14px;
+}
+
+.admin-quick-links > a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 0;
+    border-top: 1px solid #eff3f5;
+    color: #718493;
+    text-decoration: none;
+}
+
+.admin-quick-links > a:hover strong,
+.admin-quick-links > a:hover > i {
+    color: #1d5b94;
+}
+
+.admin-quick-links > a > span:nth-child(2) {
+    display: grid;
+    flex: 1;
+    gap: 4px;
+}
+
+.admin-quick-icon {
+    display: grid;
+    width: 35px;
+    height: 35px;
+    flex: none;
+    place-items: center;
+    border-radius: 9px;
+    background: #edf4f8;
+    color: #39719b;
+}
+
+.admin-quick-links strong {
+    color: #40586a;
+    font-size: 10px;
+}
+
+.admin-quick-links small {
+    color: #8797a2;
+    font-size: 9px;
+}
+
+.admin-quick-links > a > i {
+    font-size: 11px;
+}
+
+.navora-admin-main .auth-form-wrap {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+.navora-admin-main .onboarding-logout {
+    display: none;
+}
+
+.navora-admin-main .onboarding-progress-step {
+    padding: 8px;
+    border: 1px solid #e7edf1;
+    border-radius: 8px;
+    text-decoration: none;
+}
+
+.navora-admin-main .onboarding-progress-step.is-current {
+    border-color: #1d5b94;
+    background: #f1f7fb;
+}
+
+.navora-admin-main .auth-form-heading h2 {
+    font-size: 25px;
+}
+
+.navora-admin-main .onboarding-review-section {
+    margin-bottom: 12px;
+}
+
+.navora-admin-main .pagination {
+    margin-top: 18px;
+}
+
+@media (max-width: 900px) {
+    .admin-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 575px) {
+    .navora-admin-top,
+    .navora-admin-nav,
+    .navora-admin-main {
+        width: min(100% - 28px, 1180px);
+    }
+
+    .navora-admin-main {
+        padding-top: 20px;
+    }
+
+    .navora-admin-top {
+        min-height: 65px;
+    }
+
+    .navora-admin-brand {
+        font-size: 17px;
+    }
+
+    .navora-admin-nav {
+        gap: 0;
+    }
+
+    .navora-admin-nav a {
+        padding: 0 10px;
+        font-size: 10px;
+    }
+
+    .admin-welcome {
+        min-height: 160px;
+        padding: 23px 20px;
+    }
+
+    .admin-welcome-icon {
+        width: 54px;
+        height: 54px;
+        border-radius: 16px;
+        font-size: 24px;
+    }
+
+    .admin-welcome p {
+        font-size: 10px;
+    }
+
+    .admin-stats-grid {
+        gap: 10px;
+    }
+
+    .admin-stat-card {
+        min-height: 91px;
+        gap: 9px;
+        padding: 12px;
+    }
+
+    .admin-stat-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .admin-stat-card > div > span {
+        font-size: 9px;
+    }
+
+    .admin-stat-card strong {
+        font-size: 20px;
+    }
+
+    .admin-panel {
+        padding: 16px 13px;
+    }
+}

@@ -36,9 +36,7 @@ class VendorVerificationController extends Controller
             return redirect()->route('onboarding.index');
         }
 
-        $remainingWorkSamples = max(0, 5 - count($profile->work_sample_paths ?? []));
-        $remainingProductionPhotos = max(0, 5 - count($profile->production_photo_paths ?? []));
-        $remainingCertificates = max(0, 5 - count($profile->certificate_paths ?? []));
+        abort_unless(in_array($profile->verification_status, ['not_submitted', 'rejected'], true), 409);
 
         $validated = $request->validate([
             'nib' => ['required', 'string', 'max:32'],
@@ -47,17 +45,17 @@ class VendorVerificationController extends Controller
                 empty($profile->work_sample_paths) ? 'required' : 'sometimes',
                 'array',
                 'min:1',
-                'max:'.$remainingWorkSamples,
+                'max:5',
             ],
             'work_samples.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'production_photos' => [
                 empty($profile->production_photo_paths) ? 'required' : 'sometimes',
                 'array',
                 'min:1',
-                'max:'.$remainingProductionPhotos,
+                'max:5',
             ],
             'production_photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'certificates' => ['sometimes', 'array', 'max:'.$remainingCertificates],
+            'certificates' => ['sometimes', 'array', 'max:5'],
             'certificates.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ], [
             'nib.required' => 'Masukkan nomor NIB usaha.',
@@ -65,6 +63,18 @@ class VendorVerificationController extends Controller
             'work_samples.required' => 'Unggah setidaknya satu contoh pekerjaan.',
             'production_photos.required' => 'Unggah setidaknya satu foto tempat produksi.',
         ]);
+
+        if ($profile->verification_status === 'rejected'
+            && ! (
+                $request->hasFile('nib_document')
+                || $request->hasFile('work_samples')
+                || $request->hasFile('production_photos')
+                || $request->hasFile('certificates')
+            )) {
+            return back()
+                ->withErrors(['documents' => 'Unggah setidaknya satu dokumen perbaikan sebelum mengirim ulang.'])
+                ->withInput();
+        }
 
         $nibDocument = $request->file('nib_document');
         $nibDocumentPath = $nibDocument
@@ -77,9 +87,9 @@ class VendorVerificationController extends Controller
         $profile->forceFill([
             'nib' => $validated['nib'],
             'nib_document_path' => $nibDocumentPath ?? $profile->nib_document_path,
-            'work_sample_paths' => [...($profile->work_sample_paths ?? []), ...$workSamplePaths],
-            'production_photo_paths' => [...($profile->production_photo_paths ?? []), ...$productionPhotoPaths],
-            'certificate_paths' => [...($profile->certificate_paths ?? []), ...$certificatePaths],
+            'work_sample_paths' => $workSamplePaths !== [] ? $workSamplePaths : ($profile->work_sample_paths ?? []),
+            'production_photo_paths' => $productionPhotoPaths !== [] ? $productionPhotoPaths : ($profile->production_photo_paths ?? []),
+            'certificate_paths' => $certificatePaths !== [] ? $certificatePaths : ($profile->certificate_paths ?? []),
             'verification_status' => 'pending',
             'verification_notes' => null,
             'verification_submitted_at' => now(),

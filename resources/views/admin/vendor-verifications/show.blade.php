@@ -1,9 +1,9 @@
-@extends('auth.partials.layout')
+@extends('admin.layout')
 
 @section('title', 'Tinjau profil vendor')
 @section('meta-description', 'Periksa profil dan dokumen vendor Navora.')
 
-@section('auth-form')
+@section('admin-content')
     <div class="auth-form-heading">
         <span class="auth-form-eyebrow"><span></span> ADMIN NAVORA</span>
         <h2>{{ $profile->business_name ?: 'Profil vendor' }}</h2>
