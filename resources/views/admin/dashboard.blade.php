@@ -30,6 +30,10 @@
             <span class="admin-stat-icon admin-stat-purple"><i class="bi bi-chat-square-text"></i></span>
             <div><span>Total masukan</span><strong>{{ number_format($stats['feedback']) }}</strong></div>
         </article>
+        <article class="admin-stat-card">
+            <span class="admin-stat-icon admin-stat-gold"><i class="bi bi-megaphone"></i></span>
+            <div><span>Pembayaran iklan menunggu</span><strong>{{ number_format($stats['pending_ad_payments']) }}</strong></div>
+        </article>
     </section>
 
     <section class="admin-dashboard-grid">
@@ -80,6 +84,11 @@
             <a href="{{ route('admin.feedback.index') }}">
                 <span class="admin-quick-icon"><i class="bi bi-chat-square-text"></i></span>
                 <span><strong>Masukan pengguna</strong><small>Baca masukan untuk Navora</small></span>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a href="{{ route('admin.customize.index') }}">
+                <span class="admin-quick-icon"><i class="bi bi-megaphone"></i></span>
+                <span><strong>Customize iklan</strong><small>Atur paket dan tinjau pembayaran</small></span>
                 <i class="bi bi-chevron-right"></i>
             </a>
         </aside>

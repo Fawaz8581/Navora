@@ -127,6 +127,153 @@
     padding: 36px 0 56px;
 }
 
+.admin-customize-section {
+    margin-top: 22px;
+    padding: 24px;
+}
+
+.admin-customize-copy {
+    color: #718493;
+    font-size: 13px;
+}
+
+.admin-notice {
+    margin: 18px 0;
+    padding: 12px 16px;
+    border: 1px solid #cfe5db;
+    border-radius: 10px;
+    background: #eff8f4;
+    color: #28735a;
+    font-size: 13px;
+}
+
+.admin-notice-error {
+    border-color: #f0d4d4;
+    background: #fff6f6;
+    color: #9c3939;
+}
+
+.admin-ad-package-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    align-items: end;
+    gap: 12px;
+    padding: 16px 0;
+    border-top: 1px solid #eff3f5;
+}
+
+.admin-ad-package-form label {
+    display: grid;
+    gap: 6px;
+    color: #718493;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.admin-ad-package-form input:not([type="checkbox"]),
+.admin-ad-package-form select,
+.admin-ad-actions input:not([type="hidden"]) {
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid #dfe7ec;
+    border-radius: 7px;
+    color: #17314b;
+    font: inherit;
+}
+
+.admin-ad-package-form .admin-ad-active {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-ad-campaign {
+    padding: 18px 0;
+    border-top: 1px solid #eff3f5;
+}
+
+.admin-ad-campaign > p,
+.admin-ad-campaign > small,
+.admin-ad-campaign-heading span {
+    color: #718493;
+    font-size: 12px;
+}
+
+.admin-ad-campaign-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-ad-campaign-heading > div {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-status-pill {
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: #eff4f7;
+    color: #42637a !important;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.admin-ad-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.admin-ad-actions form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.admin-ad-preview {
+    width: min(100%, 560px);
+    margin: 12px 0;
+    overflow: hidden;
+    border: 1px solid #e5eaf0;
+    border-radius: 10px;
+}
+
+.admin-ad-preview img {
+    display: block;
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    background: #f5f8fc;
+}
+
+.admin-ad-note {
+    color: #a23c3c;
+}
+
+.admin-action-danger {
+    background: #fff3f3;
+    color: #a23c3c;
+}
+
+.admin-pagination {
+    padding-top: 16px;
+}
+
+@media (max-width: 640px) {
+    .admin-customize-section {
+        padding: 18px 14px;
+    }
+
+    .admin-ad-campaign-heading {
+        flex-direction: column;
+    }
+}
+
 .admin-welcome {
     display: flex;
     min-height: 190px;

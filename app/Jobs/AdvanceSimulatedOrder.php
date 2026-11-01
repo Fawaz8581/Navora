@@ -22,12 +22,7 @@ class AdvanceSimulatedOrder implements ShouldQueue
                 return null;
             }
 
-            $nextStatus = match ($order->status) {
-                Order::STATUS_PROCESSING => Order::STATUS_PRODUCTION,
-                Order::STATUS_PRODUCTION => Order::STATUS_SHIPPED,
-                Order::STATUS_SHIPPED => Order::STATUS_RECEIVED,
-                default => null,
-            };
+            $nextStatus = $order->nextSimulatedStatus();
 
             if ($nextStatus === null) {
                 return null;
@@ -37,14 +32,15 @@ class AdvanceSimulatedOrder implements ShouldQueue
             $order->statusHistory()->create([
                 'user_id' => null,
                 'status' => $nextStatus,
-                'note' => 'Simulasi otomatis; bukan konfirmasi produksi, pengiriman, atau penerimaan nyata.',
+                'note' => Order::simulatedStatusNote($nextStatus),
             ]);
 
             return $nextStatus;
         });
 
         if (in_array($nextStatus, [Order::STATUS_PRODUCTION, Order::STATUS_SHIPPED], true)) {
-            self::dispatch($this->orderId, $nextStatus)->delay(now()->addSeconds(20));
+            self::dispatch($this->orderId, $nextStatus)
+                ->delay(now()->addSeconds(Order::SIMULATION_STAGE_DELAY_SECONDS));
         }
     }
 }

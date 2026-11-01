@@ -265,6 +265,87 @@ it('advances simulated stages in order and ignores stale jobs and real orders', 
         && $job->expectedStatus === Order::STATUS_SHIPPED);
 });
 
+it('catches up simulated delivery stages when tracking is opened without a queue worker', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    Queue::fake([AdvanceSimulatedOrder::class]);
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi simulasi',
+        'quantity' => 500,
+        'packaging_details' => 'Kemasan standar.',
+        'delivery_address' => 'Jalan Melati 10, Bandung',
+        'status' => Order::STATUS_PROCESSING,
+        'is_simulated' => true,
+    ]);
+    $history = $order->statusHistory()->create([
+        'user_id' => null,
+        'status' => Order::STATUS_PROCESSING,
+        'note' => 'Simulasi otomatis dimulai.',
+    ]);
+    $history->created_at = now()->subSeconds(61);
+    $history->updated_at = $history->created_at;
+    $history->save();
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.index'))
+        ->assertOk()
+        ->assertJsonPath('orders.0.status', Order::STATUS_RECEIVED)
+        ->assertJsonPath('orders.0.history.1.status', Order::STATUS_PRODUCTION)
+        ->assertJsonPath('orders.0.history.1.note', 'Simulasi: pesanan sedang diproduksi oleh vendor.')
+        ->assertJsonPath('orders.0.history.2.status', Order::STATUS_SHIPPED)
+        ->assertJsonPath('orders.0.history.2.note', 'Simulasi: pesanan sedang dalam perjalanan ke alamat pengiriman.')
+        ->assertJsonPath('orders.0.history.3.status', Order::STATUS_RECEIVED)
+        ->assertJsonPath('orders.0.history.3.note', 'Simulasi: pesanan ditandai telah diterima.');
+
+    expect($order->fresh()->status)->toBe(Order::STATUS_RECEIVED)
+        ->and($order->statusHistory()->orderBy('id')->pluck('status')->all())->toBe([
+            Order::STATUS_PROCESSING,
+            Order::STATUS_PRODUCTION,
+            Order::STATUS_SHIPPED,
+            Order::STATUS_RECEIVED,
+        ]);
+});
+
+it('waits for the automatic simulation interval before advancing the next stage', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    Queue::fake([AdvanceSimulatedOrder::class]);
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi simulasi',
+        'quantity' => 500,
+        'packaging_details' => 'Kemasan standar.',
+        'delivery_address' => 'Jalan Melati 10, Bandung',
+        'status' => Order::STATUS_PROCESSING,
+        'is_simulated' => true,
+    ]);
+    $history = $order->statusHistory()->create([
+        'user_id' => null,
+        'status' => Order::STATUS_PROCESSING,
+    ]);
+    $history->created_at = now()->subSeconds(19);
+    $history->updated_at = $history->created_at;
+    $history->save();
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.index'))
+        ->assertOk()
+        ->assertJsonPath('orders.0.status', Order::STATUS_PROCESSING);
+
+    $history->created_at = now()->subSeconds(Order::SIMULATION_STAGE_DELAY_SECONDS + 1);
+    $history->updated_at = $history->created_at;
+    $history->save();
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.index'))
+        ->assertOk()
+        ->assertJsonPath('orders.0.status', Order::STATUS_PRODUCTION);
+
+    Queue::assertPushed(AdvanceSimulatedOrder::class, fn (AdvanceSimulatedOrder $job): bool => $job->orderId === $order->id
+        && $job->expectedStatus === Order::STATUS_PRODUCTION);
+});
+
 it('starts automatic order tracking after the assigned verified vendor confirms the order', function () {
     $buyer = User::factory()->create();
     $vendor = User::factory()->create(['role' => 'vendor']);
@@ -318,6 +399,34 @@ it('starts automatic order tracking after the assigned verified vendor confirms 
         Order::STATUS_WAITING,
         Order::STATUS_PROCESSING,
     ]);
+});
+
+it('does not allow the buyer to confirm an order without an assigned vendor', function () {
+    $buyer = User::factory()->create();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch khusus',
+        'quantity' => 100,
+        'packaging_details' => 'Kraft dengan zipper.',
+        'delivery_address' => 'Jalan Merdeka 2, Bandung',
+        'status' => Order::STATUS_WAITING,
+    ]);
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.show', $order))
+        ->assertOk()
+        ->assertJsonPath('order.allowed_transitions', [
+            ['status' => Order::STATUS_CANCELLED, 'label' => 'Dibatalkan'],
+        ]);
+
+    $this->actingAs($buyer)
+        ->patchJson(route('orders.status', $order), ['status' => Order::STATUS_PROCESSING])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['status']);
+
+    expect($order->fresh()->status)->toBe(Order::STATUS_WAITING)
+        ->and($order->fresh()->is_simulated)->toBeFalse();
 });
 
 it('rejects an unverified vendor and a vendor role from creating or joining orders', function () {

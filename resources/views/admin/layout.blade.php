@@ -12,6 +12,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/auth.css') }}" rel="stylesheet">
     <link href="{{ asset('css/admin.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
 <body class="navora-admin-body">
     <header class="navora-admin-header">
@@ -34,6 +35,9 @@
             </a>
             <a href="{{ route('admin.vendor-verifications.index') }}" @class(['is-active' => request()->routeIs('admin.vendor-verifications.*')])>
                 <i class="bi bi-patch-check"></i> Verifikasi vendor
+            </a>
+            <a href="{{ route('admin.customize.index') }}" @class(['is-active' => request()->routeIs('admin.customize.*')])>
+                <i class="bi bi-sliders"></i> Customize
             </a>
             <a href="{{ route('admin.feedback.index') }}" @class(['is-active' => request()->routeIs('admin.feedback.*')])>
                 <i class="bi bi-chat-square-text"></i> Masukan

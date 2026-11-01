@@ -3,6 +3,7 @@
 use App\Models\BusinessProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -73,10 +74,63 @@ it('filters verified vendors by catalogue details and approximate distance', fun
         ->assertOk()
         ->assertJsonPath('count', 1)
         ->assertJsonPath('vendors.0.id', $nearVendor->id)
+        ->assertJsonPath('vendors.0.images.0', route('vendors.catalog.image', [$nearVendor->businessProfile, 0]))
         ->assertJsonPath('vendors.0.distance_km', 0)
         ->assertJsonPath('vendors.0.price_per_unit', '1250.00')
         ->assertJsonMissingPath('vendors.0.work_sample_paths')
         ->assertJsonMissingPath('vendors.0.certificate_paths');
+});
+
+it('excludes vendors beyond the selected radius before rounding the displayed distance', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = User::factory()->create(['role' => 'vendor']);
+
+    BusinessProfile::factory()->for($vendor)->create([
+        'verification_status' => 'approved',
+        'completed_at' => now(),
+        'latitude' => 0,
+        'longitude' => 0.27,
+    ]);
+
+    $this->actingAs($buyer)
+        ->getJson(route('vendors.catalog', [
+            'distance_km' => 30,
+            'origin_lat' => 0,
+            'origin_lng' => 0,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('count', 0);
+});
+
+it('serves approved vendor product photos only to UMKM catalogue users', function () {
+    Storage::fake('local');
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    $profile = BusinessProfile::factory()->for($vendor)->create([
+        'verification_status' => 'approved',
+        'completed_at' => now(),
+    ]);
+    $samplePath = 'vendor-verification/'.$profile->id.'/work_samples/sample.png';
+    $profile->forceFill(['work_sample_paths' => [$samplePath]])->save();
+    Storage::disk('local')->put(
+        $samplePath,
+        base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lS8AAAAASUVORK5CYII=', true),
+    );
+
+    $this->actingAs($buyer)
+        ->get(route('vendors.catalog.image', [$profile, 0]))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/png')
+        ->assertHeader('cache-control', 'max-age=300, private');
+
+    $this->actingAs($vendor)
+        ->get(route('vendors.catalog.image', [$profile, 0]))
+        ->assertForbidden();
+
+    $profile->forceFill(['verification_status' => 'pending'])->save();
+    $this->actingAs($buyer)
+        ->get(route('vendors.catalog.image', [$profile, 0]))
+        ->assertNotFound();
 });
 
 it('returns forbidden for non-UMKM accounts and rejects a radius without an origin', function () {

@@ -11,6 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/home.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
 <body>
     <a class="skip-link" href="#konten-utama">Lewati ke konten utama</a>
@@ -52,6 +53,7 @@
         </nav>
 
         <main id="konten-utama">
+            @include('advertisements.banner')
             <section class="navora-hero">
                 <div class="container navora-hero-grid">
                     <div class="navora-hero-copy" data-reveal>
@@ -88,12 +90,12 @@
                             <div class="navora-preview-search"><i class="bi bi-search"></i> Kemasan kopi <span>Filter <i class="bi bi-sliders"></i></span></div>
                             <div class="navora-preview-label">PILIHAN VENDOR</div>
                             <article class="navora-preview-vendor">
-                                <span class="navora-preview-product navora-product-pouch"><i class="bi bi-bag"></i></span>
+                                <span class="navora-preview-product navora-product-pouch"><img src="{{ asset('images/products/coffee.jpg') }}" alt="Kemasan pouch kopi" loading="lazy"></span>
                                 <div class="navora-preview-vendor-copy"><strong>PouchKita Studio</strong><span>Standing pouch · MOQ 500 pcs</span><small><i class="bi bi-star-fill"></i> 4,9 <b>·</b> Bandung</small></div>
                                 <span class="navora-preview-price">Mulai<br><strong>Rp1.250</strong></span>
                             </article>
                             <article class="navora-preview-vendor">
-                                <span class="navora-preview-product navora-product-bottle"><i class="bi bi-cup-straw"></i></span>
+                                <span class="navora-preview-product navora-product-bottle"><img src="{{ asset('images/products/bottle.jpg') }}" alt="Botol minum" loading="lazy"></span>
                                 <div class="navora-preview-vendor-copy"><strong>Kemas Prima</strong><span>Botol PET · MOQ 1.000 pcs</span><small><i class="bi bi-star-fill"></i> 4,8 <b>·</b> Jakarta</small></div>
                                 <span class="navora-preview-price">Mulai<br><strong>Rp850</strong></span>
                             </article>
@@ -106,6 +108,7 @@
                         </div>
                         <div class="navora-float-chip"><span><i class="bi bi-people-fill"></i></span><div><strong>Patungan MOQ</strong><small>Pesan sesuai kebutuhan</small></div></div>
                     </div>
+                    @include('advertisements.sidebar')
                 </div>
                 <div class="container navora-hero-bottom">
                     <span>DIRANCANG UNTUK EKOSISTEM UMKM</span>

@@ -40,4 +40,15 @@ return [
         'password' => env('NAVORA_ADMIN_PASSWORD'),
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'base_url' => env(
+            'MIDTRANS_BASE_URL',
+            env('MIDTRANS_IS_PRODUCTION', false)
+                ? 'https://app.midtrans.com'
+                : 'https://app.sandbox.midtrans.com',
+        ),
+    ],
+
 ];

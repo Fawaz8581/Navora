@@ -284,6 +284,10 @@
         if (page === 'orders') {
             loadOrders();
         }
+
+        if (page === 'vendors') {
+            updateVendorFilters();
+        }
     };
 
     const createModalField = (field) => {
@@ -443,9 +447,26 @@
         card.dataset.description = vendor.description || '';
 
         const art = textElement('div', 'navora-vendor-art art-pouch', '');
-        const icon = textElement('span', '', '');
-        icon.append(textElement('i', 'bi bi-box-seam', ''));
-        art.append(icon, textElement('small', '', 'PROFIL VENDOR TERVERIFIKASI'));
+        const categoryText = `${vendor.category || ''} ${vendor.description || ''}`.toLocaleLowerCase('id');
+        const fallbackImage = categoryText.includes('botol')
+            ? '/images/products/bottle.jpg'
+            : categoryText.includes('box') || categoryText.includes('karton')
+                ? '/images/products/cardboard.jpg'
+                : '/images/products/coffee.jpg';
+        const vendorImage = Array.isArray(vendor.images) ? vendor.images[0] : null;
+        const productImage = textElement('img', '', '');
+        productImage.src = vendorImage || fallbackImage;
+        productImage.alt = vendorImage ? `Foto sampel produk ${vendor.name || 'vendor'}` : `Foto referensi ${vendor.category || 'produk vendor'}`;
+        productImage.loading = 'lazy';
+        productImage.addEventListener('error', () => {
+            if (vendorImage && productImage.src !== fallbackImage) {
+                productImage.src = fallbackImage;
+                return;
+            }
+
+            productImage.remove();
+        }, { once: true });
+        art.append(productImage, textElement('small', '', vendorImage ? 'FOTO SAMPEL VENDOR' : 'FOTO REFERENSI'));
         const verified = textElement('span', 'navora-verified-tag', '');
         verified.append(textElement('i', 'bi bi-patch-check-fill', ''), document.createTextNode(' Terverifikasi'));
         art.append(verified);
@@ -730,10 +751,18 @@
             const card = document.createElement('article');
             card.className = 'navora-listing-card';
             card.dataset.storedListing = 'true';
+            const productDetails = `${listing.name} ${listing.description} ${listing.material}`.toLocaleLowerCase('id');
+            const imageSource = productDetails.includes('botol')
+                ? '/images/products/bottle.jpg'
+                : productDetails.includes('box') || productDetails.includes('karton') || listing.category === 'printing'
+                    ? '/images/products/cardboard.jpg'
+                    : '/images/products/coffee.jpg';
             const art = textElement('span', `navora-listing-art ${listing.category === 'printing' ? 'art-box' : listing.category === 'maklon' ? 'art-maklon' : 'art-pouch'}`, '');
-            const icon = textElement('i', listing.category === 'printing' ? 'bi bi-box2' : listing.category === 'maklon' ? 'bi bi-cup-hot' : 'bi bi-bag', '');
-            icon.setAttribute('aria-hidden', 'true');
-            art.append(icon);
+            const productImage = textElement('img', '', '');
+            productImage.src = imageSource;
+            productImage.alt = `Foto referensi produk ${listing.name}`;
+            productImage.loading = 'lazy';
+            art.append(productImage);
             const content = textElement('div', '', '');
             content.append(
                 textElement('h2', '', listing.name),

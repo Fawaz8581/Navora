@@ -1015,6 +1015,14 @@ body.navora-app-body {
     overflow: hidden;
 }
 
+.navora-vendor-art > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .navora-vendor-art > span:first-child {
     display: grid;
     width: 54px;
@@ -1837,9 +1845,16 @@ body.navora-app-body {
     height: 51px;
     flex: none;
     place-items: center;
+    overflow: hidden;
     border-radius: 9px;
     color: #69859a;
     font-size: 21px;
+}
+
+.navora-listing-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .navora-listing-card > div {

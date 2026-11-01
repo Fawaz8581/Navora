@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdCampaign;
 use App\Models\BusinessProfile;
 use App\Models\Feedback;
 use App\Models\User;
@@ -23,6 +24,7 @@ class DashboardController extends Controller
                 'vendors' => User::query()->where('role', 'vendor')->count(),
                 'pending_verifications' => (clone $vendorProfiles)->where('verification_status', 'pending')->count(),
                 'feedback' => Feedback::query()->count(),
+                'pending_ad_payments' => AdCampaign::query()->where('status', AdCampaign::STATUS_PAID)->count(),
             ],
             'recentVerifications' => (clone $vendorProfiles)
                 ->with('user:id,name,email')

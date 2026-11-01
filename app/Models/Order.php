@@ -32,6 +32,8 @@ class Order extends Model
 
     public const STATUS_CANCELLED = 'dibatalkan';
 
+    public const SIMULATION_STAGE_DELAY_SECONDS = 20;
+
     /**
      * @var array<string, string>
      */
@@ -78,6 +80,26 @@ class Order extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class);
+    }
+
+    public function nextSimulatedStatus(): ?string
+    {
+        return match ($this->status) {
+            self::STATUS_PROCESSING => self::STATUS_PRODUCTION,
+            self::STATUS_PRODUCTION => self::STATUS_SHIPPED,
+            self::STATUS_SHIPPED => self::STATUS_RECEIVED,
+            default => null,
+        };
+    }
+
+    public static function simulatedStatusNote(string $status): string
+    {
+        return match ($status) {
+            self::STATUS_PRODUCTION => 'Simulasi: pesanan sedang diproduksi oleh vendor.',
+            self::STATUS_SHIPPED => 'Simulasi: pesanan sedang dalam perjalanan ke alamat pengiriman.',
+            self::STATUS_RECEIVED => 'Simulasi: pesanan ditandai telah diterima.',
+            default => 'Simulasi otomatis; bukan konfirmasi produksi, pengiriman, atau penerimaan nyata.',
+        };
     }
 
     /**

@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
 test('the Navora homepage explains its marketplace and audience', function () {
     $response = $this->get('/');
 

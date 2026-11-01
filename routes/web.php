@@ -2,14 +2,17 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\AdminAccountSetupController;
+use App\Http\Controllers\Admin\AdvertisementController as AdminAdvertisementController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
+use App\Http\Controllers\AdvertisementAssetController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorVerificationController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +25,8 @@ Route::post('/masukan', [FeedbackController::class, 'store'])
 Route::get('/', function () {
     return view('home');
 })->name('home');
+Route::get('/iklan/{adCampaign}/aset', [AdvertisementAssetController::class, 'show'])
+    ->name('advertisements.asset');
 
 Route::get('/ruang-kerja', function () {
     $user = auth()->user();
@@ -63,6 +68,9 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/katalog/vendor', VendorCatalogController::class)->name('vendors.catalog');
+    Route::get('/katalog/vendor/{businessProfile}/foto/{index}', [VendorCatalogController::class, 'showSample'])
+        ->whereNumber('index')
+        ->name('vendors.catalog.image');
     Route::get('/pesanan', [OrderController::class, 'index'])->name('orders.index');
     Route::post('/pesanan', [OrderController::class, 'store'])
         ->middleware('throttle:20,1')
@@ -96,6 +104,15 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1')
         ->name('vendor.verification.submit');
 
+    Route::get('/vendor/iklan', [VendorAdvertisementController::class, 'index'])
+        ->name('vendor.advertisements.index');
+    Route::post('/vendor/iklan', [VendorAdvertisementController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('vendor.advertisements.store');
+    Route::post('/vendor/iklan/{adCampaign}/aset', [VendorAdvertisementController::class, 'uploadAsset'])
+        ->middleware('throttle:10,1')
+        ->name('vendor.advertisements.asset');
+
     Route::prefix('admin/vendor-verifications')
         ->name('admin.vendor-verifications.')
         ->middleware('admin')
@@ -115,4 +132,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/feedback', [AdminFeedbackController::class, 'index'])
         ->middleware('admin')
         ->name('admin.feedback.index');
+
+    Route::prefix('admin/customize')
+        ->name('admin.customize.')
+        ->middleware('admin')
+        ->group(function () {
+            Route::get('/', [AdminAdvertisementController::class, 'index'])->name('index');
+            Route::post('/packages', [AdminAdvertisementController::class, 'storePackage'])->name('packages.store');
+            Route::patch('/packages/{adPackage}', [AdminAdvertisementController::class, 'updatePackage'])->name('packages.update');
+            Route::post('/campaigns/{adCampaign}/review', [AdminAdvertisementController::class, 'reviewCampaign'])->name('campaigns.review');
+            Route::post('/campaigns/{adCampaign}/publish', [AdminAdvertisementController::class, 'publishCampaign'])->name('campaigns.publish');
+            Route::get('/campaigns/{adCampaign}/asset', [AdvertisementAssetController::class, 'showForAdmin'])->name('campaigns.asset');
+        });
 });

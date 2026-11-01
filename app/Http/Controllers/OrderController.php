@@ -37,6 +37,9 @@ class OrderController extends Controller
             ])
             ->latest('id')
             ->paginate(50);
+
+        $orders->getCollection()->each(fn (Order $order) => $this->syncSimulatedTracking($order));
+
         $presentedOrders = $orders->getCollection()
             ->map(fn (Order $order): array => $this->presentOrder($order, $user))
             ->values();
@@ -77,6 +80,8 @@ class OrderController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canView($order, $user), 404);
+
+        $this->syncSimulatedTracking($order);
 
         $order->load([
             'creator:id,name',
@@ -340,6 +345,77 @@ class OrderController extends Controller
         return $this->show($request, $order->refresh());
     }
 
+    private function syncSimulatedTracking(Order $order): void
+    {
+        if (! $order->is_simulated || ! in_array($order->status, [
+            Order::STATUS_PROCESSING,
+            Order::STATUS_PRODUCTION,
+            Order::STATUS_SHIPPED,
+        ], true)) {
+            return;
+        }
+
+        $latestHistory = $order->relationLoaded('statusHistory')
+            ? $order->statusHistory->sortByDesc('id')->first()
+            : $order->statusHistory()->latest('id')->first();
+
+        if (! $latestHistory?->created_at
+            || $latestHistory->created_at->copy()
+                ->addSeconds(Order::SIMULATION_STAGE_DELAY_SECONDS)
+                ->isFuture()) {
+            return;
+        }
+
+        $advanced = false;
+
+        DB::transaction(function () use ($order, &$advanced): void {
+            $lockedOrder = Order::query()->lockForUpdate()->find($order->id);
+
+            if (! $lockedOrder?->is_simulated) {
+                return;
+            }
+
+            while (($nextStatus = $lockedOrder->nextSimulatedStatus()) !== null) {
+                $latestHistory = $lockedOrder->statusHistory()->latest('id')->first();
+
+                if (! $latestHistory?->created_at) {
+                    return;
+                }
+
+                $transitionAt = $latestHistory->created_at->copy()
+                    ->addSeconds(Order::SIMULATION_STAGE_DELAY_SECONDS);
+
+                if ($transitionAt->isFuture()) {
+                    return;
+                }
+
+                $lockedOrder->update(['status' => $nextStatus]);
+
+                $history = $lockedOrder->statusHistory()->make([
+                    'user_id' => null,
+                    'status' => $nextStatus,
+                    'note' => Order::simulatedStatusNote($nextStatus),
+                ]);
+                $history->created_at = $transitionAt;
+                $history->updated_at = $transitionAt;
+                $history->save();
+
+                $advanced = true;
+            }
+        });
+
+        if ($advanced) {
+            $order->status = Order::query()->findOrFail($order->id)->status;
+            $order->unsetRelation('statusHistory');
+            $order->load('statusHistory.actor:id,name');
+
+            if (in_array($order->status, [Order::STATUS_PRODUCTION, Order::STATUS_SHIPPED], true)) {
+                AdvanceSimulatedOrder::dispatch($order->id, $order->status)
+                    ->delay(now()->addSeconds(Order::SIMULATION_STAGE_DELAY_SECONDS));
+            }
+        }
+    }
+
     private function isVerifiedVendor(int $userId): bool
     {
         return BusinessProfile::query()
@@ -372,19 +448,8 @@ class OrderController extends Controller
         }
 
         if ($order->user_id === $user->id) {
-            if ($order->vendor_user_id === null) {
-                return match ($order->status) {
-                    Order::STATUS_WAITING => [Order::STATUS_PROCESSING, Order::STATUS_CANCELLED],
-                    Order::STATUS_PROCESSING => [Order::STATUS_PRODUCTION, Order::STATUS_CANCELLED],
-                    Order::STATUS_PRODUCTION => [Order::STATUS_SHIPPED, Order::STATUS_CANCELLED],
-                    Order::STATUS_SHIPPED => [Order::STATUS_RECEIVED],
-                    default => [],
-                };
-            }
-
             return match ($order->status) {
                 Order::STATUS_WAITING, Order::STATUS_PROCESSING, Order::STATUS_PRODUCTION => [Order::STATUS_CANCELLED],
-                Order::STATUS_SHIPPED => [Order::STATUS_RECEIVED],
                 default => [],
             };
         }

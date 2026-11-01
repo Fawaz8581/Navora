@@ -11,6 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/auth.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
 <body class="navora-auth-body">
     <main class="auth-layout">
@@ -22,6 +23,7 @@
                 </a>
                 <a class="auth-back-link" href="{{ route('home') }}"><i class="bi bi-arrow-left"></i> Beranda</a>
             </header>
+            @include('advertisements.banner')
             <div class="auth-form-wrap @yield('auth-form-class')">
                 @yield('auth-form')
             </div>

@@ -12,6 +12,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/navora-app.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
 <body class="navora-app-body"
     data-auth-role="{{ auth()->user()->role ?? '' }}"
@@ -80,6 +81,11 @@
                         <button class="navora-page-link is-active" type="button" data-page="overview" data-roles="umkm,vendor,partner" role="tab" aria-selected="true"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
                         <button class="navora-page-link" type="button" data-page="vendors" data-roles="umkm" role="tab" aria-selected="false"><i class="bi bi-search"></i> Cari vendor</button>
                         <button class="navora-page-link" type="button" data-page="listings" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-box-seam"></i> Katalog saya</button>
+                        @auth
+                            @if (Auth::user()->role === 'vendor')
+                                <a class="navora-page-link" href="{{ route('vendor.advertisements.index') }}"><i class="bi bi-megaphone"></i> Iklan saya</a>
+                            @endif
+                        @endauth
                         <button class="navora-page-link" type="button" data-page="groups" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-people"></i> Patungan MOQ</button>
                         <button class="navora-page-link" type="button" data-page="orders" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-box-seam"></i> Pesanan</button>
                         <button class="navora-page-link" type="button" data-page="rfq" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-chat-square-text"></i> Permintaan penawaran</button>
@@ -94,6 +100,9 @@
         </header>
 
         <main class="navora-app-main container-fluid" id="app-content">
+            @include('advertisements.banner')
+            <div class="navora-app-content-layout">
+                <div class="navora-app-panels">
             <section class="navora-page-panel is-active" data-page-panel="overview" role="tabpanel">
                 <div class="navora-welcome-row">
                     <div>
@@ -172,19 +181,19 @@
                         <div class="navora-vendor-grid" data-vendor-grid>
                             @guest
                             <article class="navora-vendor-card" data-vendor-card data-id="pouchkita" data-name="PouchKita Studio" data-category="packaging" data-product="Standing pouch kopi" data-moq="500" data-material="pouch kraft" data-location="bandung" data-price="1250" data-sample="true" data-verified="true" data-tags="pouch kopi standing pouch cetak">
-                                <div class="navora-vendor-art art-pouch"><span><i class="bi bi-bag"></i></span><small>FOTO PRODUK DEMO</small><span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Profil demo</span></div>
+                                <div class="navora-vendor-art art-pouch"><img src="{{ asset('images/products/coffee.jpg') }}" alt="Kemasan pouch kopi" loading="lazy"><small>FOTO REFERENSI</small><span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Profil demo</span></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>PouchKita Studio</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Bandung</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,9 <small>(demo)</small></span></div><p>Standing pouch custom untuk kopi, snack, dan produk kering.</p><div class="navora-vendor-tags"><span>Pouch laminasi</span><span>Kraft</span><span>Sampel tersedia</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>500 pcs</strong></span><span>Harga indikatif<strong>Rp1.250 / pcs</strong></span><span>Estimasi produksi<strong>14–21 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="PouchKita Studio">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="PouchKita Studio">Minta penawaran</button></div></div>
                             </article>
                             <article class="navora-vendor-card" data-vendor-card data-id="kemasprima" data-name="Kemas Prima" data-category="packaging" data-product="Botol PET" data-moq="1000" data-material="pet" data-location="jakarta" data-price="850" data-sample="true" data-verified="true" data-tags="botol pet minuman kosmetik">
-                                <div class="navora-vendor-art art-bottle"><span><i class="bi bi-cup-straw"></i></span><small>FOTO PRODUK DEMO</small><span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Profil demo</span></div>
+                                <div class="navora-vendor-art art-bottle"><img src="{{ asset('images/products/bottle.jpg') }}" alt="Botol minum" loading="lazy"><small>FOTO REFERENSI</small><span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Profil demo</span></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>Kemas Prima</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Jakarta</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,8 <small>(demo)</small></span></div><p>Botol PET dan tutup untuk minuman serta perawatan tubuh.</p><div class="navora-vendor-tags"><span>PET</span><span>Botol</span><span>Sampel tersedia</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>1.000 pcs</strong></span><span>Harga indikatif<strong>Rp850 / pcs</strong></span><span>Estimasi produksi<strong>10–18 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="Kemas Prima">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="Kemas Prima">Minta penawaran</button></div></div>
                             </article>
                             <article class="navora-vendor-card" data-vendor-card data-id="cetakbumi" data-name="Cetak Bumi" data-category="printing" data-product="Box karton kraft" data-moq="300" data-material="kraft carton" data-location="yogyakarta" data-price="2100" data-sample="false" data-verified="false" data-tags="cetak box karton kraft paper">
-                                <div class="navora-vendor-art art-box"><span><i class="bi bi-box2"></i></span><small>FOTO PRODUK DEMO</small></div>
+                                <div class="navora-vendor-art art-box"><img src="{{ asset('images/products/cardboard.jpg') }}" alt="Kotak karton di gudang pengemasan" loading="lazy"><small>FOTO REFERENSI</small></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>Cetak Bumi</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Yogyakarta</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,7 <small>(demo)</small></span></div><p>Cetak digital kemasan kertas dan box untuk batch terbatas.</p><div class="navora-vendor-tags"><span>Kraft paper</span><span>Karton</span><span>Batch kecil</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>300 pcs</strong></span><span>Harga indikatif<strong>Rp2.100 / pcs</strong></span><span>Estimasi produksi<strong>7–14 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="Cetak Bumi">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="Cetak Bumi">Minta penawaran</button></div></div>
                             </article>
                             <article class="navora-vendor-card" data-vendor-card data-id="rasa-racik" data-name="Rasa Racik Maklon" data-category="maklon" data-product="Maklon minuman serbuk" data-moq="5000" data-material="carton" data-location="surabaya" data-price="3200" data-sample="true" data-verified="false" data-tags="maklon minuman serbuk produksi">
-                                <div class="navora-vendor-art art-maklon"><span><i class="bi bi-cup-hot"></i></span><small>FOTO PRODUK DEMO</small></div>
+                                <div class="navora-vendor-art art-maklon"><img src="{{ asset('images/products/coffee.jpg') }}" alt="Produk kopi dalam kemasan" loading="lazy"><small>FOTO REFERENSI</small></div>
                                 <div class="navora-vendor-content"><div class="navora-vendor-name-row"><div><h2>Rasa Racik Maklon</h2><span class="navora-vendor-location"><i class="bi bi-geo-alt"></i> Surabaya</span></div><span class="navora-rating"><i class="bi bi-star-fill"></i> 4,8 <small>(demo)</small></span></div><p>Jasa maklon minuman serbuk dengan diskusi formula awal.</p><div class="navora-vendor-tags"><span>Maklon</span><span>Minuman serbuk</span><span>Konsultasi</span></div><div class="navora-vendor-specs"><span>MOQ mulai<strong>5.000 pcs</strong></span><span>Harga indikatif<strong>Rp3.200 / pcs</strong></span><span>Estimasi produksi<strong>21–35 hari</strong></span></div><div class="navora-vendor-actions"><button class="btn navora-app-outline" type="button" data-action="vendor-detail" data-vendor="Rasa Racik Maklon">Lihat detail</button><button class="btn navora-app-primary" type="button" data-action="rfq" data-vendor="Rasa Racik Maklon">Minta penawaran</button></div></div>
                             </article>
                             @endguest
@@ -209,7 +218,7 @@
                         <button class="btn navora-app-primary" type="button" data-action="create-order" data-order-type="patungan"><i class="bi bi-people"></i> Buat patungan</button>
                     </div>
                 </div>
-                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur status pesanan</strong><p>Menunggu konfirmasi → Diproses → Dalam produksi → Dikirim → Diterima. Pembuat atau vendor cukup mengonfirmasi pesanan satu kali; tahap berikutnya bergerak otomatis tiap 20 detik sebagai simulasi dan memerlukan worker antrean aktif. Status simulasi bukan konfirmasi produksi, kurir, atau penerimaan nyata. Pesanan patungan menunggu target terpenuhi sebelum dapat dikonfirmasi.</p></div></div>
+                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur status pesanan</strong><p>Menunggu konfirmasi → Diproses → Dalam produksi → Dikirim → Diterima. Vendor yang ditetapkan cukup mengonfirmasi pesanan satu kali; status bergerak otomatis tiap 20 detik sebagai simulasi dan diperbarui berkala selama halaman pelacakan terbuka. UMKM dapat membuat atau membatalkan pesanan, tetapi tidak mengonfirmasi tahap pesanan. Status simulasi bukan konfirmasi produksi, kurir, atau penerimaan nyata. Pesanan patungan menunggu target terpenuhi sebelum dapat dikonfirmasi.</p></div></div>
                 <div class="navora-empty-state" data-orders-loading aria-live="polite"><i class="bi bi-arrow-repeat"></i><strong>Memuat pesanan</strong><span>Data diambil dari akunmu.</span></div>
                 <div class="navora-empty-state" data-orders-guest hidden><i class="bi bi-person-lock"></i><strong>Masuk untuk melihat pesanan</strong><span>Pesanan dan pelacakan hanya tersedia untuk akun yang terdaftar.</span><a class="btn navora-app-primary" href="{{ route('login') }}">Masuk ke Navora</a></div>
                 <div class="navora-order-error" data-orders-error role="alert" hidden></div>
@@ -268,9 +277,9 @@
                     @endif
                 </div>
                 <div class="navora-vendor-listings" data-vendor-listings>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-pouch"><i class="bi bi-bag"></i></span><div><h2>Standing pouch custom</h2><p>MOQ 500 pcs · Pouch laminasi · Sampel tersedia</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-box"><i class="bi bi-box2"></i></span><div><h2>Box kemasan makanan</h2><p>MOQ 1.000 pcs · Kraft paper · Cetak satu warna</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-bottle"><i class="bi bi-cup-straw"></i></span><div><h2>Konsultasi kemasan awal</h2><p>Diskusi kebutuhan · Rekomendasi material · Sesi sampel</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
+                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-pouch"><img src="{{ asset('images/products/coffee.jpg') }}" alt="Foto referensi kemasan pouch kopi" loading="lazy"></span><div><h2>Standing pouch custom</h2><p>MOQ 500 pcs · Pouch laminasi · Sampel tersedia</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
+                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-box"><img src="{{ asset('images/products/cardboard.jpg') }}" alt="Foto referensi kotak kemasan karton" loading="lazy"></span><div><h2>Box kemasan makanan</h2><p>MOQ 1.000 pcs · Kraft paper · Cetak satu warna</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
+                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-bottle"><img src="{{ asset('images/products/bottle.jpg') }}" alt="Foto referensi botol kemasan" loading="lazy"></span><div><h2>Konsultasi kemasan awal</h2><p>Diskusi kebutuhan · Rekomendasi material · Sesi sampel</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
                 </div>
             </section>
 
@@ -356,6 +365,9 @@
                     </div>
                 @endauth
             </section>
+                </div>
+                @include('advertisements.sidebar')
+            </div>
             <footer class="navora-app-footer">
                 <span>Navora · Prototype</span>
                 @if (Auth::check() && in_array(Auth::user()->role, ['umkm', 'vendor'], true))

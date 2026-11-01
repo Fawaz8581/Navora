@@ -6,7 +6,9 @@ use App\Models\BusinessProfile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class VendorCatalogController extends Controller
 {
@@ -90,6 +92,11 @@ class VendorCatalogController extends Controller
                 'name' => $profile->business_name ?: $profile->user?->name ?: 'Vendor',
                 'category' => $profile->product_categories,
                 'description' => $profile->description,
+                'images' => collect($profile->work_sample_paths ?? [])
+                    ->take(5)
+                    ->keys()
+                    ->map(fn (int $index): string => route('vendors.catalog.image', [$profile, $index]))
+                    ->all(),
                 'location' => $profile->location,
                 'minimum_order_quantity' => $profile->minimum_order_quantity,
                 'materials' => $profile->materials,
@@ -97,7 +104,7 @@ class VendorCatalogController extends Controller
                 'price_per_unit' => $profile->indicative_price_per_unit,
                 'has_sample' => count($profile->work_sample_paths ?? []) > 0,
                 'certificate_count' => count($profile->certificate_paths ?? []),
-                'distance_km' => $distance === null ? null : round($distance, 1),
+                'distance_km' => $distance,
             ];
         })
             ->when(isset($validated['distance_km']), fn ($results) => $results
@@ -109,12 +116,48 @@ class VendorCatalogController extends Controller
                 'distance' => [$vendor['distance_km'] ?? PHP_INT_MAX, $vendor['name']],
                 default => [0, $vendor['name']],
             })
-            ->values();
+            ->values()
+            ->map(function (array $vendor): array {
+                $vendor['distance_km'] = $vendor['distance_km'] === null
+                    ? null
+                    : round($vendor['distance_km'], 1);
+
+                return $vendor;
+            });
 
         return response()->json([
             'vendors' => $vendors,
             'count' => $vendors->count(),
         ]);
+    }
+
+    public function showSample(Request $request, BusinessProfile $businessProfile, int $index): BinaryFileResponse
+    {
+        abort_unless($request->user()->role === 'umkm', 403);
+        abort_unless(
+            $businessProfile->verification_status === 'approved' && $businessProfile->completed_at !== null,
+            404,
+        );
+
+        $path = $businessProfile->work_sample_paths[$index] ?? null;
+        $expectedDirectory = 'vendor-verification/'.$businessProfile->id.'/work_samples';
+
+        abort_unless(is_string($path) && dirname($path) === $expectedDirectory, 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($path), 404);
+
+        $mimeType = $disk->mimeType($path);
+        abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true), 404);
+
+        $response = response()->file($disk->path($path), [
+            'Content-Type' => $mimeType,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        $response->setPrivate();
+        $response->setMaxAge(300);
+
+        return $response;
     }
 
     private function distanceInKilometers(float $originLatitude, float $originLongitude, float $latitude, float $longitude): float
