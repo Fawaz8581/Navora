@@ -14,7 +14,7 @@
     const toast = document.querySelector('[data-toast]');
     const urlParams = new URLSearchParams(window.location.search);
     const knownRoles = ['umkm', 'vendor', 'partner'];
-    const knownPages = ['overview', 'vendors', 'listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq', 'assistant', 'programs', 'account'];
+    const knownPages = ['overview', 'vendors', 'listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq', 'income', 'assistant', 'programs', 'account'];
     const orderStatuses = [
         { status: 'menunggu_konfirmasi', label: 'Menunggu konfirmasi' },
         { status: 'diproses', label: 'Diproses' },
@@ -26,6 +26,13 @@
     let orderLoadPromise = null;
     let orderListData = [];
     let orderNextPageUrl = null;
+    let activeWorkspacePage = 'overview';
+    let activeChatOrderId = null;
+    let chatRefreshTimer = 0;
+    let quoteRefreshTimer = 0;
+    let chatRequestController = null;
+    let incomeNextPageUrl = null;
+    let incomeLoadPromise = null;
     let orderSubmissionInProgress = false;
     let vendorListings = [];
     let vendorListingsVerified = false;
@@ -202,8 +209,8 @@
 
         document.querySelectorAll('[data-rfq-description]').forEach((item) => {
             item.textContent = role === 'vendor'
-                ? 'Lihat contoh kebutuhan brand dan siapkan tanggapan yang sesuai kapasitasmu.'
-                : 'Kirim kebutuhanmu dan tinjau respons vendor dalam satu ruang.';
+                ? 'Tinjau permintaan nyata, diskusikan kebutuhan melalui chat, lalu kirim harga final.'
+                : 'Kirim kebutuhanmu, diskusikan detail dengan vendor, dan bayar penawaran yang disepakati.';
         });
 
         const buyerList = document.querySelector('[data-rfq-list]');
@@ -239,14 +246,24 @@
         setText('[data-account-location]', accountLocation);
         setText('[data-account-avatar]', accountName.trim().charAt(0).toUpperCase() || 'N');
         setText('[data-stat-listings]', String(vendorListings.length + state.listings.length));
-        setText('[data-stat-incoming]', String(2 + state.quotes.length));
+        setText('[data-stat-incoming]', authenticatedUserId
+            ? String(orderListData.filter((order) => order.is_quote_request && order.payment_status === 'awaiting_quote').length)
+            : String(2 + state.quotes.length));
+        if (authenticatedUserId && role === 'vendor') {
+            setText('[data-stat-incoming-caption]', 'Permintaan penawaran');
+            setText('[data-stat-incoming-note]', 'Dari UMKM, tersimpan di akun');
+        }
+        if (authenticatedUserId && role === 'umkm') {
+            setText('[data-stat-rfq-caption]', 'Permintaan penawaran');
+            setText('[data-stat-rfq-note]', 'Tersimpan di akunmu');
+        }
         setText('[data-verification-summary]', state.verificationRequested ? 'Demo dikirim' : 'Draft');
 
         document.querySelectorAll('[data-page-panel]').forEach((panel) => {
             const page = panel.dataset.pagePanel;
             const rolePageAllowed = page === 'overview' || page === 'account'
                 || (role === 'umkm' && ['vendors', 'groups', 'orders', 'rfq', 'assistant'].includes(page))
-                || (role === 'vendor' && ['listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq'].includes(page))
+                || (role === 'vendor' && ['listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq', 'income'].includes(page))
                 || (role === 'partner' && page === 'programs');
             const tab = document.querySelector(`[data-page="${page}"]`);
 
@@ -273,6 +290,7 @@
             return;
         }
 
+        activeWorkspacePage = page;
         document.querySelectorAll('[data-page-panel]').forEach((panel) => {
             const isActive = panel.dataset.pagePanel === page;
             panel.classList.toggle('is-active', isActive);
@@ -290,6 +308,42 @@
 
         if (page === 'orders') {
             loadOrders();
+        }
+
+        if (page === 'groups') {
+            loadGroupOrders();
+        }
+
+        if (page === 'rfq') {
+            loadOrders();
+            if (activeChatOrderId) {
+                loadOrderMessages(activeChatOrderId);
+            }
+            if (!chatRefreshTimer) {
+                chatRefreshTimer = window.setInterval(() => {
+                    if (!document.hidden && activeWorkspacePage === 'rfq' && activeChatOrderId) {
+                        loadOrderMessages(activeChatOrderId);
+                    }
+                }, 5000);
+            }
+            if (!quoteRefreshTimer) {
+                quoteRefreshTimer = window.setInterval(() => {
+                    if (!document.hidden && activeWorkspacePage === 'rfq') {
+                        loadOrders();
+                    }
+                }, 15000);
+            }
+        } else if (chatRefreshTimer) {
+            window.clearInterval(chatRefreshTimer);
+            chatRefreshTimer = 0;
+        }
+        if (page !== 'rfq' && quoteRefreshTimer) {
+            window.clearInterval(quoteRefreshTimer);
+            quoteRefreshTimer = 0;
+        }
+
+        if (page === 'income') {
+            loadVendorIncome();
         }
 
         if (page === 'vendors') {
@@ -1011,6 +1065,11 @@
     };
 
     const renderStoredRfqs = () => {
+        if (authenticatedUserId && ['umkm', 'vendor'].includes(authenticatedRole)) {
+            renderQuoteRequests();
+            return;
+        }
+
         const container = document.querySelector('[data-rfq-list]');
 
         if (container) {
@@ -1271,7 +1330,7 @@
         }
 
         try {
-            await requestOrderData(document.body.dataset.ordersQuoteUrl, {
+            const payload = await requestOrderData(document.body.dataset.ordersQuoteUrl, {
                 method: 'POST',
                 body: JSON.stringify({
                     vendor_user_id: Number(vendorUserId),
@@ -1283,9 +1342,10 @@
                 }),
             });
             closeModal();
-            showPage('orders');
+            showPage('rfq');
             await loadOrders();
-            showToast('Permintaan harga sudah dikirim ke vendor. Pantau balasan dan harga final di menu Pesanan.');
+            openOrderChat(payload.order.id);
+            showToast('Permintaan penawaran terkirim. Diskusikan spesifikasi dan pantau harga final di chat ini.');
         } catch (requestError) {
             console.error('Navora could not create a catalog order.', requestError);
             showToast(requestError.message || 'Pesanan tidak dapat dibuat. Periksa data dan coba lagi.');
@@ -1297,10 +1357,36 @@
         }
     };
 
-    const createRfq = (vendor = '', vendorUserId = '', product = null) => {
-        const isCatalogVendor = Boolean(vendorUserId && authenticatedRole === 'umkm');
-        const fields = isCatalogVendor
+    const createRfq = async (vendor = '', vendorUserId = '', product = null) => {
+        const isAuthenticatedBuyer = Boolean(authenticatedUserId && authenticatedRole === 'umkm');
+        const isCatalogVendor = Boolean(vendorUserId && isAuthenticatedBuyer);
+        const isRealQuote = isAuthenticatedBuyer;
+
+        if (isAuthenticatedBuyer && !isCatalogVendor) {
+            await loadOrders();
+            if (!orderVendors.length) {
+                showToast('Belum ada vendor terverifikasi yang dapat menerima permintaan penawaran.');
+                return;
+            }
+        }
+
+        const fields = isRealQuote
             ? [
+                ...(!isCatalogVendor
+                    ? [{
+                        name: 'vendor_user_id',
+                        label: 'Vendor tujuan',
+                        type: 'select',
+                        required: true,
+                        options: [
+                            { value: '', label: 'Pilih vendor terverifikasi' },
+                            ...orderVendors.map((orderVendor) => ({
+                                value: String(orderVendor.id),
+                                label: orderVendor.name,
+                            })),
+                        ],
+                    }]
+                    : []),
                 { ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: product?.name || '' },
                 { name: 'quantity', label: 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: product ? product.minimum_order_quantity : 1, step: 1, required: true, value: product ? String(product.minimum_order_quantity) : '' },
                 { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true, value: product ? `${product.material}. ${product.description}` : '' },
@@ -1318,20 +1404,22 @@
 
         openModal({
             title: 'Buat permintaan penawaran',
-            description: isCatalogVendor
-                ? `Permintaan produk${product ? ` "${product.name}"` : ''} dikirim kepada ${vendor}. Vendor akan membalas dengan harga final di menu Pesanan.`
+            description: isRealQuote
+                ? isCatalogVendor
+                    ? `Permintaan produk${product ? ` "${product.name}"` : ''} dikirim kepada ${vendor}. Lanjutkan diskusi dan pembayaran di menu Permintaan penawaran.`
+                    : 'Pilih vendor terverifikasi untuk menerima spesifikasi, mendiskusikan kebutuhan, dan mengirim harga final.'
                 : 'Catat kebutuhan produk. Dalam demo ini, permintaan hanya tersimpan di browser dan tidak dikirim kepada vendor.',
             icon: 'bi-chat-square-text',
-            submit: isCatalogVendor ? 'Kirim permintaan penawaran' : 'Simpan permintaan demo',
+            submit: isRealQuote ? 'Kirim permintaan penawaran' : 'Simpan permintaan demo',
             fields,
             onSubmit: (values) => {
-                if (isCatalogVendor) {
+                if (isRealQuote) {
                     const quantity = Number(values.quantity);
                     if (!Number.isSafeInteger(quantity) || quantity < 1) {
                         showToast('Masukkan jumlah pesanan sebagai bilangan bulat positif.');
                         return false;
                     }
-                    submitCatalogQuote(vendorUserId, values);
+                    submitCatalogQuote(isCatalogVendor ? vendorUserId : values.vendor_user_id, values);
                     return false;
                 }
 
@@ -1488,6 +1576,304 @@
 
     const formatRupiah = (amount) => `Rp${Number(amount).toLocaleString('id-ID')}`;
 
+    const renderQuoteRequests = () => {
+        if (!authenticatedUserId || !['umkm', 'vendor'].includes(authenticatedRole)) {
+            return;
+        }
+
+        const buyerList = document.querySelector('[data-rfq-list]');
+        const vendorInbox = document.querySelector('[data-vendor-inbox]');
+        const requests = orderListData.filter((order) => order.is_quote_request);
+        const buyerRequests = authenticatedRole === 'umkm' ? requests : [];
+
+        if (buyerList) {
+            buyerList.replaceChildren();
+            buyerRequests.forEach((order) => {
+                buyerList.append(renderQuoteRequestCard(order));
+            });
+        }
+
+        if (vendorInbox) {
+            vendorInbox.querySelectorAll('.navora-incoming-rfq').forEach((item) => item.remove());
+            requests.forEach((order) => {
+                vendorInbox.append(renderQuoteRequestCard(order));
+            });
+        }
+
+        const waitingForQuote = requests.filter((order) => order.payment_status === 'awaiting_quote').length;
+        setText('[data-rfq-count]', String(requests.length));
+        setText('[data-rfq-quotes]', String(requests.filter((order) => order.unit_price).length));
+        setText('[data-stat-rfqs]', String(requests.length));
+        setText('[data-rfq-count-label]', authenticatedRole === 'vendor' ? 'Permintaan masuk' : 'Permintaan saya');
+        setText('[data-rfq-quotes-label]', authenticatedRole === 'vendor' ? 'Penawaran dikirim' : 'Harga dari vendor');
+        setText('[data-stat-incoming]', String(waitingForQuote));
+        setText('[data-rfq-inbox-count]', `${waitingForQuote} baru`);
+        setText('[data-vendor-rfq-overview-title]', `Permintaan penawaran · ${requests.length}`);
+        setText(
+            '[data-vendor-rfq-overview-description]',
+            requests.length
+                ? `${requests.length} permintaan dari UMKM tersimpan di akun vendor ini.`
+                : 'Belum ada permintaan dari UMKM. Permintaan yang ditujukan ke tokomu akan muncul di sini.',
+        );
+        setText(
+            '[data-vendor-rfq-overview-status]',
+            waitingForQuote ? `${waitingForQuote} menunggu penawaran harga` : 'Tidak ada penawaran yang menunggu',
+        );
+        document.querySelectorAll('[data-rfq-demo-note], [data-rfq-demo-footer]').forEach((note) => {
+            note.hidden = true;
+        });
+
+        const empty = document.querySelector('[data-rfq-empty]');
+        if (empty) {
+            empty.hidden = requests.length > 0;
+            const title = empty.querySelector('strong');
+            const copy = empty.querySelector('span');
+            if (title) {
+                title.textContent = authenticatedRole === 'vendor'
+                    ? 'Belum ada permintaan dari UMKM'
+                    : 'Belum ada permintaan penawaran';
+            }
+            if (copy) {
+                copy.textContent = authenticatedRole === 'vendor'
+                    ? 'Permintaan yang ditujukan ke tokomu akan muncul di sini.'
+                    : 'Permintaan penawaran yang kamu kirim akan muncul di sini.';
+            }
+        }
+
+        const currentOrder = orderListData.find((order) => String(order.id) === String(activeChatOrderId));
+        if (currentOrder) {
+            renderOrderChatActions(currentOrder);
+        }
+    };
+
+    const renderQuoteRequestCard = (order) => {
+        const card = textElement('article', 'navora-rfq-card navora-live-rfq-card', '');
+        card.dataset.id = String(order.id);
+        const statusLabel = order.payment_status === 'awaiting_quote'
+            ? 'Menunggu penawaran'
+            : order.payment_status === 'paid'
+                ? 'Lunas'
+                : order.unit_price
+                    ? 'Penawaran tersedia'
+                    : 'Menunggu pembaruan';
+        const statusClass = order.payment_status === 'paid' ? 'status-open' : 'status-waiting';
+        const header = textElement('div', 'navora-rfq-card-head', '');
+        const icon = textElement('span', 'navora-rfq-icon', '');
+        icon.append(textElement('i', 'bi bi-box-seam', ''));
+        const heading = textElement('div', '', '');
+        heading.append(
+            textElement('h2', '', order.product_name || 'Permintaan produk'),
+            textElement('span', '', `${authenticatedRole === 'vendor' ? order.creator_name : order.vendor_name || 'Vendor'} · ${displayOrderDate(order.created_at)}`),
+        );
+        header.append(
+            icon,
+            heading,
+            textElement('span', `navora-status-pill ${statusClass}`, statusLabel),
+        );
+
+        const details = textElement('div', 'navora-rfq-details', '');
+        [
+            ['Jumlah', `${Number(order.quantity).toLocaleString('id-ID')} pcs`],
+            ['Spesifikasi', order.packaging_details || 'Belum diisi'],
+            ['Tujuan', order.delivery_address || 'Alamat tersedia setelah permintaan dibuat'],
+            ...(order.unit_price ? [['Harga final', `${formatRupiah(order.unit_price)} / pcs`]] : []),
+        ].forEach(([label, value]) => {
+            const item = textElement('span', '', '');
+            item.append(textElement('small', '', label), textElement('strong', '', value));
+            details.append(item);
+        });
+
+        const button = textElement(
+            'button',
+            'btn navora-app-primary',
+            authenticatedRole === 'vendor' ? 'Buka chat & tanggapi' : order.can_pay ? 'Buka chat & bayar' : 'Buka chat',
+        );
+        button.type = 'button';
+        button.dataset.action = 'open-order-chat';
+        button.dataset.order = String(order.id);
+        card.append(header, details, button);
+
+        return card;
+    };
+
+    const renderOrderChatActions = (order) => {
+        const actions = document.querySelector('[data-order-chat-actions]');
+        const chatPanel = document.querySelector('[data-order-chat]');
+        if (!actions || !chatPanel || !activeChatOrderId || String(order.id) !== String(activeChatOrderId)) {
+            return;
+        }
+
+        const items = [];
+        if (order.unit_price) {
+            items.push(textElement(
+                'p',
+                'navora-order-chat-offer',
+                `Penawaran: ${formatRupiah(order.unit_price)} / pcs · Total ${formatRupiah(order.total_amount)} · ${order.payment_status === 'paid' ? 'Lunas' : order.payment_status === 'pending' ? 'Menunggu pembayaran' : 'Pembayaran gagal'}`,
+            ));
+        }
+
+        if (order.can_set_price) {
+            const quoteButton = textElement('button', 'btn navora-app-outline', 'Kirim penawaran harga final');
+            quoteButton.type = 'button';
+            quoteButton.dataset.action = 'set-order-price';
+            quoteButton.dataset.order = String(order.id);
+            items.push(quoteButton);
+        }
+
+        if (order.can_pay) {
+            const paymentButton = textElement(
+                'button',
+                'btn navora-app-primary',
+                `Bayar ${formatRupiah(order.payment_amount)} via Midtrans`,
+            );
+            paymentButton.type = 'button';
+            paymentButton.dataset.action = 'pay-order-from-chat';
+            paymentButton.dataset.order = String(order.id);
+            items.push(paymentButton);
+        }
+
+        actions.replaceChildren(...items);
+    };
+
+    const renderOrderMessages = (messages) => {
+        const list = document.querySelector('[data-order-chat-messages]');
+        if (!list) {
+            return;
+        }
+
+        if (!messages.length) {
+            list.replaceChildren(textElement('p', 'navora-order-chat-empty', 'Belum ada pesan. Mulai diskusi dengan vendor atau UMKM.'));
+            return;
+        }
+
+        list.replaceChildren(...messages.map((message) => {
+            const item = textElement('article', `navora-order-chat-message${message.is_mine ? ' is-mine' : ''}`, '');
+            item.append(
+                textElement('strong', '', message.is_mine ? 'Kamu' : message.sender_name || 'Pengguna'),
+                textElement('p', '', message.message),
+                textElement('time', '', displayOrderDate(message.created_at)),
+            );
+            return item;
+        }));
+        list.scrollTop = list.scrollHeight;
+    };
+
+    const openOrderChat = (orderId) => {
+        if (String(activeChatOrderId) !== String(orderId)) {
+            chatRequestController?.abort();
+            chatRequestController = null;
+        }
+        activeChatOrderId = String(orderId);
+        const order = orderListData.find((item) => String(item.id) === String(orderId));
+        const panel = document.querySelector('[data-order-chat]');
+        const form = document.querySelector('[data-order-chat-form]');
+        const title = document.querySelector('[data-order-chat-title]');
+        const messageInput = document.querySelector('[data-order-chat-form] textarea');
+
+        if (!order || !panel || !form) {
+            showToast('Permintaan tidak ditemukan. Segarkan daftar dan coba lagi.');
+            return;
+        }
+
+        if (title) {
+            title.textContent = `${order.product_name} · ${Number(order.quantity).toLocaleString('id-ID')} pcs`;
+        }
+        panel.hidden = false;
+        renderOrderChatActions(order);
+        loadOrderMessages(orderId);
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        messageInput?.focus({ preventScroll: true });
+    };
+
+    const loadOrderMessages = async (orderId) => {
+        if (!activeChatOrderId || String(activeChatOrderId) !== String(orderId) || chatRequestController) {
+            return;
+        }
+
+        const panel = document.querySelector('[data-order-chat]');
+        const loading = document.querySelector('[data-order-chat-loading]');
+        const error = document.querySelector('[data-order-chat-error]');
+        const requestController = new AbortController();
+        chatRequestController = requestController;
+        if (panel) {
+            panel.hidden = false;
+        }
+        if (loading && !document.querySelector('[data-order-chat-messages]')?.childElementCount) {
+            loading.hidden = false;
+        }
+        if (error) {
+            error.hidden = true;
+        }
+
+        try {
+            const payload = await requestOrderData(
+                orderUrl(document.body.dataset.orderMessagesTemplate, orderId),
+                { signal: requestController.signal },
+            );
+            if (String(activeChatOrderId) === String(orderId)) {
+                renderOrderMessages(Array.isArray(payload.messages) ? payload.messages : []);
+            }
+        } catch (requestError) {
+            if (requestError.name !== 'AbortError') {
+                console.error('Navora could not load order messages.', requestError);
+                if (error) {
+                    error.textContent = requestError.message || 'Percakapan tidak dapat dimuat. Coba segarkan.';
+                    error.hidden = false;
+                }
+            }
+        } finally {
+            if (chatRequestController === requestController) {
+                chatRequestController = null;
+            }
+            if (loading) {
+                loading.hidden = true;
+            }
+        }
+    };
+
+    const submitOrderMessage = async (form) => {
+        if (!activeChatOrderId || orderSubmissionInProgress) {
+            return;
+        }
+
+        const input = form.querySelector('textarea[name="message"]');
+        const sendButton = form.querySelector('[data-order-chat-send]');
+        const message = input?.value.trim();
+        if (!message) {
+            input?.focus();
+            return;
+        }
+
+        orderSubmissionInProgress = true;
+        if (sendButton) {
+            sendButton.disabled = true;
+        }
+
+        try {
+            await requestOrderData(
+                orderUrl(document.body.dataset.orderMessageStoreTemplate, activeChatOrderId),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ message }),
+                },
+            );
+            if (input) {
+                input.value = '';
+            }
+            chatRequestController?.abort();
+            chatRequestController = null;
+            await loadOrderMessages(activeChatOrderId);
+        } catch (requestError) {
+            console.error('Navora could not send an order message.', requestError);
+            showToast(requestError.message || 'Pesan tidak dapat dikirim. Coba lagi.');
+        } finally {
+            orderSubmissionInProgress = false;
+            if (sendButton) {
+                sendButton.disabled = false;
+            }
+        }
+    };
+
     const renderOrderCard = (order) => {
         const card = document.createElement('article');
         card.className = 'navora-order-card';
@@ -1534,6 +1920,7 @@
             ...(order.current_payment_status && order.current_payment_status !== 'not_required'
                 ? [['Pembayaran', ({
                     awaiting_quote: 'Menunggu harga final dari vendor',
+                    awaiting_approval: 'Menunggu persetujuan harga dari UMKM',
                     pending: 'Menunggu pembayaran',
                     paid: 'Lunas',
                     failed: 'Pembayaran gagal; silakan coba lagi',
@@ -1548,6 +1935,21 @@
             details.append(item);
         });
         card.append(details);
+
+        if (order.payment_receipt) {
+            const receipt = document.createElement('section');
+            receipt.className = 'navora-order-group';
+            receipt.append(textElement('strong', '', 'Bukti pembayaran Midtrans'));
+            [
+                ['ID transaksi', order.payment_receipt.transaction_id || order.payment_receipt.payment_order_id || 'Tersimpan'],
+                ['Metode', order.payment_receipt.payment_type || 'Midtrans'],
+                ['Status', order.payment_receipt.transaction_status || 'settlement'],
+                ['Dibayar', displayOrderDate(order.payment_receipt.paid_at)],
+            ].forEach(([label, value]) => {
+                receipt.append(textElement('p', '', `${label}: ${value}`));
+            });
+            card.append(receipt);
+        }
 
         if (order.type === 'patungan') {
             const committed = Number(order.committed_quantity) || 0;
@@ -1577,10 +1979,13 @@
                 const participantList = document.createElement('ul');
                 participantList.className = 'navora-order-participants';
                 order.participants.forEach((participant) => {
+                    const receiptDetails = participant.payment_receipt
+                        ? ` · Bukti Midtrans: ${participant.payment_receipt.transaction_id || participant.payment_receipt.payment_order_id || 'terverifikasi'}`
+                        : '';
                     participantList.append(textElement(
                         'li',
                         '',
-                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs${participant.payment_amount ? ` · ${formatRupiah(participant.payment_amount)} · ${participant.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}` : ''}`,
+                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs${participant.payment_amount ? ` · ${formatRupiah(participant.payment_amount)} · ${participant.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}` : ''}${receiptDetails}`,
                     ));
                 });
                 group.append(participantList);
@@ -1642,6 +2047,23 @@
             priceButton.dataset.order = String(order.id);
             actions.append(priceButton);
         }
+        if (order.can_decide_quote) {
+            [
+                ['accept', 'Setujui harga'],
+                ['reject', 'Tolak harga'],
+            ].forEach(([decision, label]) => {
+                const decisionButton = textElement(
+                    'button',
+                    decision === 'accept' ? 'btn navora-app-primary' : 'btn navora-order-cancel',
+                    label,
+                );
+                decisionButton.type = 'button';
+                decisionButton.dataset.action = 'decide-order-quote';
+                decisionButton.dataset.order = String(order.id);
+                decisionButton.dataset.decision = decision;
+                actions.append(decisionButton);
+            });
+        }
         if (order.can_pay) {
             const paymentButton = textElement(
                 'button',
@@ -1652,6 +2074,13 @@
             paymentButton.dataset.action = 'checkout-order';
             paymentButton.dataset.order = String(order.id);
             actions.append(paymentButton);
+        }
+        if (order.can_refresh_payment) {
+            const refreshButton = textElement('button', 'btn navora-app-outline', 'Periksa status pembayaran');
+            refreshButton.type = 'button';
+            refreshButton.dataset.action = 'refresh-order-payment';
+            refreshButton.dataset.order = String(order.id);
+            actions.append(refreshButton);
         }
         if (order.can_join) {
             const joinButton = textElement('button', 'btn navora-app-primary', 'Ikut patungan');
@@ -1695,6 +2124,7 @@
 
         orderListData = append ? [...orderListData, ...orders] : orders;
         list.replaceChildren(...orderListData.map(renderOrderCard));
+        renderQuoteRequests();
         empty.hidden = orderListData.length > 0;
         if (more) {
             more.hidden = !orderNextPageUrl;
@@ -1719,10 +2149,58 @@
         }
     };
 
+    const renderGroupOrders = (orders) => {
+        const list = document.querySelector('[data-group-orders-list]');
+        const empty = document.querySelector('[data-groups-empty]');
+
+        if (!list || !empty) {
+            return;
+        }
+
+        list.replaceChildren(...orders.map(renderOrderCard));
+        empty.hidden = orders.length > 0;
+    };
+
+    const loadGroupOrders = async () => {
+        if (!authenticatedUserId) {
+            return;
+        }
+
+        const loading = document.querySelector('[data-groups-loading]');
+        const error = document.querySelector('[data-groups-error]');
+        if (loading) {
+            loading.hidden = false;
+        }
+        if (error) {
+            error.hidden = true;
+        }
+
+        try {
+            const url = new URL(document.body.dataset.ordersUrl, window.location.origin);
+            url.searchParams.set('type', 'patungan');
+            const payload = await requestOrderData(url.toString());
+            orderVendors = Array.isArray(payload.vendors) ? payload.vendors : orderVendors;
+            renderGroupOrders(Array.isArray(payload.orders) ? payload.orders : []);
+        } catch (requestError) {
+            console.error('Navora could not load group orders.', requestError);
+            if (error) {
+                error.textContent = requestError.message || 'Patungan MOQ tidak dapat dimuat. Coba lagi.';
+                error.hidden = false;
+            }
+            showToast(requestError.message || 'Patungan MOQ tidak dapat dimuat. Coba lagi.');
+        } finally {
+            if (loading) {
+                loading.hidden = true;
+            }
+        }
+    };
+
     const loadOrders = async (loadMore = false) => {
         const loading = document.querySelector('[data-orders-loading]');
+        const rfqLoading = document.querySelector('[data-rfq-loading]');
         const guest = document.querySelector('[data-orders-guest]');
         const error = document.querySelector('[data-orders-error]');
+        const rfqError = document.querySelector('[data-rfq-error]');
         const more = document.querySelector('[data-orders-more]');
 
         if (!authenticatedUserId) {
@@ -1746,11 +2224,17 @@
         if (loading) {
             loading.hidden = loadMore;
         }
+        if (rfqLoading) {
+            rfqLoading.hidden = loadMore || activeWorkspacePage !== 'rfq';
+        }
         if (guest) {
             guest.hidden = true;
         }
         if (error) {
             error.hidden = true;
+        }
+        if (rfqError) {
+            rfqError.hidden = true;
         }
         if (!loadMore) {
             orderNextPageUrl = null;
@@ -1778,6 +2262,10 @@
                     error.textContent = requestError.message || 'Pesanan tidak dapat dimuat. Coba lagi.';
                     error.hidden = false;
                 }
+                if (rfqError) {
+                    rfqError.textContent = requestError.message || 'Permintaan penawaran tidak dapat dimuat. Coba lagi.';
+                    rfqError.hidden = false;
+                }
                 if (more) {
                     more.disabled = false;
                     more.textContent = 'Coba muat pesanan lainnya';
@@ -1787,11 +2275,111 @@
                 if (loading) {
                     loading.hidden = true;
                 }
+                if (rfqLoading) {
+                    rfqLoading.hidden = true;
+                }
                 orderLoadPromise = null;
             }
         })();
 
         return orderLoadPromise;
+    };
+
+    const loadVendorIncome = async (loadMore = false) => {
+        if (authenticatedRole !== 'vendor' || !authenticatedUserId) {
+            return;
+        }
+
+        if (incomeLoadPromise) {
+            return incomeLoadPromise;
+        }
+
+        if (loadMore && !incomeNextPageUrl) {
+            return;
+        }
+
+        const loading = document.querySelector('[data-income-loading]');
+        const error = document.querySelector('[data-income-error]');
+        const empty = document.querySelector('[data-income-empty]');
+        const tableWrap = document.querySelector('[data-income-table-wrap]');
+        const tableBody = document.querySelector('[data-income-sales]');
+        const more = document.querySelector('[data-income-more]');
+
+        if (!loadMore) {
+            incomeNextPageUrl = null;
+            tableBody?.replaceChildren();
+        }
+        if (loading) {
+            loading.hidden = loadMore;
+        }
+        if (error) {
+            error.hidden = true;
+        }
+        if (more && loadMore) {
+            more.disabled = true;
+            more.textContent = 'Memuat transaksi…';
+        }
+
+        incomeLoadPromise = (async () => {
+            try {
+                const payload = await requestOrderData(
+                    loadMore ? incomeNextPageUrl : document.body.dataset.vendorIncomeUrl,
+                );
+                const sales = Array.isArray(payload.sales) ? payload.sales : [];
+                const rows = sales.map((sale) => {
+                    const row = document.createElement('tr');
+                    [
+                        `#${sale.id}`,
+                        sale.product_name || 'Produk',
+                        sale.buyer_name || 'UMKM',
+                        `${Number(sale.quantity).toLocaleString('id-ID')} pcs`,
+                        sale.unit_price ? `${formatRupiah(sale.unit_price)} / pcs` : '—',
+                        formatRupiah(sale.total_amount || 0),
+                        displayOrderDate(sale.paid_at),
+                    ].forEach((value) => row.append(textElement('td', '', value)));
+                    return row;
+                });
+                if (loadMore) {
+                    tableBody?.append(...rows);
+                } else {
+                    tableBody?.replaceChildren(...rows);
+                }
+
+                setText('[data-income-total]', formatRupiah(payload.summary?.total_revenue || 0));
+                setText('[data-income-count]', Number(payload.summary?.completed_orders || 0).toLocaleString('id-ID'));
+                incomeNextPageUrl = payload.next_page_url || null;
+                if (more) {
+                    more.hidden = !incomeNextPageUrl;
+                    more.disabled = false;
+                    more.textContent = 'Muat transaksi lainnya';
+                }
+                const hasSales = Boolean(tableBody?.childElementCount);
+                if (empty) {
+                    empty.hidden = hasSales;
+                }
+                if (tableWrap) {
+                    tableWrap.hidden = !hasSales;
+                }
+            } catch (requestError) {
+                console.error('Navora could not load vendor income.', requestError);
+                if (error) {
+                    error.textContent = requestError.message || 'Rekap pendapatan tidak dapat dimuat. Coba lagi.';
+                    error.hidden = false;
+                }
+                if (more) {
+                    more.disabled = false;
+                    more.textContent = 'Coba muat transaksi lainnya';
+                }
+                showToast(requestError.message || 'Rekap pendapatan tidak dapat dimuat. Coba lagi.');
+            } finally {
+                if (loading) {
+                    loading.hidden = true;
+                }
+                incomeLoadPromise = null;
+            }
+        })();
+
+        return incomeLoadPromise;
     };
 
     const createOrder = async (type) => {
@@ -1879,7 +2467,11 @@
             closeModal();
             showToast('Pesanan berhasil disimpan dan dapat dilacak di akunmu.');
             if (payload.order) {
-                await loadOrders();
+                if (type === 'patungan') {
+                    await loadGroupOrders();
+                } else {
+                    await loadOrders();
+                }
             }
         } catch (requestError) {
             console.error('Navora could not create the order.', requestError);
@@ -1937,7 +2529,7 @@
             });
             closeModal();
             showToast('Jumlahmu berhasil ditambahkan ke pesanan patungan.');
-            await loadOrders();
+            await loadGroupOrders();
         } catch (requestError) {
             console.error('Navora could not join the group order.', requestError);
             showToast(requestError.message || 'Kamu tidak dapat bergabung. Muat ulang pesanan dan coba lagi.');
@@ -1961,6 +2553,7 @@
             });
             showToast('Status pesanan berhasil diperbarui.');
             await loadOrders();
+            await loadGroupOrders();
         } catch (requestError) {
             console.error('Navora could not update the order status.', requestError);
             showToast(requestError.message || 'Status tidak dapat diperbarui. Muat ulang dan coba lagi.');
@@ -2005,8 +2598,9 @@
                 body: JSON.stringify({ unit_price: unitPrice }),
             });
             closeModal();
-            showToast('Harga final tersimpan. Pembeli sekarang dapat membayar lewat Midtrans.');
+            showToast('Penawaran final dikirim. Pembeli harus menyetujui harga sebelum pembayaran.');
             await loadOrders();
+            await loadGroupOrders();
         } catch (requestError) {
             console.error('Navora could not set the final order price.', requestError);
             showToast(requestError.message || 'Harga final tidak dapat disimpan. Coba lagi.');
@@ -2024,21 +2618,103 @@
         }
         orderSubmissionInProgress = true;
         button.disabled = true;
+        let popupOpened = false;
+        let refreshStarted = false;
 
         try {
             const payload = await requestOrderData(orderUrl(document.body.dataset.ordersCheckoutTemplate, orderId), {
                 method: 'POST',
             });
-            if (!payload.redirect_url) {
-                throw new Error('Midtrans tidak mengembalikan tautan pembayaran.');
+            if (!payload.token) {
+                throw new Error('Midtrans tidak mengembalikan token pembayaran.');
             }
-            window.location.assign(payload.redirect_url);
+            if (!window.snap || typeof window.snap.pay !== 'function') {
+                throw new Error('Popup Midtrans belum tersedia. Muat ulang halaman atau hubungi admin.');
+            }
+
+            const refreshPayment = async (message) => {
+                if (refreshStarted) {
+                    return;
+                }
+                refreshStarted = true;
+                try {
+                    const result = await requestOrderData(
+                        orderUrl(document.body.dataset.ordersPaymentRefreshTemplate, orderId),
+                        { method: 'POST' },
+                    );
+                    await loadOrders();
+                    await loadGroupOrders();
+                    showToast(result.payment_status === 'paid'
+                        ? 'Pembayaran berhasil diverifikasi. Vendor dapat melihat bukti transaksi.'
+                        : message);
+                } catch (requestError) {
+                    console.error('Navora could not refresh the Midtrans order payment.', requestError);
+                    showToast(requestError.message || 'Status pembayaran belum dapat diperiksa. Coba periksa kembali.');
+                } finally {
+                    button.disabled = false;
+                }
+            };
+
+            window.snap.pay(payload.token, {
+                onSuccess: () => refreshPayment('Pembayaran berhasil; status sedang diverifikasi Midtrans.'),
+                onPending: () => refreshPayment('Pembayaran sedang diproses Midtrans.'),
+                onError: () => refreshPayment('Pembayaran belum berhasil. Periksa status atau coba kembali.'),
+                onClose: () => refreshPayment('Popup ditutup. Status pembayaran sudah diperiksa.'),
+            });
+            popupOpened = true;
         } catch (requestError) {
             console.error('Navora could not start the Midtrans order checkout.', requestError);
             showToast(requestError.message || 'Checkout Midtrans gagal dibuat. Coba lagi.');
-            button.disabled = false;
         } finally {
             orderSubmissionInProgress = false;
+            if (!popupOpened) {
+                button.disabled = false;
+            }
+        }
+    };
+
+    const decideOrderQuote = async (orderId, decision) => {
+        if (decision === 'reject'
+            && !window.confirm('Tolak harga final ini? Vendor dapat mengirim penawaran harga revisi.')) {
+            return;
+        }
+
+        try {
+            await requestOrderData(
+                orderUrl(document.body.dataset.ordersQuoteDecisionTemplate, orderId),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ decision }),
+                },
+            );
+            showToast(decision === 'accept'
+                ? 'Harga disetujui. Pembayaran Midtrans sekarang tersedia.'
+                : 'Penawaran ditolak. Vendor dapat mengirim harga revisi.');
+            await loadOrders();
+            await loadGroupOrders();
+        } catch (requestError) {
+            console.error('Navora could not record the buyer quote decision.', requestError);
+            showToast(requestError.message || 'Keputusan harga tidak dapat disimpan. Coba lagi.');
+        }
+    };
+
+    const refreshOrderPayment = async (orderId, button) => {
+        button.disabled = true;
+        try {
+            const result = await requestOrderData(
+                orderUrl(document.body.dataset.ordersPaymentRefreshTemplate, orderId),
+                { method: 'POST' },
+            );
+            showToast(result.payment_status === 'paid'
+                ? 'Pembayaran berhasil diverifikasi oleh Midtrans.'
+                : 'Pembayaran belum terkonfirmasi. Coba periksa lagi setelah beberapa saat.');
+            await loadOrders();
+            await loadGroupOrders();
+        } catch (requestError) {
+            console.error('Navora could not refresh the Midtrans order payment.', requestError);
+            showToast(requestError.message || 'Status pembayaran belum dapat diperiksa. Coba lagi.');
+        } finally {
+            button.disabled = false;
         }
     };
 
@@ -2547,6 +3223,24 @@
             setOrderPrice(button.dataset.order || '');
         } else if (action === 'checkout-order') {
             checkoutOrder(button.dataset.order || '', button);
+        } else if (action === 'decide-order-quote') {
+            decideOrderQuote(button.dataset.order || '', button.dataset.decision || '');
+        } else if (action === 'refresh-order-payment') {
+            refreshOrderPayment(button.dataset.order || '', button);
+        } else if (action === 'open-order-chat') {
+            openOrderChat(button.dataset.order || '');
+        } else if (action === 'refresh-order-chat') {
+            if (activeChatOrderId) {
+                chatRequestController?.abort();
+                chatRequestController = null;
+                loadOrderMessages(activeChatOrderId);
+            }
+        } else if (action === 'pay-order-from-chat') {
+            checkoutOrder(button.dataset.order || '', button);
+        } else if (action === 'refresh-vendor-income') {
+            loadVendorIncome();
+        } else if (action === 'load-more-income') {
+            loadVendorIncome(true);
         } else if (action === 'rfq') {
             createRfq(button.dataset.vendor || '', button.dataset.vendorUserId || '');
         } else if (action === 'product-detail') {
@@ -2565,7 +3259,7 @@
         } else if (action === 'join-group') {
             joinGroup(button.dataset.group || '');
         } else if (action === 'create-group') {
-            createGroup();
+            createOrder('patungan');
         } else if (action === 'add-listing') {
             createListing();
         } else if (action === 'edit-vendor-listing') {
@@ -2718,6 +3412,12 @@
     document.addEventListener('submit', (event) => {
         const form = event.target;
 
+        if (form instanceof HTMLFormElement && form.matches('[data-order-chat-form]')) {
+            event.preventDefault();
+            submitOrderMessage(form);
+            return;
+        }
+
         if (form instanceof HTMLFormElement
             && form.dataset.confirmSubmit
             && !window.confirm(form.dataset.confirmSubmit)) {
@@ -2830,6 +3530,9 @@
     updateRoleContent();
     if (authenticatedRole === 'vendor') {
         loadVendorListings();
+    }
+    if (authenticatedUserId && ['umkm', 'vendor'].includes(authenticatedRole)) {
+        loadOrders();
     }
 
     const requestedPage = urlParams.get('tab') || urlParams.get('page');

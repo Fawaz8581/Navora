@@ -119,8 +119,16 @@ class MidtransNotificationController extends Controller
 
             DB::transaction(function () use ($order, $validated): void {
                 $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+                $transactionStatus = $validated['transaction_status'];
+                $paymentDetails = array_filter([
+                    'midtrans_transaction_id' => $validated['transaction_id'] ?? null,
+                    'payment_type' => $validated['payment_type'] ?? null,
+                    'midtrans_transaction_status' => $transactionStatus,
+                ], fn (?string $value): bool => $value !== null && $value !== '');
 
                 if ($lockedOrder->paid_at) {
+                    $lockedOrder->forceFill($paymentDetails)->save();
+
                     return;
                 }
 
@@ -128,11 +136,22 @@ class MidtransNotificationController extends Controller
 
                 if ($outcome === 'paid') {
                     $lockedOrder->forceFill([
+                        ...$paymentDetails,
                         'payment_status' => 'paid',
                         'paid_at' => now(),
                     ])->save();
+                    $lockedOrder->statusHistory()->create([
+                        'user_id' => null,
+                        'status' => $lockedOrder->status,
+                        'note' => 'Pembayaran berhasil diverifikasi oleh Midtrans.',
+                    ]);
                 } elseif ($outcome === 'failed') {
-                    $lockedOrder->forceFill(['payment_status' => 'failed'])->save();
+                    $lockedOrder->forceFill([
+                        ...$paymentDetails,
+                        'payment_status' => 'failed',
+                    ])->save();
+                } else {
+                    $lockedOrder->forceFill($paymentDetails)->save();
                 }
             });
 
@@ -147,8 +166,16 @@ class MidtransNotificationController extends Controller
         DB::transaction(function () use ($participant, $validated): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($participant->order_id);
             $lockedParticipant = OrderParticipant::query()->lockForUpdate()->findOrFail($participant->id);
+            $transactionStatus = $validated['transaction_status'];
+            $paymentDetails = array_filter([
+                'midtrans_transaction_id' => $validated['transaction_id'] ?? null,
+                'payment_type' => $validated['payment_type'] ?? null,
+                'midtrans_transaction_status' => $transactionStatus,
+            ], fn (?string $value): bool => $value !== null && $value !== '');
 
             if ($lockedParticipant->paid_at) {
+                $lockedParticipant->forceFill($paymentDetails)->save();
+
                 return;
             }
 
@@ -156,9 +183,15 @@ class MidtransNotificationController extends Controller
 
             if ($outcome === 'paid') {
                 $lockedParticipant->forceFill([
+                    ...$paymentDetails,
                     'payment_status' => 'paid',
                     'paid_at' => now(),
                 ])->save();
+                $lockedOrder->statusHistory()->create([
+                    'user_id' => null,
+                    'status' => $lockedOrder->status,
+                    'note' => 'Pembayaran peserta berhasil diverifikasi oleh Midtrans.',
+                ]);
 
                 if (! $lockedOrder->participants()->where('payment_status', '!=', 'paid')->exists()) {
                     $lockedOrder->forceFill([
@@ -167,7 +200,12 @@ class MidtransNotificationController extends Controller
                     ])->save();
                 }
             } elseif ($outcome === 'failed') {
-                $lockedParticipant->forceFill(['payment_status' => 'failed'])->save();
+                $lockedParticipant->forceFill([
+                    ...$paymentDetails,
+                    'payment_status' => 'failed',
+                ])->save();
+            } else {
+                $lockedParticipant->forceFill($paymentDetails)->save();
             }
         });
 

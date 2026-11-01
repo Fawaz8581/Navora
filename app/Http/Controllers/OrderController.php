@@ -26,13 +26,22 @@ class OrderController extends Controller
         $user = $request->user();
         abort_unless(in_array($user->role, ['umkm', 'vendor'], true), 403);
 
+        $validated = $request->validate([
+            'type' => ['sometimes', Rule::in([Order::TYPE_DIRECT, Order::TYPE_GROUP])],
+        ]);
+        $type = $validated['type'] ?? Order::TYPE_DIRECT;
+
         $orders = Order::query()
-            ->where(function (Builder $query) use ($user): void {
+            ->where('type', $type)
+            ->where(function (Builder $query) use ($user, $type): void {
                 $query
                     ->where('user_id', $user->id)
                     ->orWhere('vendor_user_id', $user->id)
-                    ->orWhereHas('participants', fn (Builder $participants) => $participants->where('user_id', $user->id))
-                    ->orWhere('type', Order::TYPE_GROUP);
+                    ->orWhereHas('participants', fn (Builder $participants) => $participants->where('user_id', $user->id));
+
+                if ($type === Order::TYPE_GROUP) {
+                    $query->orWhere('type', Order::TYPE_GROUP);
+                }
             })
             ->with([
                 'creator:id,name',
@@ -79,6 +88,50 @@ class OrderController extends Controller
             'vendors' => $vendors,
             'next_page_url' => $orders->nextPageUrl(),
             'open_group_count' => $openGroupCount,
+        ]);
+    }
+
+    public function vendorIncome(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'vendor', 403);
+
+        $paidOrders = Order::query()
+            ->where('vendor_user_id', $user->id)
+            ->where('payment_status', 'paid');
+
+        $sales = (clone $paidOrders)
+            ->with([
+                'creator:id,name',
+                'creator.businessProfile:id,user_id,business_name',
+            ])
+            ->select([
+                'id',
+                'user_id',
+                'product_name',
+                'quantity',
+                'unit_price',
+                'total_amount',
+                'paid_at',
+            ])
+            ->latest('paid_at')
+            ->paginate(50);
+
+        return response()->json([
+            'summary' => [
+                'total_revenue' => (int) (clone $paidOrders)->sum('total_amount'),
+                'completed_orders' => (clone $paidOrders)->count(),
+            ],
+            'sales' => $sales->getCollection()->map(fn (Order $order): array => [
+                'id' => $order->id,
+                'product_name' => $order->product_name,
+                'buyer_name' => $order->creator?->businessProfile?->business_name ?: $order->creator?->name,
+                'quantity' => $order->quantity,
+                'unit_price' => $order->unit_price,
+                'total_amount' => $order->total_amount,
+                'paid_at' => $order->paid_at?->toIso8601String(),
+            ])->values(),
+            'next_page_url' => $sales->nextPageUrl(),
         ]);
     }
 
@@ -163,6 +216,7 @@ class OrderController extends Controller
                 'status' => Order::STATUS_WAITING,
                 'is_simulated' => false,
                 'payment_status' => 'awaiting_quote',
+                'quote_status' => 'awaiting_vendor',
             ]);
 
             $order->statusHistory()->create([
@@ -228,12 +282,19 @@ class OrderController extends Controller
                 'status' => Order::STATUS_WAITING,
                 'is_simulated' => false,
                 'payment_status' => 'awaiting_quote',
+                'quote_status' => 'awaiting_vendor',
             ]);
 
             $order->statusHistory()->create([
                 'user_id' => $user->id,
                 'status' => Order::STATUS_WAITING,
                 'note' => 'Permintaan penawaran dikirim ke vendor.',
+            ]);
+            $order->messages()->create([
+                'user_id' => $user->id,
+                'message' => 'Permintaan penawaran untuk '.$order->product_name.' sejumlah '
+                    .number_format($order->quantity, 0, ',', '.').' pcs.'
+                    .(filled($order->notes) ? "\n".$order->notes : ''),
             ]);
 
             return $order;
@@ -257,9 +318,12 @@ class OrderController extends Controller
         $order = DB::transaction(function () use ($order, $user, $validated): Order {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
 
+            $canSetPrice = in_array($lockedOrder->quote_status, ['awaiting_vendor', 'rejected'], true);
+
             if ($lockedOrder->status !== Order::STATUS_WAITING
                 || $lockedOrder->is_simulated
-                || $lockedOrder->payment_status !== 'awaiting_quote') {
+                || $lockedOrder->payment_status !== 'awaiting_quote'
+                || ! $canSetPrice) {
                 throw ValidationException::withMessages([
                     'order' => 'Harga hanya dapat ditetapkan untuk pesanan yang masih menunggu penawaran.',
                 ]);
@@ -284,14 +348,18 @@ class OrderController extends Controller
             $lockedOrder->forceFill([
                 'unit_price' => $unitPrice,
                 'total_amount' => $totalAmount,
-                'payment_status' => 'pending',
+                'payment_status' => $lockedOrder->type === Order::TYPE_DIRECT
+                    ? 'awaiting_approval'
+                    : 'awaiting_approval',
+                'quote_status' => 'pending_buyer',
             ])->save();
 
             if ($lockedOrder->type === Order::TYPE_GROUP) {
                 $lockedOrder->participants()->get()->each(function ($participant) use ($unitPrice): void {
                     $participant->forceFill([
                         'payment_amount' => $unitPrice * $participant->quantity,
-                        'payment_status' => 'pending',
+                        'payment_status' => 'awaiting_approval',
+                        'quote_status' => 'pending_buyer',
                     ])->save();
                 });
             }
@@ -301,6 +369,13 @@ class OrderController extends Controller
                 'status' => $lockedOrder->status,
                 'note' => 'Vendor menetapkan harga final Rp'.number_format($unitPrice, 0, ',', '.').' per pcs.',
             ]);
+            if ($lockedOrder->type === Order::TYPE_DIRECT) {
+                $lockedOrder->messages()->create([
+                    'user_id' => $user->id,
+                    'message' => 'Penawaran final: Rp'.number_format($unitPrice, 0, ',', '.')
+                        .' per pcs, total Rp'.number_format($totalAmount, 0, ',', '.').'.',
+                ]);
+            }
 
             return $lockedOrder;
         });
@@ -314,6 +389,113 @@ class OrderController extends Controller
         ]);
 
         return response()->json(['order' => $this->presentOrder($order, $user)]);
+    }
+
+    public function decideQuote(Request $request, Order $order): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'umkm', 403);
+        $participant = $order->type === Order::TYPE_GROUP
+            ? $order->participants()->where('user_id', $user->id)->first()
+            : null;
+        abort_unless(
+            ($order->type === Order::TYPE_DIRECT && $order->user_id === $user->id)
+                || ($order->type === Order::TYPE_GROUP && $participant !== null),
+            404,
+        );
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['accept', 'reject'])],
+        ]);
+
+        DB::transaction(function () use ($order, $participant, $user, $validated): void {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $lockedParticipant = $participant
+                ? $lockedOrder->participants()->lockForUpdate()->findOrFail($participant->id)
+                : null;
+            $currentQuoteStatus = $lockedParticipant?->quote_status ?? $lockedOrder->quote_status;
+
+            if ($currentQuoteStatus !== 'pending_buyer'
+                || ! in_array($lockedOrder->payment_status, ['awaiting_approval', 'pending'], true)
+                || $lockedOrder->status !== Order::STATUS_WAITING) {
+                throw ValidationException::withMessages([
+                    'decision' => 'Penawaran ini sudah diproses atau tidak lagi menunggu keputusan.',
+                ]);
+            }
+
+            $accepted = $validated['decision'] === 'accept';
+            $message = $accepted
+                ? 'Pembeli menyetujui penawaran harga final.'
+                : 'Pembeli menolak penawaran harga. Vendor dapat mengirim harga revisi.';
+
+            if ($lockedParticipant) {
+                if (! $accepted && $lockedOrder->participants()->whereNotNull('paid_at')->exists()) {
+                    throw ValidationException::withMessages([
+                        'decision' => 'Penawaran tidak dapat ditolak setelah ada peserta yang membayar.',
+                    ]);
+                }
+
+                $lockedParticipant->forceFill([
+                    'quote_status' => $accepted ? 'accepted' : 'rejected',
+                    'payment_status' => $accepted ? 'awaiting_approval' : 'awaiting_quote',
+                ])->save();
+
+                if ($accepted
+                    && ! $lockedOrder->participants()->where('quote_status', '!=', 'accepted')->exists()) {
+                    $lockedOrder->forceFill([
+                        'quote_status' => 'accepted',
+                        'payment_status' => 'pending',
+                    ])->save();
+                    $lockedOrder->participants()->where('quote_status', 'accepted')->update([
+                        'payment_status' => 'pending',
+                    ]);
+                } elseif (! $accepted) {
+                    $lockedOrder->forceFill([
+                        'quote_status' => 'rejected',
+                        'payment_status' => 'awaiting_quote',
+                        'unit_price' => null,
+                        'total_amount' => null,
+                    ])->save();
+                    $lockedOrder->participants()->update([
+                        'quote_status' => 'rejected',
+                        'payment_amount' => null,
+                        'payment_status' => 'awaiting_quote',
+                        'payment_order_id' => null,
+                        'snap_token' => null,
+                        'snap_redirect_url' => null,
+                    ]);
+                } else {
+                    $lockedOrder->forceFill([
+                        'quote_status' => 'pending_buyer',
+                        'payment_status' => 'awaiting_approval',
+                    ])->save();
+                }
+            } else {
+                $lockedOrder->forceFill([
+                    'quote_status' => $accepted ? 'accepted' : 'rejected',
+                    'payment_status' => $accepted ? 'pending' : 'awaiting_quote',
+                    ...(! $accepted ? [
+                        'unit_price' => null,
+                        'total_amount' => null,
+                        'payment_order_id' => null,
+                        'snap_token' => null,
+                        'snap_redirect_url' => null,
+                    ] : []),
+                ])->save();
+            }
+
+            $lockedOrder->statusHistory()->create([
+                'user_id' => $user->id,
+                'status' => $lockedOrder->status,
+                'note' => $message,
+            ]);
+            $lockedOrder->messages()->create([
+                'user_id' => $user->id,
+                'message' => $message,
+            ]);
+        });
+
+        return $this->show($request, $order->refresh());
     }
 
     public function checkout(Request $request, Order $order, MidtransSnapService $midtrans): JsonResponse
@@ -340,6 +522,12 @@ class OrderController extends Controller
             }
 
             if ($lockedOrder->type === Order::TYPE_DIRECT) {
+                if ($lockedOrder->quote_status !== 'accepted') {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Setujui penawaran final vendor sebelum melanjutkan pembayaran.',
+                    ]);
+                }
+
                 if ($lockedOrder->payment_status === 'paid') {
                     throw ValidationException::withMessages(['payment' => 'Pesanan ini sudah dibayar.']);
                 }
@@ -349,9 +537,9 @@ class OrderController extends Controller
                 }
 
                 if ($lockedOrder->payment_status === 'pending'
-                    && is_string($lockedOrder->snap_redirect_url)
-                    && $lockedOrder->snap_redirect_url !== '') {
-                    return ['redirect_url' => $lockedOrder->snap_redirect_url];
+                    && is_string($lockedOrder->snap_token)
+                    && $lockedOrder->snap_token !== '') {
+                    return ['token' => $lockedOrder->snap_token];
                 }
 
                 $orderId = $lockedOrder->payment_status === 'failed' || ! $lockedOrder->payment_order_id
@@ -376,6 +564,12 @@ class OrderController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            if ($lockedOrder->quote_status !== 'accepted') {
+                throw ValidationException::withMessages([
+                    'payment' => 'Semua peserta harus menyetujui penawaran sebelum pembayaran dimulai.',
+                ]);
+            }
+
             if ($participant->payment_status === 'paid') {
                 throw ValidationException::withMessages(['payment' => 'Bagian pesananmu sudah dibayar.']);
             }
@@ -389,9 +583,9 @@ class OrderController extends Controller
             }
 
             if ($participant->payment_status === 'pending'
-                && is_string($participant->snap_redirect_url)
-                && $participant->snap_redirect_url !== '') {
-                return ['redirect_url' => $participant->snap_redirect_url];
+                && is_string($participant->snap_token)
+                && $participant->snap_token !== '') {
+                return ['token' => $participant->snap_token];
             }
 
             $orderId = $participant->payment_status === 'failed' || ! $participant->payment_order_id
@@ -411,8 +605,8 @@ class OrderController extends Controller
             ];
         });
 
-        if (isset($payment['redirect_url'])) {
-            return response()->json(['redirect_url' => $payment['redirect_url']]);
+        if (isset($payment['token'])) {
+            return response()->json(['token' => $payment['token']]);
         }
 
         try {
@@ -448,7 +642,119 @@ class OrderController extends Controller
                 ])->save();
         }
 
-        return response()->json(['redirect_url' => $checkout['redirect_url']]);
+        return response()->json(['token' => $checkout['token']]);
+    }
+
+    public function refreshPayment(
+        Request $request,
+        Order $order,
+        MidtransSnapService $midtrans,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless($this->canView($order, $user), 404);
+
+        $participant = null;
+        if ($order->type === Order::TYPE_GROUP) {
+            $participant = $order->participants()->where('user_id', $user->id)->first();
+            abort_unless($user->id === $order->vendor_user_id || $participant !== null, 404);
+            abort_unless(is_string($participant?->payment_order_id) && $participant->payment_order_id !== '', 422);
+            $paymentOrderId = $participant->payment_order_id;
+            $expectedAmount = (int) $participant->payment_amount;
+        } else {
+            abort_unless($user->id === $order->user_id || $user->id === $order->vendor_user_id, 404);
+            abort_unless(is_string($order->payment_order_id) && $order->payment_order_id !== '', 422);
+            $paymentOrderId = $order->payment_order_id;
+            $expectedAmount = (int) $order->total_amount;
+        }
+
+        try {
+            $transaction = $midtrans->getTransactionStatus($paymentOrderId);
+        } catch (ConnectionException|RequestException|RuntimeException $exception) {
+            Log::warning('Midtrans order payment status could not be refreshed.', [
+                'order_id' => $order->id,
+                'payment_order_id' => $paymentOrderId,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Status Midtrans belum berhasil diperiksa. Coba lagi sebentar.',
+            ], 502);
+        }
+
+        abort_unless(
+            $transaction['order_id'] === $paymentOrderId
+                && $this->amountMatches($transaction['gross_amount'], $expectedAmount),
+            422,
+        );
+
+        DB::transaction(function () use ($order, $participant, $transaction): void {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $transactionStatus = $transaction['transaction_status'];
+            $details = array_filter([
+                'midtrans_transaction_id' => $transaction['transaction_id'] ?? null,
+                'payment_type' => $transaction['payment_type'] ?? null,
+                'midtrans_transaction_status' => $transactionStatus,
+            ], fn (?string $value): bool => $value !== null && $value !== '');
+            $outcome = $this->paymentOutcome($transaction);
+
+            if ($participant === null) {
+                $lockedOrder->forceFill($details)->save();
+                if ($outcome === 'paid' && ! $lockedOrder->paid_at) {
+                    $lockedOrder->forceFill([
+                        'payment_status' => 'paid',
+                        'paid_at' => now(),
+                    ])->save();
+                    $lockedOrder->statusHistory()->create([
+                        'user_id' => null,
+                        'status' => $lockedOrder->status,
+                        'note' => 'Pembayaran berhasil diverifikasi oleh Midtrans.',
+                    ]);
+                } elseif ($outcome === 'failed' && ! $lockedOrder->paid_at) {
+                    $lockedOrder->forceFill(['payment_status' => 'failed'])->save();
+                }
+
+                return;
+            }
+
+            $lockedParticipant = $lockedOrder->participants()->lockForUpdate()->findOrFail($participant->id);
+            $lockedParticipant->forceFill($details)->save();
+
+            if ($outcome === 'paid' && ! $lockedParticipant->paid_at) {
+                $lockedParticipant->forceFill([
+                    'payment_status' => 'paid',
+                    'paid_at' => now(),
+                ])->save();
+
+                $lockedOrder->statusHistory()->create([
+                    'user_id' => null,
+                    'status' => $lockedOrder->status,
+                    'note' => 'Pembayaran peserta berhasil diverifikasi oleh Midtrans.',
+                ]);
+
+                if (! $lockedOrder->participants()->where('payment_status', '!=', 'paid')->exists()) {
+                    $lockedOrder->forceFill([
+                        'payment_status' => 'paid',
+                        'paid_at' => now(),
+                    ])->save();
+                }
+            } elseif ($outcome === 'failed' && ! $lockedParticipant->paid_at) {
+                $lockedParticipant->forceFill(['payment_status' => 'failed'])->save();
+            }
+        });
+
+        $order->refresh()->load([
+            'creator:id,name',
+            'vendor:id,name',
+            'vendor.businessProfile:id,user_id,business_name',
+            'participants.user:id,name',
+            'statusHistory.actor:id,name',
+        ]);
+        $presented = $this->presentOrder($order, $user);
+
+        return response()->json([
+            'order' => $presented,
+            'payment_status' => $presented['current_payment_status'],
+        ]);
     }
 
     public function join(Request $request, Order $order): JsonResponse
@@ -650,6 +956,40 @@ class OrderController extends Controller
         return $order->participants()->where('user_id', $user->id)->exists();
     }
 
+    private function amountMatches(mixed $grossAmount, int $expected): bool
+    {
+        $grossAmount = (string) $grossAmount;
+
+        if (preg_match('/^\d+(?:\.\d+)?$/D', $grossAmount) !== 1) {
+            return false;
+        }
+
+        [$wholeAmount, $fractionalAmount] = array_pad(explode('.', $grossAmount, 2), 2, '');
+
+        return (int) $wholeAmount === $expected
+            && trim($fractionalAmount, '0') === '';
+    }
+
+    /**
+     * @param  array{transaction_status: string, fraud_status?: ?string}  $transaction
+     */
+    private function paymentOutcome(array $transaction): ?string
+    {
+        $transactionStatus = $transaction['transaction_status'];
+
+        if ($transactionStatus === 'settlement'
+            || ($transactionStatus === 'capture' && ($transaction['fraud_status'] ?? null) === 'accept')) {
+            return 'paid';
+        }
+
+        if (in_array($transactionStatus, ['deny', 'cancel', 'expire', 'failure'], true)
+            || ($transactionStatus === 'capture' && ($transaction['fraud_status'] ?? null) === 'deny')) {
+            return 'failed';
+        }
+
+        return null;
+    }
+
     private function hasPaymentAttempt(Order $order): bool
     {
         return $order->payment_order_id !== null
@@ -723,6 +1063,10 @@ class OrderController extends Controller
         return [
             'id' => $order->id,
             'type' => $order->type,
+            'vendor_user_id' => $order->vendor_user_id,
+            'is_quote_request' => $order->type === Order::TYPE_DIRECT
+                && $order->vendor_user_id !== null
+                && $order->payment_status !== 'not_required',
             'type_label' => Order::TYPE_LABELS[$order->type] ?? 'Jenis pesanan tidak dikenal',
             'product_name' => $order->product_name,
             'quantity' => $order->quantity,
@@ -737,6 +1081,16 @@ class OrderController extends Controller
             'unit_price' => $order->unit_price,
             'total_amount' => $order->total_amount,
             'payment_status' => $order->payment_status,
+            'quote_status' => $order->quote_status,
+            'payment_receipt' => ($isBuyer || $isAssignedVendor) && $order->payment_status === 'paid'
+                ? [
+                    'transaction_id' => $order->midtrans_transaction_id,
+                    'payment_order_id' => $order->payment_order_id,
+                    'payment_type' => $order->payment_type,
+                    'transaction_status' => $order->midtrans_transaction_status,
+                    'paid_at' => $order->paid_at?->toIso8601String(),
+                ]
+                : null,
             'payment_amount' => $order->type === Order::TYPE_DIRECT
                 ? $order->total_amount
                 : $currentParticipant?->payment_amount,
@@ -744,7 +1098,13 @@ class OrderController extends Controller
                 && $order->status === Order::STATUS_WAITING
                 && ! $order->is_simulated
                 && $order->payment_status === 'awaiting_quote'
-                && ($order->type === Order::TYPE_DIRECT || $isGroupTargetMet),
+                && ($order->type === Order::TYPE_GROUP
+                    ? $isGroupTargetMet
+                    : in_array($order->quote_status, ['awaiting_vendor', 'rejected'], true)),
+            'can_decide_quote' => $user->role === 'umkm'
+                && ($order->type === Order::TYPE_DIRECT
+                    ? $isBuyer && $order->quote_status === 'pending_buyer'
+                    : $currentParticipant?->quote_status === 'pending_buyer'),
             'can_pay' => $user->role === 'umkm'
                 && $order->status === Order::STATUS_WAITING
                 && ($order->type === Order::TYPE_DIRECT
@@ -770,6 +1130,16 @@ class OrderController extends Controller
                 'payment_amount' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
                     ? $participant->payment_amount
                     : null,
+                'payment_receipt' => ($isBuyer || $isAssignedVendor || $participant->user_id === $user->id)
+                    && $participant->payment_status === 'paid'
+                    ? [
+                        'transaction_id' => $participant->midtrans_transaction_id,
+                        'payment_order_id' => $participant->payment_order_id,
+                        'payment_type' => $participant->payment_type,
+                        'transaction_status' => $participant->midtrans_transaction_status,
+                        'paid_at' => $participant->paid_at?->toIso8601String(),
+                    ]
+                    : null,
             ])->values(),
             'committed_quantity' => $participantQuantity,
             'remaining_quantity' => max(0, $order->quantity - $participantQuantity),
@@ -779,6 +1149,13 @@ class OrderController extends Controller
                 && in_array($order->payment_status, ['awaiting_quote', 'not_required'], true)
                 && $participantQuantity < $order->quantity
                 && ! $order->participants->contains('user_id', $user->id),
+            'can_refresh_payment' => $order->type === Order::TYPE_DIRECT
+                ? ($isBuyer || $isAssignedVendor)
+                    && $order->payment_status === 'pending'
+                    && filled($order->payment_order_id)
+                : $currentParticipant !== null
+                    && $currentParticipant->payment_status === 'pending'
+                    && filled($currentParticipant->payment_order_id),
             'allowed_transitions' => collect($this->allowedTransitions($order, $user))
                 ->map(fn (string $status): array => [
                     'status' => $status,

@@ -37,6 +37,7 @@ it('creates a direct order and records its initial tracking status', function ()
         ->assertCreated()
         ->assertJsonPath('order.type_label', 'Pesanan langsung')
         ->assertJsonPath('order.status', Order::STATUS_WAITING)
+        ->assertJsonPath('order.quote_status', 'awaiting_vendor')
         ->assertJsonPath('order.delivery_address', 'Jalan Melati 10, Bandung');
 
     $order = Order::query()->sole();
@@ -89,7 +90,14 @@ it('creates a group order and starts processing when its target is reached', fun
     $this->actingAs($organizer)
         ->getJson(route('orders.index'))
         ->assertOk()
-        ->assertJsonPath('open_group_count', 1);
+        ->assertJsonPath('open_group_count', 1)
+        ->assertJsonCount(0, 'orders');
+
+    $this->actingAs($organizer)
+        ->getJson(route('orders.index', ['type' => Order::TYPE_GROUP]))
+        ->assertOk()
+        ->assertJsonCount(1, 'orders')
+        ->assertJsonPath('orders.0.type', Order::TYPE_GROUP);
 
     $this->actingAs($participant)
         ->postJson(route('orders.join', $orderId), ['quantity' => 60])

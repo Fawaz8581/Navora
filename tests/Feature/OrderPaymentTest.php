@@ -23,7 +23,7 @@ function createPaymentVendor(): User
 }
 
 /**
- * @return array{order_id: string, status_code: string, gross_amount: string, signature_key: string, transaction_status: string}
+ * @return array{order_id: string, status_code: string, gross_amount: string, signature_key: string, transaction_status: string, transaction_id: string, payment_type: string}
  */
 function orderPaymentNotification(string $orderId, int $amount): array
 {
@@ -37,6 +37,8 @@ function orderPaymentNotification(string $orderId, int $amount): array
         'gross_amount' => $grossAmount,
         'signature_key' => hash('sha512', $orderId.$statusCode.$grossAmount.$serverKey),
         'transaction_status' => 'settlement',
+        'transaction_id' => 'midtrans-'.$orderId,
+        'payment_type' => 'bank_transfer',
     ];
 }
 
@@ -78,12 +80,19 @@ it('requires a final vendor price and confirms a direct order only after a signe
         ->assertOk()
         ->assertJsonPath('order.unit_price', 180)
         ->assertJsonPath('order.total_amount', 90000)
+        ->assertJsonPath('order.payment_status', 'awaiting_approval')
+        ->assertJsonPath('order.quote_status', 'pending_buyer');
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.quote-decision', $orderId), ['decision' => 'accept'])
+        ->assertOk()
+        ->assertJsonPath('order.quote_status', 'accepted')
         ->assertJsonPath('order.payment_status', 'pending');
 
     $this->actingAs($buyer)
         ->postJson(route('orders.checkout', $orderId))
         ->assertOk()
-        ->assertJsonPath('redirect_url', 'https://app.sandbox.midtrans.com/snap/v2/vtweb/order-snap-token');
+        ->assertJsonPath('token', 'order-snap-token');
 
     $order = Order::query()->findOrFail($orderId);
     expect($order->payment_order_id)->toStartWith('NAVORA-ORDER-')
@@ -107,7 +116,23 @@ it('requires a final vendor price and confirms a direct order only after a signe
         ->assertJson(['status' => 'ok']);
 
     expect($order->fresh()->payment_status)->toBe('paid')
-        ->and($order->fresh()->paid_at)->not->toBeNull();
+        ->and($order->fresh()->paid_at)->not->toBeNull()
+        ->and($order->fresh()->midtrans_transaction_id)->toBe('midtrans-'.$order->payment_order_id)
+        ->and($order->fresh()->payment_type)->toBe('bank_transfer');
+
+    $this->actingAs($vendor)
+        ->getJson(route('orders.vendor-income'))
+        ->assertOk()
+        ->assertJsonPath('summary.total_revenue', 90000)
+        ->assertJsonPath('summary.completed_orders', 1)
+        ->assertJsonPath('sales.0.product_name', 'Pouch kopi')
+        ->assertJsonPath('sales.0.total_amount', 90000);
+
+    $this->actingAs($vendor)
+        ->getJson(route('orders.show', $order))
+        ->assertOk()
+        ->assertJsonPath('order.payment_receipt.transaction_id', 'midtrans-'.$order->payment_order_id)
+        ->assertJsonPath('order.payment_receipt.payment_type', 'bank_transfer');
 
     $this->actingAs($vendor)
         ->patchJson(route('orders.status', $order), ['status' => Order::STATUS_PROCESSING])
@@ -159,13 +184,30 @@ it('requires each group-order participant to pay their own share before the orde
         ->postJson(route('orders.price', $orderId), ['unit_price' => 200])
         ->assertOk()
         ->assertJsonPath('order.total_amount', 20000)
+        ->assertJsonPath('order.payment_status', 'awaiting_approval')
         ->assertJsonPath('order.participants.0.payment_amount', 8000)
         ->assertJsonPath('order.participants.1.payment_amount', 12000);
 
     $this->actingAs($organizer)
+        ->postJson(route('orders.quote-decision', $orderId), ['decision' => 'accept'])
+        ->assertOk()
+        ->assertJsonPath('order.payment_status', 'awaiting_approval');
+
+    $this->actingAs($organizer)
+        ->postJson(route('orders.checkout', $orderId))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['payment']);
+
+    $this->actingAs($participant)
+        ->postJson(route('orders.quote-decision', $orderId), ['decision' => 'accept'])
+        ->assertOk()
+        ->assertJsonPath('order.quote_status', 'accepted')
+        ->assertJsonPath('order.payment_status', 'pending');
+
+    $this->actingAs($organizer)
         ->postJson(route('orders.checkout', $orderId))
         ->assertOk()
-        ->assertJsonPath('redirect_url', 'https://app.sandbox.midtrans.com/snap/v2/vtweb/organizer');
+        ->assertJsonPath('token', 'organizer-snap-token');
 
     $order = Order::query()->findOrFail($orderId);
     $organizerPaymentId = $order->participants()->where('user_id', $organizer->id)->value('payment_order_id');
@@ -190,7 +232,7 @@ it('requires each group-order participant to pay their own share before the orde
     $this->actingAs($participant)
         ->postJson(route('orders.checkout', $orderId))
         ->assertOk()
-        ->assertJsonPath('redirect_url', 'https://app.sandbox.midtrans.com/snap/v2/vtweb/participant');
+        ->assertJsonPath('token', 'participant-snap-token');
 
     $participantPaymentId = $order->participants()->where('user_id', $participant->id)->value('payment_order_id');
     $this->postJson(
@@ -203,6 +245,90 @@ it('requires each group-order participant to pay their own share before the orde
 
     Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 8000);
     Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 12000);
+});
+
+it('allows a buyer to reject a quote and receive a revised offer before paying', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createPaymentVendor();
+
+    $orderId = $this->actingAs($buyer)
+        ->postJson(route('orders.quote'), [
+            'vendor_user_id' => $vendor->id,
+            'product_name' => 'Pouch kopi',
+            'quantity' => 100,
+            'packaging_details' => 'Kraft laminasi.',
+            'delivery_address' => 'Bandung.',
+        ])
+        ->assertCreated()
+        ->json('order.id');
+
+    $this->actingAs($vendor)
+        ->postJson(route('orders.price', $orderId), ['unit_price' => 200])
+        ->assertOk()
+        ->assertJsonPath('order.can_set_price', false);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.quote-decision', $orderId), ['decision' => 'reject'])
+        ->assertOk()
+        ->assertJsonPath('order.quote_status', 'rejected')
+        ->assertJsonPath('order.payment_status', 'awaiting_quote')
+        ->assertJsonPath('order.unit_price', null);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.checkout', $orderId))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['payment']);
+
+    $this->actingAs($vendor)
+        ->postJson(route('orders.price', $orderId), ['unit_price' => 175])
+        ->assertOk()
+        ->assertJsonPath('order.unit_price', 175)
+        ->assertJsonPath('order.quote_status', 'pending_buyer');
+});
+
+it('refreshes Midtrans status from the server and records a verified receipt', function () {
+    config([
+        'services.midtrans.server_key' => 'refresh-payment-test-key',
+        'services.midtrans.api_base_url' => 'https://api.sandbox.midtrans.com',
+    ]);
+    Http::preventStrayRequests();
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createPaymentVendor();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'vendor_user_id' => $vendor->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi',
+        'quantity' => 10,
+        'packaging_details' => 'Kraft.',
+        'delivery_address' => 'Bandung.',
+        'status' => Order::STATUS_WAITING,
+        'unit_price' => 100,
+        'total_amount' => 1000,
+        'payment_status' => 'pending',
+        'quote_status' => 'accepted',
+        'payment_order_id' => 'NAVORA-ORDER-refresh',
+    ]);
+    Http::fake([
+        'https://api.sandbox.midtrans.com/v2/NAVORA-ORDER-refresh/status' => Http::response([
+            'status_code' => '200',
+            'order_id' => $order->payment_order_id,
+            'gross_amount' => '1000.00',
+            'transaction_status' => 'settlement',
+            'transaction_id' => 'verified-transaction-1',
+            'payment_type' => 'qris',
+        ]),
+    ]);
+
+    $this->actingAs($vendor)
+        ->postJson(route('orders.payment-refresh', $order))
+        ->assertOk()
+        ->assertJsonPath('payment_status', 'paid')
+        ->assertJsonPath('order.payment_receipt.transaction_id', 'verified-transaction-1')
+        ->assertJsonPath('order.payment_receipt.payment_type', 'qris');
+
+    expect($order->fresh()->payment_status)->toBe('paid')
+        ->and($order->fresh()->midtrans_transaction_status)->toBe('settlement');
 });
 
 it('rejects price changes from a vendor who is not assigned to the order', function () {

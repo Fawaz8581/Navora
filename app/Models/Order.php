@@ -63,10 +63,14 @@ class Order extends Model
         'unit_price',
         'total_amount',
         'payment_status',
+        'quote_status',
         'payment_order_id',
         'snap_token',
         'snap_redirect_url',
         'paid_at',
+        'midtrans_transaction_id',
+        'payment_type',
+        'midtrans_transaction_status',
     ];
 
     public function creator(): BelongsTo
@@ -87,6 +91,11 @@ class Order extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(OrderStatusHistory::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(OrderMessage::class);
     }
 
     public function nextSimulatedStatus(): ?string

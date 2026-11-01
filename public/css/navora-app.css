@@ -1790,6 +1790,193 @@ body.navora-app-body {
     margin-left: auto;
 }
 
+.navora-live-rfq-card {
+    display: grid;
+    gap: 10px;
+}
+
+.navora-live-rfq-card .navora-rfq-card-head {
+    padding-bottom: 10px;
+}
+
+.navora-live-rfq-card > .btn {
+    justify-self: start;
+}
+
+.navora-chat-panel {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+}
+
+.navora-chat-panel .navora-panel-heading {
+    margin: 0;
+}
+
+.navora-chat-panel .navora-panel-heading h2 {
+    margin: 3px 0 0;
+}
+
+.navora-order-chat-messages {
+    display: grid;
+    max-height: 340px;
+    gap: 9px;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid #e8edf1;
+    border-radius: 9px;
+    background: #f7f9fb;
+}
+
+.navora-order-chat-message {
+    width: fit-content;
+    max-width: min(82%, 620px);
+    padding: 9px 11px;
+    border: 1px solid #e6edf1;
+    border-radius: 10px 10px 10px 3px;
+    background: #fff;
+}
+
+.navora-order-chat-message.is-mine {
+    justify-self: end;
+    border-color: #d7e9e3;
+    border-radius: 10px 10px 3px 10px;
+    background: #edf7f3;
+}
+
+.navora-order-chat-message strong,
+.navora-order-chat-message time {
+    display: block;
+    color: #788b98;
+    font-size: 8px;
+}
+
+.navora-order-chat-message p {
+    margin: 5px 0;
+    color: #36546a;
+    font-size: 10px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.navora-order-chat-message time {
+    text-align: right;
+}
+
+.navora-order-chat-empty,
+.navora-order-chat-loading {
+    margin: 0;
+    color: #80909b;
+    font-size: 9px;
+    text-align: center;
+}
+
+.navora-order-chat-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.navora-order-chat-actions .btn {
+    min-height: 32px;
+    padding: 7px 10px;
+    font-size: 9px;
+}
+
+.navora-order-chat-offer {
+    margin: 0 auto 0 0;
+    color: #3f735f;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.navora-order-chat-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.navora-order-chat-form textarea {
+    width: 100%;
+    min-height: 42px;
+    resize: vertical;
+    padding: 9px 11px;
+    border: 1px solid #dfe7ec;
+    border-radius: 8px;
+    color: #345269;
+    font: inherit;
+    font-size: 10px;
+}
+
+.navora-order-chat-form .btn {
+    flex: none;
+    min-height: 38px;
+}
+
+.navora-income-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.navora-income-summary article {
+    display: grid;
+    gap: 7px;
+    padding: 15px;
+    border: 1px solid var(--navora-app-line);
+    border-radius: 9px;
+    background: #fff;
+}
+
+.navora-income-summary span {
+    color: #82919d;
+    font-size: 9px;
+}
+
+.navora-income-summary strong {
+    color: #356a57;
+    font-family: 'Manrope', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.navora-income-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--navora-app-line);
+    border-radius: 9px;
+    background: #fff;
+}
+
+.navora-income-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #50697c;
+    font-size: 9px;
+}
+
+.navora-income-table th,
+.navora-income-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #edf1f4;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.navora-income-table th {
+    background: #f7f9fb;
+    color: #758795;
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.navora-income-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
 .navora-ai-demo-chip {
     display: inline-flex;
     flex: none;
@@ -3469,5 +3656,24 @@ body.navora-app-body {
     .navora-app-primary,
     .navora-app-outline {
         display: none !important;
+    }
+}
+
+@media (max-width: 700px) {
+    .navora-order-chat-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .navora-order-chat-form .btn {
+        align-self: flex-end;
+    }
+
+    .navora-order-chat-message {
+        max-width: 94%;
+    }
+
+    .navora-income-summary {
+        grid-template-columns: 1fr;
     }
 }

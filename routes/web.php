@@ -15,6 +15,7 @@ use App\Http\Controllers\BusinessProfileController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderMessageController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorListingController;
@@ -100,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/katalog/vendor/produk/{vendorListing}/media/{vendorListingMedia}', [VendorCatalogController::class, 'showListingMedia'])
         ->name('vendors.catalog.listing-media');
     Route::get('/pesanan', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/vendor/pendapatan', [OrderController::class, 'vendorIncome'])->name('orders.vendor-income');
     Route::post('/pesanan', [OrderController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('orders.store');
@@ -107,12 +109,23 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1')
         ->name('orders.quote');
     Route::get('/pesanan/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::get('/pesanan/{order}/pesan', [OrderMessageController::class, 'index'])
+        ->name('orders.messages.index');
+    Route::post('/pesanan/{order}/pesan', [OrderMessageController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('orders.messages.store');
     Route::post('/pesanan/{order}/penawaran-harga', [OrderController::class, 'setPrice'])
         ->middleware('throttle:10,1')
         ->name('orders.price');
+    Route::post('/pesanan/{order}/penawaran/keputusan', [OrderController::class, 'decideQuote'])
+        ->middleware('throttle:10,1')
+        ->name('orders.quote-decision');
     Route::post('/pesanan/{order}/pembayaran', [OrderController::class, 'checkout'])
         ->middleware('throttle:10,1')
         ->name('orders.checkout');
+    Route::post('/pesanan/{order}/pembayaran/periksa', [OrderController::class, 'refreshPayment'])
+        ->middleware('throttle:20,1')
+        ->name('orders.payment-refresh');
     Route::post('/pesanan/{order}/peserta', [OrderController::class, 'join'])
         ->middleware('throttle:20,1')
         ->name('orders.join');
