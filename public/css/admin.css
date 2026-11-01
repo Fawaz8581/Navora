@@ -153,42 +153,6 @@
     color: #9c3939;
 }
 
-.admin-ad-package-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    align-items: end;
-    gap: 12px;
-    padding: 16px 0;
-    border-top: 1px solid #eff3f5;
-}
-
-.admin-ad-package-form label {
-    display: grid;
-    gap: 6px;
-    color: #718493;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.admin-ad-package-form input:not([type="checkbox"]),
-.admin-ad-package-form select,
-.admin-ad-actions input:not([type="hidden"]) {
-    min-width: 0;
-    min-height: 38px;
-    padding: 8px 10px;
-    border: 1px solid #dfe7ec;
-    border-radius: 7px;
-    color: #17314b;
-    font: inherit;
-}
-
-.admin-ad-package-form .admin-ad-active {
-    display: flex;
-    min-height: 38px;
-    align-items: center;
-    gap: 8px;
-}
-
 .admin-ad-campaign {
     padding: 18px 0;
     border-top: 1px solid #eff3f5;
@@ -251,7 +215,79 @@
     background: #f5f8fc;
 }
 
+.admin-ad-preview > a {
+    display: block;
+}
+
+.admin-ad-preview > span {
+    display: block;
+    padding: 8px 12px;
+    color: #718493;
+    font-size: 11px;
+}
+
 .admin-ad-note {
+    color: #a23c3c;
+}
+
+.admin-ad-income {
+    margin: 0;
+    color: #17684d;
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 800;
+}
+
+.admin-ad-payment-proof {
+    display: grid;
+    gap: 5px;
+    margin: 12px 0;
+    padding: 12px 14px;
+    border: 1px solid #e3ebe7;
+    border-radius: 9px;
+    background: #f5faf7;
+    color: #50677a;
+    font-size: 12px;
+}
+
+.admin-ad-payment-proof strong {
+    color: #17684d;
+}
+
+.admin-ad-review-reason {
+    padding: 10px 12px;
+    border-left: 3px solid #c88d47;
+    background: #fffaf3;
+}
+
+.admin-ad-review-form {
+    display: grid;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.admin-ad-review-form > label {
+    color: #50677a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-ad-review-form textarea {
+    width: min(100%, 560px);
+    padding: 9px 11px;
+    border: 1px solid #dfe7ec;
+    border-radius: 7px;
+    color: #17314b;
+    font: inherit;
+}
+
+.admin-ad-refresh-form {
+    margin-top: 12px;
+}
+
+.admin-ad-reject-action {
+    border-color: #e8cccc;
+    background: #fff4f4;
     color: #a23c3c;
 }
 

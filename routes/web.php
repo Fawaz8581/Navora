@@ -12,11 +12,13 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorListingController;
 use App\Http\Controllers\VendorVerificationController;
+use App\Models\AdCampaign;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/masukan', [FeedbackController::class, 'create'])->name('feedback.create');
@@ -49,7 +51,16 @@ Route::get('/ruang-kerja', function () {
         }
     }
 
-    return view('workspace');
+    return view('workspace', [
+        'advertisementNotices' => $user?->role === 'vendor'
+            ? $user->adCampaigns()
+                ->whereIn('status', [AdCampaign::STATUS_ACTIVE, AdCampaign::STATUS_REJECTED])
+                ->whereNotNull('reviewed_at')
+                ->latest('reviewed_at')
+                ->limit(5)
+                ->get()
+            : collect(),
+    ]);
 })->name('workspace');
 
 Route::middleware('guest')->group(function () {
@@ -124,6 +135,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/vendor/iklan/{adCampaign}/aset', [VendorAdvertisementController::class, 'uploadAsset'])
         ->middleware('throttle:10,1')
         ->name('vendor.advertisements.asset');
+    Route::post('/iklan/{adCampaign}/cek-pembayaran', [MidtransNotificationController::class, 'refreshAdvertisement'])
+        ->middleware('throttle:20,1')
+        ->name('vendor.advertisements.refresh');
 
     Route::prefix('admin/vendor-verifications')
         ->name('admin.vendor-verifications.')
@@ -159,10 +173,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('admin')
         ->group(function () {
             Route::get('/', [AdminAdvertisementController::class, 'index'])->name('index');
-            Route::post('/packages', [AdminAdvertisementController::class, 'storePackage'])->name('packages.store');
-            Route::patch('/packages/{adPackage}', [AdminAdvertisementController::class, 'updatePackage'])->name('packages.update');
-            Route::post('/campaigns/{adCampaign}/review', [AdminAdvertisementController::class, 'reviewCampaign'])->name('campaigns.review');
-            Route::post('/campaigns/{adCampaign}/publish', [AdminAdvertisementController::class, 'publishCampaign'])->name('campaigns.publish');
+            Route::post('/campaigns/{adCampaign}/review', [AdminAdvertisementController::class, 'reviewCampaign'])
+                ->middleware('throttle:10,1')
+                ->name('campaigns.review');
+            Route::post('/campaigns/{adCampaign}/refund/retry', [AdminAdvertisementController::class, 'retryRefund'])
+                ->middleware('throttle:10,1')
+                ->name('campaigns.refund.retry');
             Route::get('/campaigns/{adCampaign}/asset', [AdvertisementAssetController::class, 'showForAdmin'])->name('campaigns.asset');
         });
 });

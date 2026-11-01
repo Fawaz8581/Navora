@@ -40,7 +40,7 @@
                 <i class="bi bi-box-seam"></i> Persetujuan katalog
             </a>
             <a href="{{ route('admin.customize.index') }}" @class(['is-active' => request()->routeIs('admin.customize.*')])>
-                <i class="bi bi-sliders"></i> Customize
+                <i class="bi bi-megaphone"></i> Iklan
             </a>
             <a href="{{ route('admin.feedback.index') }}" @class(['is-active' => request()->routeIs('admin.feedback.*')])>
                 <i class="bi bi-chat-square-text"></i> Masukan

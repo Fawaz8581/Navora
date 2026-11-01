@@ -25,7 +25,13 @@ class DashboardController extends Controller
                 'vendors' => User::query()->where('role', 'vendor')->count(),
                 'pending_verifications' => (clone $vendorProfiles)->where('verification_status', 'pending')->count(),
                 'feedback' => Feedback::query()->count(),
-                'pending_ad_payments' => AdCampaign::query()->where('status', AdCampaign::STATUS_PAID)->count(),
+                'pending_ad_payments' => AdCampaign::query()
+                    ->where('payment_status', 'paid')
+                    ->whereIn('status', [
+                        AdCampaign::STATUS_PAID,
+                        AdCampaign::STATUS_ASSET_SUBMITTED,
+                    ])
+                    ->count(),
                 'pending_vendor_listings' => VendorListing::query()
                     ->where('status', VendorListing::STATUS_PENDING)
                     ->count(),

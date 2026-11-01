@@ -7,6 +7,7 @@ use App\Models\AdPackage;
 use App\Services\MidtransSnapService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -31,10 +32,12 @@ class VendorAdvertisementController extends Controller
                 ->latest()
                 ->get(),
             'midtransConfigured' => $this->midtransIsConfigured(),
+            'midtransClientKey' => config('services.midtrans.client_key'),
+            'midtransSnapUrl' => rtrim((string) config('services.midtrans.base_url'), '/').'/snap/snap.js',
         ]);
     }
 
-    public function store(Request $request, MidtransSnapService $midtrans): RedirectResponse
+    public function store(Request $request, MidtransSnapService $midtrans): RedirectResponse|JsonResponse
     {
         $this->ensureVerifiedVendor($request);
 
@@ -44,6 +47,9 @@ class VendorAdvertisementController extends Controller
                 'integer',
                 Rule::exists('ad_packages', 'id')->where('is_active', true),
             ],
+            'ad_title' => ['required', 'string', 'max:120'],
+            'destination_url' => ['required', 'url:https', 'max:2048'],
+            'asset' => ['required', 'image', 'mimes:png,gif', 'extensions:png,gif', 'max:5120'],
         ]);
 
         $package = AdPackage::query()
@@ -62,15 +68,27 @@ class VendorAdvertisementController extends Controller
             'ad_package_id' => $package->id,
             'vendor_user_id' => $vendor->id,
             'package_name' => $package->name,
+            'ad_title' => $validated['ad_title'],
+            'destination_url' => $validated['destination_url'],
             'placement' => $package->placement,
             'width' => $package->width,
             'height' => $package->height,
-            'amount' => $package->price,
+            'amount' => AdCampaign::priceForPlacement($package->placement),
             'duration_days' => $package->duration_days,
             'order_id' => 'NAVORA-AD-'.Str::uuid(),
             'payment_status' => 'pending',
             'status' => AdCampaign::STATUS_PENDING_PAYMENT,
         ]);
+        $assetPath = $validated['asset']->store('advertisements/'.$campaign->id, 'local');
+
+        if ($assetPath === false) {
+            throw new RuntimeException('Aset iklan tidak berhasil disimpan.');
+        }
+
+        $campaign->forceFill([
+            'asset_path' => $assetPath,
+            'asset_submitted_at' => now(),
+        ])->save();
 
         try {
             $checkout = $midtrans->createTransaction($campaign, $vendor);
@@ -95,7 +113,19 @@ class VendorAdvertisementController extends Controller
             'snap_redirect_url' => $checkout['redirect_url'],
         ])->save();
 
-        return redirect()->away($checkout['redirect_url']);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'token' => $checkout['token'],
+                'campaign_id' => $campaign->id,
+                'status_url' => route('vendor.advertisements.refresh', $campaign),
+            ]);
+        }
+
+        return redirect()
+            ->route('vendor.advertisements.index')
+            ->with('snapToken', $checkout['token'])
+            ->with('campaignId', $campaign->id)
+            ->with('statusUrl', route('vendor.advertisements.refresh', $campaign));
     }
 
     public function uploadAsset(Request $request, AdCampaign $adCampaign): RedirectResponse
@@ -105,7 +135,7 @@ class VendorAdvertisementController extends Controller
         abort_unless($adCampaign->status === AdCampaign::STATUS_AWAITING_ASSET, 409);
 
         $validated = $request->validate([
-            'asset' => ['required', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:5120'],
+            'asset' => ['required', 'image', 'mimes:png,gif', 'extensions:png,gif', 'max:5120'],
         ]);
 
         $assetPath = $validated['asset']->store('advertisements/'.$adCampaign->id, 'local');
@@ -136,7 +166,11 @@ class VendorAdvertisementController extends Controller
     private function midtransIsConfigured(): bool
     {
         $serverKey = config('services.midtrans.server_key');
+        $clientKey = config('services.midtrans.client_key');
 
-        return is_string($serverKey) && trim($serverKey) !== '';
+        return is_string($serverKey)
+            && trim($serverKey) !== ''
+            && is_string($clientKey)
+            && trim($clientKey) !== '';
     }
 }

@@ -36,6 +36,115 @@ class MidtransSnapService
     }
 
     /**
+     * @return array{
+     *     status_code: string,
+     *     order_id: string,
+     *     gross_amount: string,
+     *     transaction_status: string,
+     *     transaction_id?: string,
+     *     payment_type?: string,
+     *     fraud_status?: string
+     * }
+     */
+    public function getTransactionStatus(string $orderId): array
+    {
+        $serverKey = config('services.midtrans.server_key');
+
+        if (! is_string($serverKey) || $serverKey === '') {
+            throw new RuntimeException('Kunci server Midtrans belum dikonfigurasi.');
+        }
+
+        $baseUrl = rtrim((string) config('services.midtrans.api_base_url'), '/');
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('URL API Midtrans belum dikonfigurasi.');
+        }
+
+        $response = Http::acceptJson()
+            ->withBasicAuth($serverKey, '')
+            ->timeout(15)
+            ->get($baseUrl.'/v2/'.rawurlencode($orderId).'/status');
+
+        $response->throw();
+
+        $data = $response->json();
+
+        if (! is_array($data)
+            || (string) ($data['status_code'] ?? '') !== '200'
+            || ($data['order_id'] ?? null) !== $orderId
+            || ! is_string($data['gross_amount'] ?? null)
+            || ! is_string($data['transaction_status'] ?? null)) {
+            throw new RuntimeException('Midtrans tidak mengembalikan status transaksi yang valid.');
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array{transaction_id: string, order_id: string, transaction_status: string, refund_key: ?string}
+     */
+    public function refundAdvertisement(AdCampaign $campaign, string $reason): array
+    {
+        $serverKey = config('services.midtrans.server_key');
+
+        if (! is_string($serverKey) || $serverKey === '') {
+            throw new RuntimeException('Kunci server Midtrans belum dikonfigurasi.');
+        }
+
+        $baseUrl = rtrim((string) config('services.midtrans.api_base_url'), '/');
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('URL Midtrans belum dikonfigurasi.');
+        }
+
+        if (! is_string($campaign->refund_key) || $campaign->refund_key === '') {
+            throw new RuntimeException('Kunci refund iklan belum tersedia.');
+        }
+
+        $transactionReference = $campaign->midtrans_transaction_id ?: $campaign->order_id;
+        $isCapture = $campaign->midtrans_transaction_status === 'capture';
+        $action = $isCapture ? 'cancel' : 'refund';
+        $refundRequest = Http::acceptJson()
+            ->withBasicAuth($serverKey, '')
+            ->timeout(15);
+        $refundUrl = $baseUrl.'/v2/'.rawurlencode($transactionReference).'/'.$action;
+
+        $response = $isCapture
+            ? $refundRequest->post($refundUrl)
+            : $refundRequest->asJson()->post($refundUrl, [
+                'refund_key' => $campaign->refund_key,
+                'amount' => $campaign->amount,
+                'reason' => mb_substr('Iklan ditolak: '.$reason, 0, 255),
+            ]);
+
+        $response->throw();
+
+        $data = $response->json();
+        $transactionId = is_array($data) ? ($data['transaction_id'] ?? null) : null;
+        $orderId = is_array($data) ? ($data['order_id'] ?? null) : null;
+        $transactionStatus = is_array($data) ? ($data['transaction_status'] ?? null) : null;
+        $refundKey = is_array($data) ? ($data['refund_key'] ?? null) : null;
+
+        if (! is_array($data)
+            || (string) ($data['status_code'] ?? '') !== '200'
+            || $orderId !== $campaign->order_id
+            || ! is_string($transactionId)
+            || ($isCapture
+                ? $transactionStatus !== 'cancel'
+                : (! in_array($transactionStatus, ['refund', 'partial_refund'], true)
+                    || $refundKey !== $campaign->refund_key))) {
+            throw new RuntimeException('Midtrans belum mengonfirmasi permintaan refund iklan.');
+        }
+
+        return [
+            'transaction_id' => $transactionId,
+            'order_id' => $orderId,
+            'transaction_status' => $transactionStatus,
+            'refund_key' => $refundKey,
+        ];
+    }
+
+    /**
      * @return array{token: string, redirect_url: string}
      */
     private function requestTransaction(string $orderId, int $amount, User $customer, string $finishUrl): array

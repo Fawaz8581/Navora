@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdCampaign extends Model
 {
+    public const TOP_PRICE = 200000;
+
+    public const SIDEBAR_PRICE = 100000;
+
+    public const DEFAULT_BANNER_WIDTH = 1200;
+
+    public const DEFAULT_BANNER_HEIGHT = 300;
+
     public const STATUS_PENDING_PAYMENT = 'pending_payment';
 
     public const STATUS_PAYMENT_FAILED = 'payment_failed';
@@ -19,10 +27,14 @@ class AdCampaign extends Model
 
     public const STATUS_ACTIVE = 'active';
 
+    public const STATUS_REJECTED = 'rejected';
+
     protected $fillable = [
         'ad_package_id',
         'vendor_user_id',
         'package_name',
+        'ad_title',
+        'destination_url',
         'placement',
         'width',
         'height',
@@ -32,10 +44,19 @@ class AdCampaign extends Model
         'snap_token',
         'snap_redirect_url',
         'payment_status',
+        'midtrans_transaction_id',
+        'payment_type',
+        'midtrans_transaction_status',
         'status',
         'paid_at',
         'approved_by',
         'approved_at',
+        'review_reason',
+        'reviewed_by',
+        'reviewed_at',
+        'refund_key',
+        'refund_status',
+        'refund_requested_at',
         'asset_path',
         'asset_submitted_at',
         'published_by',
@@ -64,6 +85,16 @@ class AdCampaign extends Model
         return $this->belongsTo(User::class, 'published_by');
     }
 
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public static function priceForPlacement(string $placement): int
+    {
+        return $placement === 'sidebar' ? self::SIDEBAR_PRICE : self::TOP_PRICE;
+    }
+
     protected function casts(): array
     {
         return [
@@ -73,6 +104,8 @@ class AdCampaign extends Model
             'duration_days' => 'integer',
             'paid_at' => 'datetime',
             'approved_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+            'refund_requested_at' => 'datetime',
             'asset_submitted_at' => 'datetime',
             'published_at' => 'datetime',
             'starts_at' => 'datetime',

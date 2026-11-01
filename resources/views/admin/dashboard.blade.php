@@ -141,7 +141,7 @@
                 </a>
                 <a href="{{ route('admin.customize.index') }}">
                     <span class="admin-quick-icon admin-quick-icon-gold"><i class="bi bi-megaphone"></i></span>
-                    <span><strong>Paket dan iklan</strong><small>Kelola paket dan pembayaran</small></span>
+                    <span><strong>Iklan</strong><small>Tinjau iklan, refund, dan pemasukan</small></span>
                     @if ($stats['pending_ad_payments'] > 0)<span class="admin-quick-count admin-quick-count-gold">{{ number_format($stats['pending_ad_payments']) }}</span>@endif
                     <i class="bi bi-arrow-up-right"></i>
                 </a>

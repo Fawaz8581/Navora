@@ -105,6 +105,31 @@
 
         <main class="navora-app-main container-fluid" id="app-content">
             @include('advertisements.banner')
+            @if (Auth::check() && Auth::user()->role === 'vendor' && $advertisementNotices->isNotEmpty())
+                <section class="ad-dashboard-notices" aria-label="Notifikasi keputusan iklan">
+                    <h2>Notifikasi iklan</h2>
+                    @foreach ($advertisementNotices as $notice)
+                        <article class="ad-campaign-review-notice" role="status">
+                            <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}: {{ $notice->ad_title ?: $notice->package_name }}</strong>
+                            @if ($notice->review_reason)
+                                <span>Catatan admin: {{ $notice->review_reason }}</span>
+                            @endif
+                            @if ($notice->status === 'rejected')
+                                <span>Status refund: {{ match ($notice->refund_status) {
+                                    'requested' => 'Permintaan refund diterima Midtrans',
+                                    'refunded' => 'Refund selesai',
+                                    'partially_refunded' => 'Refund sebagian',
+                                    'cancel_requested' => 'Pembatalan transaksi diterima Midtrans',
+                                    'cancelled' => 'Pembayaran berhasil dibatalkan',
+                                    'failed' => 'Refund gagal diajukan; admin akan mencoba kembali',
+                                    default => 'Sedang diproses',
+                                } }}</span>
+                            @endif
+                        </article>
+                    @endforeach
+                    <a href="{{ route('vendor.advertisements.index') }}">Lihat bukti pembayaran dan status iklan <i class="bi bi-arrow-right"></i></a>
+                </section>
+            @endif
             <div class="navora-app-content-layout">
                 <div class="navora-app-panels">
             <section class="navora-page-panel is-active" data-page-panel="overview" role="tabpanel">

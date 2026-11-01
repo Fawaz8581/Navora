@@ -15,6 +15,69 @@
     object-fit: contain;
 }
 
+.navora-ad-banner > a,
+.navora-ad-sidebar > a {
+    display: block;
+}
+
+.navora-ad-promo {
+    min-height: 180px;
+    background:
+        radial-gradient(ellipse at 82% 18%, rgba(205, 235, 219, .8), transparent 38%),
+        linear-gradient(120deg, #f3f8f6 0%, #e8f3ee 50%, #f8f5e9 100%);
+}
+
+.navora-ad-promo-link {
+    display: flex;
+    min-height: inherit;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 34px clamp(22px, 6vw, 72px);
+    color: #173c32;
+    text-decoration: none;
+}
+
+.navora-ad-promo-link:hover {
+    color: #173c32;
+}
+
+.navora-ad-promo-copy {
+    display: grid;
+    gap: 8px;
+}
+
+.navora-ad-promo-copy strong,
+.navora-ad-sidebar-promo .navora-ad-promo-link > strong {
+    font-size: clamp(22px, 3vw, 34px);
+    line-height: 1.15;
+}
+
+.navora-ad-promo-copy > span,
+.navora-ad-sidebar-promo .navora-ad-promo-link > span:not(.navora-ad-promo-action) {
+    color: #536f64;
+    font-size: 15px;
+}
+
+.navora-ad-promo-action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: 999px;
+    background: #17684d;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    transition: background-color .18s ease, transform .18s ease;
+}
+
+.navora-ad-promo-link:hover .navora-ad-promo-action {
+    transform: translateY(-1px);
+    background: #10513c;
+}
+
 .navora-ad-sidebar {
     position: relative;
     width: min(100%, 240px);
@@ -30,6 +93,29 @@
     width: 100%;
     max-height: 480px;
     object-fit: contain;
+}
+
+.navora-ad-sidebar-promo {
+    min-height: 280px;
+    background:
+        radial-gradient(ellipse at 80% 10%, rgba(205, 235, 219, .8), transparent 42%),
+        linear-gradient(150deg, #f3f8f6 0%, #e8f3ee 54%, #f8f5e9 100%);
+}
+
+.navora-ad-sidebar-promo .navora-ad-promo-link {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+    padding: 42px 22px 24px;
+}
+
+.navora-ad-sidebar-promo .navora-ad-promo-link > strong {
+    font-size: 24px;
+}
+
+.navora-ad-sidebar-promo .navora-ad-promo-action {
+    margin-top: 6px;
 }
 
 .navora-ad-label {
@@ -80,9 +166,117 @@
     font-weight: 700;
 }
 
+.ad-campaign-payment-proof,
+.ad-campaign-review-notice {
+    display: grid;
+    gap: 5px;
+    margin: 12px 0;
+    padding: 12px 14px;
+    border: 1px solid #e3ebe7;
+    border-radius: 9px;
+    background: #f5faf7;
+    color: #50677a;
+    font-size: 12px;
+}
+
+.ad-payment-feedback {
+    position: fixed;
+    z-index: 20;
+    right: 20px;
+    bottom: 20px;
+    max-width: min(440px, calc(100vw - 40px));
+    padding: 14px 18px;
+    border: 1px solid #cfe7d9;
+    border-radius: 10px;
+    background: #f5faf7;
+    color: #17684d;
+    box-shadow: 0 12px 32px rgba(20, 48, 65, .16);
+    font-size: 14px;
+}
+
+.ad-payment-feedback.is-error {
+    border-color: #f0d4d4;
+    background: #fff6f6;
+    color: #9c3939;
+}
+
+.ad-campaign-payment-proof strong {
+    color: #17684d;
+}
+
+.ad-campaign-review-notice {
+    border-color: #ecdcc6;
+    background: #fffaf3;
+}
+
+.ad-campaign-review-notice strong {
+    color: #8d5d24;
+}
+
+.ad-dashboard-notices {
+    display: grid;
+    gap: 8px;
+    max-width: 1180px;
+    margin: 0 auto 18px;
+    padding: 16px;
+    border: 1px solid #e5eaf0;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.ad-dashboard-notices h2 {
+    margin: 0;
+    color: #344f64;
+    font-size: 16px;
+}
+
+.ad-dashboard-notices > a {
+    justify-self: start;
+    color: #17684d;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
 .ad-campaign-note {
     width: 100%;
     color: #a23c3c !important;
+}
+
+.ad-campaign-form {
+    display: grid;
+    gap: 8px;
+}
+
+.ad-campaign-form > label {
+    margin: 6px 0 0;
+    color: #50677a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.ad-campaign-form > input,
+.ad-campaign-form > select {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #dce5eb;
+    border-radius: 7px;
+    background: #fff;
+    color: #344f64;
+    font: inherit;
+}
+
+.ad-campaign-form > input:focus,
+.ad-campaign-form > select:focus {
+    border-color: #82aaca;
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(29, 91, 148, .1);
+}
+
+.ad-campaign-form .auth-submit {
+    width: 100%;
+    margin-top: 8px;
 }
 
 @media (max-width: 640px) {
@@ -105,6 +299,17 @@
         margin-top: 12px;
         margin-bottom: 12px;
         border-radius: 10px;
+    }
+
+    .navora-ad-promo-link {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 16px;
+        padding: 38px 20px 20px;
+    }
+
+    .navora-ad-promo-copy > span {
+        font-size: 14px;
     }
 
     .navora-ad-sidebar {
