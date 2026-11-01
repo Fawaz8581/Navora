@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessProfile;
 use App\Models\VendorListing;
+use App\Models\VendorListingMedia;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
@@ -48,7 +49,8 @@ class VendorCatalogController extends Controller
                 'user.vendorListings' => fn (HasMany $listings) => $listings
                     ->where('status', VendorListing::STATUS_ACTIVE)
                     ->latest('id')
-                    ->limit(10),
+                    ->limit(10)
+                    ->with('media'),
             ])
             ->when($validated['search'] ?? null, function (Builder $query, string $search): void {
                 $query->where(function (Builder $matches) use ($search): void {
@@ -109,6 +111,12 @@ class VendorCatalogController extends Controller
                 'name' => $profile->business_name ?: $profile->user?->name ?: 'Vendor',
                 'category' => $profile->product_categories,
                 'description' => $profile->description,
+                'profile_image_url' => $profile->profile_image_path
+                    ? route('business-profile.image', [$profile, 'profile'])
+                    : null,
+                'cover_image_url' => $profile->cover_image_path
+                    ? route('business-profile.image', [$profile, 'cover'])
+                    : null,
                 'images' => collect($profile->work_sample_paths ?? [])
                     ->take(5)
                     ->keys()
@@ -124,11 +132,22 @@ class VendorCatalogController extends Controller
                 'distance_km' => $distance,
                 'listings' => $profile->user?->vendorListings
                     ->map(fn (VendorListing $listing): array => [
+                        'id' => $listing->id,
                         'name' => $listing->name,
                         'category' => $listing->category,
                         'material' => $listing->material,
                         'minimum_order_quantity' => $listing->minimum_order_quantity,
+                        'price_per_unit' => $listing->price_per_unit,
+                        'pricing_type' => $listing->pricing_type,
                         'description' => $listing->description,
+                        'media' => $listing->media
+                            ->map(fn (VendorListingMedia $media): array => [
+                                'id' => $media->id,
+                                'type' => $media->media_type,
+                                'mime_type' => $media->mime_type,
+                                'url' => route('vendors.catalog.listing-media', [$listing, $media]),
+                            ])
+                            ->all(),
                     ])
                     ->values()
                     ->all() ?? [],
@@ -178,6 +197,50 @@ class VendorCatalogController extends Controller
         abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true), 404);
 
         $response = response()->file($disk->path($path), [
+            'Content-Type' => $mimeType,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        $response->setPrivate();
+        $response->setMaxAge(300);
+
+        return $response;
+    }
+
+    public function showListingMedia(
+        Request $request,
+        VendorListing $vendorListing,
+        VendorListingMedia $vendorListingMedia,
+    ): BinaryFileResponse {
+        abort_unless($vendorListingMedia->vendor_listing_id === $vendorListing->id, 404);
+
+        $user = $request->user();
+        $isOwner = $user->role === 'vendor' && $vendorListing->vendor_user_id === $user->id;
+        $isAdmin = $user->role === 'admin';
+        $profile = $vendorListing->vendor?->businessProfile;
+        $isPublished = $vendorListing->status === VendorListing::STATUS_ACTIVE
+            && $profile?->completed_at !== null
+            && $profile->verification_status === 'approved';
+
+        abort_unless($isAdmin || $isOwner || ($user->role === 'umkm' && $isPublished), 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($vendorListingMedia->path), 404);
+
+        $mimeType = $disk->mimeType($vendorListingMedia->path);
+        abort_unless(
+            $mimeType === $vendorListingMedia->mime_type
+                && in_array($mimeType, [
+                    'image/jpeg',
+                    'image/png',
+                    'image/gif',
+                    'image/webp',
+                    'video/mp4',
+                    'video/webm',
+                ], true),
+            404,
+        );
+
+        $response = response()->file($disk->path($vendorListingMedia->path), [
             'Content-Type' => $mimeType,
             'X-Content-Type-Options' => 'nosniff',
         ]);

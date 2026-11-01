@@ -281,8 +281,8 @@
             </section>
 
             <section class="navora-page-panel" data-page-panel="listings" role="tabpanel" hidden>
-                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Katalog saya</span></div><h1>Tampilkan layanan bisnismu</h1><p>Kirim katalog untuk ditinjau admin. Produk baru aktif setelah disetujui.</p></div><button class="btn navora-app-primary" type="button" data-action="add-listing"><i class="bi bi-plus-lg"></i> Tambah katalog</button></div>
-                <div class="navora-vendor-setup" data-vendor-listing-notice><span><i class="bi bi-patch-check"></i></span><div><strong data-vendor-listing-notice-copy>Katalog perlu persetujuan admin</strong><p>Produk baru perlu ditinjau admin. Produk hanya aktif dan terlihat UMKM setelah disetujui.</p></div>
+                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Katalog saya</span></div><h1>Tampilkan layanan bisnismu</h1><p>Katalog baru ditinjau admin sebelum aktif. Katalog aktif dapat diedit tanpa ACC ulang.</p></div><button class="btn navora-app-primary" type="button" data-action="add-listing"><i class="bi bi-plus-lg"></i> Tambah katalog</button></div>
+                <div class="navora-vendor-setup" data-vendor-listing-notice><span><i class="bi bi-patch-check"></i></span><div><strong data-vendor-listing-notice-copy>Katalog baru perlu persetujuan admin</strong><p>Perubahan katalog yang sudah aktif langsung ditampilkan tanpa ACC ulang.</p></div>
                     @if (auth()->check() && auth()->user()->role === 'vendor')
                         <a class="btn navora-app-outline" href="{{ route('vendor.verification.index') }}">Verifikasi profil <i class="bi bi-arrow-right"></i></a>
                     @else
@@ -352,7 +352,11 @@
                     <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Pengaturan</span><i class="bi bi-chevron-right"></i><span>Profil usaha</span></div><h1>Profil usahamu</h1><p>Informasi usaha ini tersimpan di akun Navora dan dapat kamu perbarui.</p></div></div>
                     <div class="navora-account-layout">
                         <section class="navora-panel navora-account-card">
-                            <div class="navora-account-avatar">{{ mb_strtoupper(mb_substr(Auth::user()->name, 0, 1)) }}</div>
+                            @if ($businessProfile?->profile_image_path)
+                                <img class="navora-account-avatar" src="{{ route('business-profile.image', [$businessProfile, 'profile']) }}" alt="Foto profil {{ $businessProfile?->business_name ?? Auth::user()->name }}">
+                            @else
+                                <div class="navora-account-avatar">{{ mb_strtoupper(mb_substr(Auth::user()->name, 0, 1)) }}</div>
+                            @endif
                             <div>
                                 <span class="navora-panel-kicker">PROFIL TERSIMPAN</span>
                                 <h2>{{ $businessProfile?->business_name ?? Auth::user()->name }}</h2>
@@ -450,6 +454,25 @@
             </dialog>
         @endif
     @endauth
+
+    <dialog class="navora-product-dialog" data-product-dialog aria-labelledby="product-dialog-title">
+        <div class="navora-product-dialog-header">
+            <span class="navora-panel-kicker" data-product-vendor></span>
+            <button class="navora-modal-close" type="button" data-close-product-dialog aria-label="Tutup detail produk"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="navora-product-dialog-body">
+            <div class="navora-product-gallery" data-product-gallery></div>
+            <section class="navora-product-information">
+                <h2 id="product-dialog-title" data-product-title></h2>
+                <p data-product-description></p>
+                <dl class="navora-product-specifications" data-product-specifications></dl>
+                <div class="navora-product-price" data-product-price></div>
+                <button class="btn navora-app-primary" type="button" data-action="product-request-quote">
+                    Minta penawaran harga <i class="bi bi-arrow-right"></i>
+                </button>
+            </section>
+        </div>
+    </dialog>
 
     <div class="navora-modal" data-modal hidden>
         <button class="navora-modal-backdrop" type="button" data-close-modal aria-label="Tutup dialog"></button>

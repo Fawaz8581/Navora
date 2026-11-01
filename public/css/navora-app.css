@@ -1118,9 +1118,30 @@ body.navora-app-body {
 
 .navora-vendor-name-row {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: flex-start;
     gap: 6px;
+}
+
+.navora-vendor-profile-avatar {
+    display: grid;
+    width: 35px;
+    height: 35px;
+    flex: none;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #e6edf1;
+    border-radius: 50%;
+    background: #e9f0f6;
+    color: #4b7696;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    object-fit: cover;
+}
+
+.navora-vendor-name-row > div {
+    min-width: 0;
 }
 
 .navora-vendor-name-row h2 {
@@ -1201,12 +1222,64 @@ body.navora-app-body {
     font-weight: 800;
 }
 
-.navora-vendor-active-listings ul {
+.navora-catalog-products {
     display: grid;
+    gap: 6px;
+}
+
+.navora-catalog-product {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #e8efeb;
+    border-radius: 7px;
+    background: #fff;
+    color: #36576a;
+    text-align: left;
+}
+
+.navora-catalog-product:hover {
+    border-color: #9dc9b3;
+    background: #fbfefc;
+}
+
+.navora-catalog-product-preview {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 5px;
+    background: #f0f5f2;
+    color: #729381;
+}
+
+.navora-catalog-product-preview img,
+.navora-catalog-product-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.navora-catalog-product-copy {
+    display: grid;
+    min-width: 0;
     gap: 3px;
-    margin: 0;
-    padding-left: 14px;
-    color: #647d8e;
+}
+
+.navora-catalog-product-copy strong {
+    overflow: hidden;
+    color: #36576a;
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navora-catalog-product-copy small {
+    color: #718795;
     font-size: 8px;
 }
 
@@ -1911,7 +1984,8 @@ body.navora-app-body {
     font-size: 21px;
 }
 
-.navora-listing-art img {
+.navora-listing-art img,
+.navora-listing-art video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -2048,6 +2122,7 @@ body.navora-app-body {
     font-family: 'Manrope', sans-serif;
     font-size: 20px;
     font-weight: 800;
+    object-fit: cover;
 }
 
 .navora-account-card > div:nth-child(2) {
@@ -2252,6 +2327,93 @@ body.navora-app-body {
     display: block;
 }
 
+.navora-modal-field-help {
+    display: block;
+    margin-top: 5px;
+    color: #758b97;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+.navora-listing-media-editor {
+    display: grid;
+    gap: 6px;
+    padding: 11px;
+    border: 1px solid #e1e9ed;
+    border-radius: 9px;
+    background: #f8fbfc;
+}
+
+.navora-listing-media-editor > strong {
+    color: #40596c;
+    font-size: 10px;
+}
+
+.navora-listing-media-editor > small {
+    color: #758b97;
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+.navora-listing-media-editor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 8px;
+    margin-top: 3px;
+}
+
+.navora-listing-media-editor-item {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid #e1e9ed;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.navora-listing-media-editor-item img,
+.navora-listing-media-editor-item video {
+    width: 100%;
+    height: 66px;
+    border-radius: 4px;
+    background: #e9f0f3;
+    object-fit: cover;
+}
+
+.navora-listing-media-remove {
+    min-height: 27px;
+    border: 1px solid #edcaca;
+    border-radius: 5px;
+    background: #fff;
+    color: #9c4545;
+    font: inherit;
+    font-size: 9px;
+    cursor: pointer;
+}
+
+.navora-listing-media-editor-item.is-marked-for-removal {
+    border-color: #ce7777;
+    background: #fff5f5;
+}
+
+.navora-listing-media-editor-item.is-marked-for-removal img,
+.navora-listing-media-editor-item.is-marked-for-removal video {
+    opacity: .42;
+}
+
+.navora-listing-media-editor-item.is-marked-for-removal .navora-listing-media-remove {
+    border-color: #d3a0a0;
+    background: #9c4545;
+    color: #fff;
+}
+
+.navora-listing-media-empty {
+    grid-column: 1 / -1;
+    color: #758b97;
+    font-size: 9px;
+}
+
 .navora-modal-fields input,
 .navora-modal-fields select,
 .navora-modal-fields textarea {
@@ -2283,6 +2445,170 @@ body.navora-app-body {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 17px;
+}
+
+.navora-product-dialog {
+    width: min(940px, calc(100vw - 28px));
+    max-height: min(90vh, 820px);
+    padding: 22px;
+    overflow: auto;
+    border: 1px solid #dfe8ec;
+    border-radius: 16px;
+    background: #fff;
+    color: #345367;
+    box-shadow: 0 24px 80px rgba(20, 43, 58, .25);
+}
+
+.navora-product-dialog::backdrop {
+    background: rgba(18, 38, 51, .58);
+    backdrop-filter: blur(3px);
+}
+
+.navora-product-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.navora-product-dialog-header .navora-panel-kicker {
+    color: #4a8c6e;
+}
+
+.navora-product-dialog-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
+    gap: 24px;
+}
+
+.navora-product-gallery {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 10px;
+}
+
+.navora-product-media-item {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid #e6ecef;
+    border-radius: 10px;
+    background: #f6f8f9;
+}
+
+.navora-product-media-item:first-child {
+    grid-column: 1 / -1;
+}
+
+.navora-product-media-item img,
+.navora-product-media-item video {
+    display: block;
+    width: 100%;
+    max-height: 420px;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+    background: #f3f6f7;
+}
+
+.navora-product-media-empty {
+    display: grid;
+    min-height: 250px;
+    align-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding: 20px;
+    border: 1px dashed #cbd9df;
+    border-radius: 10px;
+    color: #78909c;
+    text-align: center;
+}
+
+.navora-product-media-empty i {
+    font-size: 30px;
+}
+
+.navora-product-information h2 {
+    margin: 0 0 10px;
+    color: #29485d;
+    font: 800 24px/1.3 'Manrope', sans-serif;
+}
+
+.navora-product-information > p {
+    color: #627b89;
+    line-height: 1.65;
+    white-space: pre-line;
+}
+
+.navora-product-specifications {
+    display: grid;
+    gap: 8px;
+    margin: 20px 0;
+}
+
+.navora-product-specifications > div {
+    display: grid;
+    grid-template-columns: minmax(100px, .7fr) 1fr;
+    gap: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #edf1f3;
+}
+
+.navora-product-specifications dt {
+    color: #81939d;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.navora-product-specifications dd {
+    margin: 0;
+    color: #39576a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.navora-product-price {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 13px;
+    border-radius: 9px;
+    background: #f2f8f4;
+}
+
+.navora-product-price strong {
+    color: #2f7858;
+    font-size: 16px;
+}
+
+.navora-product-price span {
+    color: #6e8580;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.navora-product-information > .btn {
+    width: 100%;
+}
+
+@media (max-width: 700px) {
+    .navora-product-dialog {
+        padding: 16px;
+    }
+
+    .navora-product-dialog-body {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .navora-product-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .navora-product-information h2 {
+        font-size: 20px;
+    }
 }
 
 .navora-toast {

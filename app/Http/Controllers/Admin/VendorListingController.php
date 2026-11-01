@@ -20,7 +20,7 @@ class VendorListingController extends Controller
         ], true), 404);
 
         $listings = VendorListing::query()
-            ->with(['vendor:id,name,email', 'vendor.businessProfile', 'approver:id,name'])
+            ->with(['media', 'vendor:id,name,email', 'vendor.businessProfile', 'approver:id,name'])
             ->when($status !== 'all', fn ($query) => $query->where('status', $status))
             ->latest('id')
             ->paginate(15)

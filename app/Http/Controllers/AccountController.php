@@ -21,10 +21,14 @@ class AccountController extends Controller
         $user = $request->user();
         $profile = $user->businessProfile;
 
-        if ($profile && ! Storage::disk('local')->deleteDirectory('vendor-verification/'.$profile->id)) {
-            return back()->withErrors([
-                'account' => 'Dokumen verifikasi tidak berhasil dihapus. Akun kamu belum dihapus.',
-            ]);
+        if ($profile) {
+            foreach (['vendor-verification', 'business-profiles'] as $directory) {
+                if (! Storage::disk('local')->deleteDirectory($directory.'/'.$profile->id)) {
+                    return back()->withErrors([
+                        'account' => 'Dokumen dan gambar profil tidak berhasil dihapus. Akun kamu belum dihapus.',
+                    ]);
+                }
+            }
         }
 
         Auth::logout();

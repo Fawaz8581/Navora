@@ -97,6 +97,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/katalog/vendor/{businessProfile}/foto/{index}', [VendorCatalogController::class, 'showSample'])
         ->whereNumber('index')
         ->name('vendors.catalog.image');
+    Route::get('/katalog/vendor/produk/{vendorListing}/media/{vendorListingMedia}', [VendorCatalogController::class, 'showListingMedia'])
+        ->name('vendors.catalog.listing-media');
     Route::get('/pesanan', [OrderController::class, 'index'])->name('orders.index');
     Route::post('/pesanan', [OrderController::class, 'store'])
         ->middleware('throttle:20,1')
@@ -130,6 +132,9 @@ Route::middleware('auth')->group(function () {
         ->whereNumber('step')
         ->name('onboarding.update');
     Route::get('/profil-usaha', [BusinessProfileController::class, 'profile'])->name('business-profile.show');
+    Route::get('/profil-usaha/{businessProfile}/gambar/{type}', [BusinessProfileController::class, 'showImage'])
+        ->where('type', 'profile|cover')
+        ->name('business-profile.image');
 
     Route::get('/vendor/verifikasi', [VendorVerificationController::class, 'index'])->name('vendor.verification.index');
     Route::post('/vendor/verifikasi', [VendorVerificationController::class, 'submit'])

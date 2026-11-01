@@ -601,6 +601,66 @@ body.navora-auth-body {
     font-size: 10px;
 }
 
+.onboarding-form-section > p {
+    margin: -5px 0 12px;
+    color: var(--auth-muted);
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+.onboarding-image-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.onboarding-image-input {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--auth-line);
+    border-radius: 7px;
+    color: #50677a;
+    font: inherit;
+    font-size: 10px;
+}
+
+.onboarding-image-preview {
+    display: block;
+    width: 100%;
+    margin-bottom: 8px;
+    border: 1px solid var(--auth-line);
+    border-radius: 8px;
+    background: #f3f6f8;
+    object-fit: cover;
+}
+
+.onboarding-profile-preview {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+}
+
+.onboarding-cover-preview {
+    height: 90px;
+}
+
+.auth-field-hint {
+    display: block;
+    margin-top: 5px;
+    color: var(--auth-muted);
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+.onboarding-review-image-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #50677a;
+    font-size: 9px;
+    font-weight: 700;
+}
+
 .onboarding-form-subheading {
     margin: 0 0 12px;
     color: #63839b;
@@ -833,6 +893,10 @@ body.navora-auth-body {
 }
 
 @media (max-width: 700px) {
+    .onboarding-image-fields {
+        grid-template-columns: 1fr;
+    }
+
     .auth-layout {
         display: block;
     }

@@ -3,6 +3,7 @@
 use App\Models\BusinessProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -130,6 +131,51 @@ it('serves approved vendor product photos only to UMKM catalogue users', functio
     $profile->forceFill(['verification_status' => 'pending'])->save();
     $this->actingAs($buyer)
         ->get(route('vendors.catalog.image', [$profile, 0]))
+        ->assertNotFound();
+});
+
+it('shows vendor profile and cover images on UMKM search and restricts image access', function () {
+    Storage::fake('local');
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    $otherVendor = User::factory()->create(['role' => 'vendor']);
+    $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_name' => 'Vendor dengan Foto',
+        'verification_status' => 'approved',
+        'completed_at' => now(),
+    ]);
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lS8AAAAASUVORK5CYII=', true);
+    $profilePath = UploadedFile::fake()->createWithContent('profile.png', $png)->store(
+        'business-profiles/'.$profile->id.'/profile',
+        'local',
+    );
+    $coverPath = UploadedFile::fake()->createWithContent('cover.png', $png)->store(
+        'business-profiles/'.$profile->id.'/cover',
+        'local',
+    );
+    $profile->forceFill([
+        'profile_image_path' => $profilePath,
+        'cover_image_path' => $coverPath,
+    ])->save();
+
+    $this->actingAs($buyer)
+        ->getJson(route('vendors.catalog'))
+        ->assertOk()
+        ->assertJsonPath('vendors.0.profile_image_url', route('business-profile.image', [$profile, 'profile']))
+        ->assertJsonPath('vendors.0.cover_image_url', route('business-profile.image', [$profile, 'cover']));
+
+    $this->actingAs($buyer)
+        ->get(route('business-profile.image', [$profile, 'profile']))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/png');
+
+    $this->actingAs($buyer)
+        ->get(route('business-profile.image', [$profile, 'cover']))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/png');
+
+    $this->actingAs($otherVendor)
+        ->get(route('business-profile.image', [$profile, 'cover']))
         ->assertNotFound();
 });
 

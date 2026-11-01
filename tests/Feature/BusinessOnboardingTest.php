@@ -3,6 +3,8 @@
 use App\Models\BusinessProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -86,6 +88,91 @@ test('UMKM can complete their business and packaging needs in one submission', f
     $this->get(route('onboarding.step', ['step' => 1]))
         ->assertOk()
         ->assertSee('value="Kopi Nusantara"', false);
+});
+
+test('UMKM can replace their profile picture from the business profile editor', function () {
+    Storage::fake('local');
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lS8AAAAASUVORK5CYII=', true);
+    $user = User::factory()->create(['role' => 'umkm']);
+    $profile = BusinessProfile::factory()->for($user)->create([
+        'completed_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('onboarding.update', ['step' => 1]), [
+            'business_name' => 'Kopi Nusantara',
+            'category' => 'Makanan dan minuman',
+            'location' => 'Bandung',
+            'product_type' => 'Kopi bubuk',
+            'confirm_profile' => '1',
+            'profile_image' => UploadedFile::fake()->createWithContent('profile.png', $png),
+            'cover_image' => UploadedFile::fake()->createWithContent('cover.png', $png),
+        ])
+        ->assertRedirect(route('business-profile.show'));
+
+    $profile = $profile->fresh();
+    $oldProfileImagePath = $profile->profile_image_path;
+    $oldCoverImagePath = $profile->cover_image_path;
+    Storage::disk('local')->assertExists($oldProfileImagePath);
+    Storage::disk('local')->assertExists($oldCoverImagePath);
+
+    $this->actingAs($user)
+        ->get(route('business-profile.image', [$profile, 'profile']))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/png');
+
+    $this->actingAs($user)
+        ->post(route('onboarding.update', ['step' => 1]), [
+            'business_name' => 'Kopi Nusantara',
+            'category' => 'Makanan dan minuman',
+            'location' => 'Bandung',
+            'product_type' => 'Kopi bubuk',
+            'confirm_profile' => '1',
+            'profile_image' => UploadedFile::fake()->createWithContent('new-profile.png', $png),
+        ])
+        ->assertRedirect(route('business-profile.show'));
+
+    $profile = $profile->fresh();
+    expect($profile->profile_image_path)->not->toBe($oldProfileImagePath)
+        ->and($profile->cover_image_path)->toBe($oldCoverImagePath);
+    Storage::disk('local')->assertMissing($oldProfileImagePath);
+    Storage::disk('local')->assertExists($profile->profile_image_path);
+    Storage::disk('local')->assertExists($oldCoverImagePath);
+
+    $this->actingAs($user)
+        ->get(route('business-profile.show'))
+        ->assertOk()
+        ->assertSee(route('business-profile.image', [$profile, 'profile']), false);
+});
+
+test('updating vendor images does not invalidate their approved verification', function () {
+    Storage::fake('local');
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lS8AAAAASUVORK5CYII=', true);
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_name' => 'Kemasan Prima',
+        'category' => 'Manufaktur kemasan',
+        'location' => 'Jakarta',
+        'product_categories' => 'Pouch dan botol',
+        'minimum_order_quantity' => 500,
+        'verification_status' => 'approved',
+        'completed_at' => now(),
+    ]);
+
+    $this->actingAs($vendor)
+        ->post(route('onboarding.update', ['step' => 1]), [
+            'business_name' => $profile->business_name,
+            'category' => $profile->category,
+            'location' => $profile->location,
+            'product_categories' => $profile->product_categories,
+            'minimum_order_quantity' => $profile->minimum_order_quantity,
+            'confirm_profile' => '1',
+            'profile_image' => UploadedFile::fake()->createWithContent('vendor-profile.png', $png),
+            'cover_image' => UploadedFile::fake()->createWithContent('vendor-cover.png', $png),
+        ])
+        ->assertRedirect(route('business-profile.show'));
+
+    expect($profile->fresh()->verification_status)->toBe('approved');
 });
 
 test('UMKM cannot finish onboarding without confirming a complete profile', function () {

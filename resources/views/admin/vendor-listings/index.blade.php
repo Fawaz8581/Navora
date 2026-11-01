@@ -43,7 +43,27 @@
                     <div class="onboarding-review-row"><span>Pemilik akun</span><strong>{{ $listing->vendor?->name }} ({{ $listing->vendor?->email }})</strong></div>
                     <div class="onboarding-review-row"><span>Jenis / material</span><strong>{{ ucfirst($listing->category) }} · {{ $listing->material }}</strong></div>
                     <div class="onboarding-review-row"><span>MOQ</span><strong>{{ number_format($listing->minimum_order_quantity, 0, ',', '.') }} pcs</strong></div>
+                    <div class="onboarding-review-row"><span>Harga per pcs</span><strong>
+                        @if ($listing->price_per_unit)
+                            {{ $listing->pricing_type === \App\Models\VendorListing::PRICING_FINAL ? 'Harga final' : 'Bisa nego' }} · Rp{{ number_format($listing->price_per_unit, 0, ',', '.') }}
+                        @else
+                            Bisa nego · harga belum dicantumkan
+                        @endif
+                    </strong></div>
                     <p>{{ $listing->description }}</p>
+                    @if ($listing->media->isNotEmpty())
+                        <div class="admin-listing-media" aria-label="Media katalog {{ $listing->name }}">
+                            @foreach ($listing->media as $media)
+                                @if ($media->media_type === 'video')
+                                    <video controls preload="metadata" playsinline>
+                                        <source src="{{ route('vendors.catalog.listing-media', [$listing, $media]) }}" type="{{ $media->mime_type }}">
+                                    </video>
+                                @else
+                                    <img src="{{ route('vendors.catalog.listing-media', [$listing, $media]) }}" alt="Media produk {{ $listing->name }}" loading="lazy">
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
                     <small>Diajukan {{ $listing->created_at->format('d M Y, H:i') }}</small>
                     @if ($listing->status === \App\Models\VendorListing::STATUS_PENDING)
                         <form action="{{ route('admin.vendor-listings.approve', $listing) }}" method="post">

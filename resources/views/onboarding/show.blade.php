@@ -34,9 +34,33 @@
     @endif
 
     @if ($isEditing)
-        <form action="{{ route('onboarding.update', ['step' => 1]) }}" method="post" class="auth-form onboarding-form">
+        <form action="{{ route('onboarding.update', ['step' => 1]) }}" method="post" enctype="multipart/form-data" class="auth-form onboarding-form">
             @csrf
             @include('onboarding.partials.business-fields')
+            <section class="onboarding-form-section">
+                <h3>Foto profil dan cover</h3>
+                <p>Gunakan gambar hingga 5 MB. Foto cover vendor akan terlihat di hasil pencarian UMKM.</p>
+                <div class="onboarding-image-fields">
+                    <div class="auth-field">
+                        <label for="profile_image">Foto profil</label>
+                        @if ($profile->profile_image_path)
+                            <img class="onboarding-image-preview onboarding-profile-preview" src="{{ route('business-profile.image', [$profile, 'profile']) }}" alt="Foto profil saat ini">
+                        @endif
+                        <input class="onboarding-image-input" id="profile_image" name="profile_image" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <small class="auth-field-hint">JPG, PNG, GIF, atau WebP. Mengunggah gambar baru akan mengganti foto saat ini.</small>
+                        @error('profile_image')<span class="auth-field-error">{{ $message }}</span>@enderror
+                    </div>
+                    <div class="auth-field">
+                        <label for="cover_image">Foto cover</label>
+                        @if ($profile->cover_image_path)
+                            <img class="onboarding-image-preview onboarding-cover-preview" src="{{ route('business-profile.image', [$profile, 'cover']) }}" alt="Foto cover saat ini">
+                        @endif
+                        <input class="onboarding-image-input" id="cover_image" name="cover_image" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <small class="auth-field-hint">JPG, PNG, GIF, atau WebP. Mengunggah gambar baru akan mengganti cover saat ini.</small>
+                        @error('cover_image')<span class="auth-field-error">{{ $message }}</span>@enderror
+                    </div>
+                </div>
+            </section>
             <section class="onboarding-form-section onboarding-review-confirm">
                 <h3><span>03</span> Tinjau profil</h3>
                 <p>Periksa kembali profil usaha dan kebutuhan bisnismu sebelum menyimpan.</p>
@@ -80,6 +104,25 @@
                 ];
         @endphp
         <div class="onboarding-review">
+            @if ($profile->profile_image_path || $profile->cover_image_path)
+                <section class="onboarding-review-section">
+                    <h3>Foto profil dan cover</h3>
+                    <div class="onboarding-image-fields">
+                        @if ($profile->profile_image_path)
+                            <div>
+                                <span class="onboarding-review-image-label">Foto profil</span>
+                                <img class="onboarding-image-preview onboarding-profile-preview" src="{{ route('business-profile.image', [$profile, 'profile']) }}" alt="Foto profil usaha">
+                            </div>
+                        @endif
+                        @if ($profile->cover_image_path)
+                            <div>
+                                <span class="onboarding-review-image-label">Foto cover</span>
+                                <img class="onboarding-image-preview onboarding-cover-preview" src="{{ route('business-profile.image', [$profile, 'cover']) }}" alt="Foto cover usaha">
+                            </div>
+                        @endif
+                    </div>
+                </section>
+            @endif
             @foreach (['Profil usaha' => $reviewRows, 'Informasi ' . strtolower($roleLabel) => $detailRows] as $sectionTitle => $rows)
                 <section class="onboarding-review-section">
                     <h3>{{ $sectionTitle }}</h3>

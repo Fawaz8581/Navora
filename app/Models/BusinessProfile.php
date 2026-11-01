@@ -21,6 +21,8 @@ class BusinessProfile extends Model
         'category',
         'location',
         'description',
+        'profile_image_path',
+        'cover_image_path',
         'product_type',
         'packaging_type',
         'preferred_material',

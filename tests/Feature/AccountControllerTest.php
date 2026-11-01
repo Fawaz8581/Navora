@@ -55,8 +55,16 @@ it('deletes the authenticated account and its verification files with confirmati
         'completed_at' => now(),
     ]);
     $documentPath = 'vendor-verification/'.$profile->id.'/nib.pdf';
-    $profile->update(['nib_document_path' => $documentPath]);
+    $profileImagePath = 'business-profiles/'.$profile->id.'/profile/avatar.png';
+    $coverImagePath = 'business-profiles/'.$profile->id.'/cover/cover.png';
+    $profile->update([
+        'nib_document_path' => $documentPath,
+        'profile_image_path' => $profileImagePath,
+        'cover_image_path' => $coverImagePath,
+    ]);
     Storage::disk('local')->put($documentPath, 'private document');
+    Storage::disk('local')->put($profileImagePath, 'profile image');
+    Storage::disk('local')->put($coverImagePath, 'cover image');
 
     $this->actingAs($user)
         ->from(route('workspace', ['tab' => 'account']))
@@ -68,6 +76,8 @@ it('deletes the authenticated account and its verification files with confirmati
     $this->assertDatabaseMissing('users', ['id' => $user->id]);
     $this->assertDatabaseMissing('business_profiles', ['id' => $profile->id]);
     Storage::disk('local')->assertMissing($documentPath);
+    Storage::disk('local')->assertMissing($profileImagePath);
+    Storage::disk('local')->assertMissing($coverImagePath);
 
     $this->get(route('login'))
         ->assertOk()

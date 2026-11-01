@@ -10,6 +10,7 @@
     const modal = document.querySelector('[data-modal]');
     const modalForm = document.querySelector('[data-modal-form]');
     const modalFields = document.querySelector('[data-modal-fields]');
+    const productDialog = document.querySelector('[data-product-dialog]');
     const toast = document.querySelector('[data-toast]');
     const urlParams = new URLSearchParams(window.location.search);
     const knownRoles = ['umkm', 'vendor', 'partner'];
@@ -33,10 +34,12 @@
     let vendorCatalogTimer = 0;
     let vendorOrigin = null;
     let vendorCatalogRequestController = null;
+    let listingMediaValidationInProgress = false;
     let simulationRefreshTimer = 0;
     let activeModalHandler = null;
     let toastTimer = 0;
     let lastFocusedElement = null;
+    let activeProductContext = null;
 
     const emptyState = () => ({
         role: 'umkm',
@@ -318,6 +321,14 @@
             input.type = field.type || 'text';
         }
 
+        if (field.accept && input instanceof HTMLInputElement) {
+            input.accept = field.accept;
+        }
+
+        if (field.multiple && input instanceof HTMLInputElement) {
+            input.multiple = true;
+        }
+
         if (field.placeholder) {
             input.placeholder = field.placeholder;
         }
@@ -344,6 +355,9 @@
 
         input.classList.add('form-control');
         wrapper.append(label, input);
+        if (field.help) {
+            wrapper.append(textElement('small', 'navora-modal-field-help', field.help));
+        }
 
         return wrapper;
     };
@@ -461,10 +475,14 @@
             : categoryText.includes('box') || categoryText.includes('karton')
                 ? '/images/products/cardboard.jpg'
                 : '/images/products/coffee.jpg';
-        const vendorImage = Array.isArray(vendor.images) ? vendor.images[0] : null;
+        const vendorImage = vendor.cover_image_url || (Array.isArray(vendor.images) ? vendor.images[0] : null);
         const productImage = textElement('img', '', '');
         productImage.src = vendorImage || fallbackImage;
-        productImage.alt = vendorImage ? `Foto sampel produk ${vendor.name || 'vendor'}` : `Foto referensi ${vendor.category || 'produk vendor'}`;
+        productImage.alt = vendor.cover_image_url
+            ? `Foto cover ${vendor.name || 'vendor'}`
+            : vendorImage
+                ? `Foto sampel produk ${vendor.name || 'vendor'}`
+                : `Foto referensi ${vendor.category || 'produk vendor'}`;
         productImage.loading = 'lazy';
         productImage.addEventListener('error', () => {
             if (vendorImage && productImage.src !== fallbackImage) {
@@ -474,7 +492,11 @@
 
             productImage.remove();
         }, { once: true });
-        art.append(productImage, textElement('small', '', vendorImage ? 'FOTO SAMPEL VENDOR' : 'FOTO REFERENSI'));
+        art.append(productImage, textElement('small', '', vendor.cover_image_url
+            ? 'COVER VENDOR'
+            : vendorImage
+                ? 'FOTO SAMPEL VENDOR'
+                : 'FOTO REFERENSI'));
         const verified = textElement('span', 'navora-verified-tag', '');
         verified.append(textElement('i', 'bi bi-patch-check-fill', ''), document.createTextNode(' Terverifikasi'));
         art.append(verified);
@@ -493,6 +515,19 @@
                 : `${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vendor.price_per_unit))} / pcs (indikatif)`,
             vendor.distance_km === null ? 'Jarak belum tersedia' : `± ${vendor.distance_km} km (garis lurus)`,
         ];
+        if (vendor.profile_image_url) {
+            const profileImage = textElement('img', 'navora-vendor-profile-avatar', '');
+            profileImage.src = vendor.profile_image_url;
+            profileImage.alt = `Foto profil ${vendor.name || 'vendor'}`;
+            profileImage.loading = 'lazy';
+            heading.append(profileImage);
+        } else {
+            heading.append(textElement(
+                'span',
+                'navora-vendor-profile-avatar navora-vendor-profile-fallback',
+                (vendor.name || 'V').charAt(0).toLocaleUpperCase('id'),
+            ));
+        }
         heading.append(nameAndLocation);
         const tags = textElement('div', 'navora-vendor-tags', '');
         [
@@ -504,15 +539,52 @@
         content.append(heading, textElement('p', '', vendor.description || 'Vendor belum menambahkan deskripsi.'));
         if (Array.isArray(vendor.listings) && vendor.listings.length) {
             const activeProducts = textElement('div', 'navora-vendor-active-listings', '');
-            activeProducts.append(textElement('strong', '', 'Produk tersedia'));
-            const productList = document.createElement('ul');
+            activeProducts.append(textElement('strong', '', 'Katalog produk'));
+            const productList = textElement('div', 'navora-catalog-products', '');
+
             vendor.listings.forEach((listing) => {
-                productList.append(textElement(
-                    'li',
-                    '',
-                    `${listing.name} · MOQ ${Number(listing.minimum_order_quantity).toLocaleString('id-ID')} pcs`,
-                ));
+                const productButton = textElement('button', 'navora-catalog-product', '');
+                productButton.type = 'button';
+                productButton.dataset.action = 'product-detail';
+                productButton.dataset.vendorUserId = String(vendor.id);
+                productButton.dataset.vendor = vendor.name || 'Vendor';
+                productButton.dataset.vendorPrice = vendor.price_per_unit ?? '';
+                productButton.dataset.productListing = JSON.stringify(listing);
+
+                const preview = textElement('span', 'navora-catalog-product-preview', '');
+                const firstMedia = Array.isArray(listing.media) ? listing.media[0] : null;
+                if (firstMedia?.type === 'video') {
+                    const video = document.createElement('video');
+                    video.src = firstMedia.url;
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.preload = 'metadata';
+                    video.setAttribute('aria-label', `Video ${listing.name}`);
+                    preview.append(video);
+                } else if (firstMedia?.url) {
+                    const image = document.createElement('img');
+                    image.src = firstMedia.url;
+                    image.alt = `Foto ${listing.name}`;
+                    image.loading = 'lazy';
+                    preview.append(image);
+                } else {
+                    const icon = textElement('i', 'bi bi-box-seam', '');
+                    icon.setAttribute('aria-hidden', 'true');
+                    preview.append(icon);
+                }
+
+                const productCopy = textElement('span', 'navora-catalog-product-copy', '');
+                const priceSummary = listing.price_per_unit
+                    ? `${formatRupiah(listing.price_per_unit)} / pcs · ${listing.pricing_type === 'final' ? 'Harga final' : 'Bisa nego'}`
+                    : 'Bisa nego · Harga belum dicantumkan';
+                productCopy.append(
+                    textElement('strong', '', listing.name),
+                    textElement('small', '', `MOQ ${Number(listing.minimum_order_quantity).toLocaleString('id-ID')} pcs · ${priceSummary}`),
+                );
+                productButton.append(preview, productCopy, textElement('i', 'bi bi-chevron-right', ''));
+                productList.append(productButton);
             });
+
             activeProducts.append(productList);
             content.append(activeProducts);
         }
@@ -793,20 +865,34 @@
                     ? '/images/products/cardboard.jpg'
                     : '/images/products/coffee.jpg';
             const art = textElement('span', `navora-listing-art ${listing.category === 'printing' ? 'art-box' : listing.category === 'maklon' ? 'art-maklon' : 'art-pouch'}`, '');
-            const productImage = textElement('img', '', '');
-            productImage.src = imageSource;
-            productImage.alt = `Foto referensi produk ${listing.name}`;
-            productImage.loading = 'lazy';
-            art.append(productImage);
+            const firstMedia = Array.isArray(listing.media) ? listing.media[0] : null;
+            if (firstMedia?.type === 'video') {
+                const productVideo = document.createElement('video');
+                productVideo.src = firstMedia.url;
+                productVideo.controls = true;
+                productVideo.playsInline = true;
+                productVideo.preload = 'metadata';
+                productVideo.setAttribute('aria-label', `Video produk ${listing.name}`);
+                art.append(productVideo);
+            } else {
+                const productImage = textElement('img', '', '');
+                productImage.src = firstMedia?.url || imageSource;
+                productImage.alt = firstMedia ? `Foto produk ${listing.name}` : `Foto referensi produk ${listing.name}`;
+                productImage.loading = 'lazy';
+                art.append(productImage);
+            }
             const statusLabel = listing.status === 'active'
                 ? 'Aktif'
                 : listing.status === 'pending'
                     ? 'Menunggu ACC admin'
                     : 'Draft';
             const content = textElement('div', '', '');
+            const priceSummary = listing.price_per_unit
+                ? `${formatRupiah(listing.price_per_unit)} / pcs · ${listing.pricing_type === 'final' ? 'Harga final' : 'Bisa nego'}`
+                : 'Bisa nego · harga belum dicantumkan';
             content.append(
                 textElement('h2', '', listing.name),
-                textElement('p', '', `MOQ ${Number(listing.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs · ${listing.material} · ${listing.description}`),
+                textElement('p', '', `MOQ ${Number(listing.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs · ${priceSummary} · ${listing.material} · ${listing.description}`),
                 textElement('small', '', listing.localDraft
                     ? 'Draft demo tersimpan di browser ini, belum masuk ke admin'
                     : listing.status === 'pending'
@@ -819,6 +905,18 @@
                 content,
                 textElement('span', `navora-status-pill ${isActive ? 'status-open' : 'status-waiting'}`, statusLabel),
             );
+
+            if (isActive && authenticatedRole === 'vendor' && vendorListingsVerified) {
+                const editButton = textElement(
+                    'button',
+                    'btn navora-app-outline navora-listing-review-submit',
+                    'Edit katalog',
+                );
+                editButton.type = 'button';
+                editButton.dataset.action = 'edit-vendor-listing';
+                editButton.dataset.listingReference = String(listing.id);
+                card.append(editButton);
+            }
 
             if (!isActive && authenticatedRole === 'vendor'
                 && (listing.localDraft || listing.status === 'draft' || listing.status === 'rejected')
@@ -880,10 +978,10 @@
                 if (notice) {
                     notice.replaceChildren(
                         textElement('strong', '', vendorListingsVerified
-                            ? 'Profil terverifikasi · katalog menunggu ACC admin'
+                            ? 'Profil terverifikasi · katalog baru perlu ACC admin'
                             : 'Tunggu verifikasi profil sebelum mengajukan katalog'),
                         textElement('p', '', vendorListingsVerified
-                            ? 'Produk baru perlu ditinjau admin. Produk hanya aktif dan terlihat UMKM setelah disetujui.'
+                            ? 'Katalog baru perlu ditinjau admin. Perubahan katalog yang sudah aktif langsung ditampilkan tanpa ACC ulang.'
                             : 'Lengkapi dokumen usaha dan tunggu persetujuan admin atas profil vendor.'),
                     );
                 }
@@ -1070,6 +1168,98 @@
         name, label, placeholder, required, type,
     });
 
+    const openProductDetail = (button) => {
+        if (!(productDialog instanceof HTMLDialogElement)) {
+            showToast('Detail produk tidak tersedia. Muat ulang halaman untuk mencoba kembali.');
+            return;
+        }
+
+        let listing;
+        try {
+            listing = JSON.parse(button.dataset.productListing || '');
+        } catch (error) {
+            console.error('Navora could not read product details.', error);
+            showToast('Detail produk tidak dapat dibuka. Muat ulang katalog dan coba lagi.');
+            return;
+        }
+
+        const vendor = button.dataset.vendor || 'Vendor';
+        const vendorUserId = button.dataset.vendorUserId || '';
+        activeProductContext = { vendor, vendorUserId, listing };
+
+        const gallery = productDialog.querySelector('[data-product-gallery]');
+        gallery?.replaceChildren();
+        const media = Array.isArray(listing.media) ? listing.media : [];
+
+        media.forEach((item, index) => {
+            const frame = textElement('figure', 'navora-product-media-item', '');
+            if (item.type === 'video') {
+                const video = document.createElement('video');
+                video.src = item.url;
+                video.controls = true;
+                video.playsInline = true;
+                video.preload = 'metadata';
+                video.setAttribute('aria-label', `Video ${listing.name} ${index + 1}`);
+                frame.append(video);
+            } else {
+                const image = document.createElement('img');
+                image.src = item.url;
+                image.alt = `Foto ${listing.name} ${index + 1}`;
+                image.loading = 'lazy';
+                frame.append(image);
+            }
+            gallery?.append(frame);
+        });
+
+        if (media.length === 0) {
+            const empty = textElement('div', 'navora-product-media-empty', '');
+            empty.append(
+                textElement('i', 'bi bi-box-seam', ''),
+                textElement('span', '', 'Vendor belum menambahkan foto atau video produk.'),
+            );
+            gallery?.append(empty);
+        }
+
+        setText('[data-product-vendor]', vendor);
+        setText('[data-product-title]', listing.name || 'Produk vendor');
+        setText('[data-product-description]', listing.description || 'Vendor belum menambahkan deskripsi.');
+
+        const specifications = productDialog.querySelector('[data-product-specifications]');
+        specifications?.replaceChildren();
+        [
+            ['Jenis layanan', listing.category],
+            ['Material', listing.material],
+            ['Minimum pemesanan', `${Number(listing.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs`],
+        ].forEach(([label, value]) => {
+            const row = document.createElement('div');
+            row.append(textElement('dt', '', label), textElement('dd', '', value || 'Belum diisi'));
+            specifications?.append(row);
+        });
+
+        const priceContainer = productDialog.querySelector('[data-product-price]');
+        priceContainer?.replaceChildren();
+        const pricePerUnit = Number(listing.price_per_unit);
+        if (Number.isFinite(pricePerUnit) && pricePerUnit > 0) {
+            priceContainer?.append(textElement(
+                'strong',
+                '',
+                `${formatRupiah(pricePerUnit)} / pcs`,
+            ));
+            priceContainer?.append(textElement(
+                'span',
+                '',
+                listing.pricing_type === 'final'
+                    ? 'Harga final per pcs dari vendor.'
+                    : 'Harga awal per pcs; masih bisa dinegosiasikan dengan vendor.',
+            ));
+        } else {
+            priceContainer?.append(textElement('strong', '', 'Harga bisa dinegosiasikan'));
+            priceContainer?.append(textElement('span', '', 'Kirim permintaan penawaran untuk menerima harga dan total biaya.'));
+        }
+
+        productDialog.showModal();
+    };
+
     const submitCatalogQuote = async (vendorUserId, values) => {
         if (orderSubmissionInProgress) {
             return;
@@ -1095,7 +1285,7 @@
             closeModal();
             showPage('orders');
             await loadOrders();
-            showToast('Pesanan simulasi tercatat di Pesanan. Tidak ada notifikasi atau transaksi vendor nyata.');
+            showToast('Permintaan harga sudah dikirim ke vendor. Pantau balasan dan harga final di menu Pesanan.');
         } catch (requestError) {
             console.error('Navora could not create a catalog order.', requestError);
             showToast(requestError.message || 'Pesanan tidak dapat dibuat. Periksa data dan coba lagi.');
@@ -1107,13 +1297,13 @@
         }
     };
 
-    const createRfq = (vendor = '', vendorUserId = '') => {
+    const createRfq = (vendor = '', vendorUserId = '', product = null) => {
         const isCatalogVendor = Boolean(vendorUserId && authenticatedRole === 'umkm');
         const fields = isCatalogVendor
             ? [
-                modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'),
-                { name: 'quantity', label: 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: 1, step: 1, required: true },
-                { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true },
+                { ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: product?.name || '' },
+                { name: 'quantity', label: 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: product ? product.minimum_order_quantity : 1, step: 1, required: true, value: product ? String(product.minimum_order_quantity) : '' },
+                { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true, value: product ? `${product.material}. ${product.description}` : '' },
                 { name: 'delivery_address', label: 'Alamat pengiriman', placeholder: 'Alamat lengkap penerima', type: 'textarea', rows: 2, required: true },
                 { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan', type: 'textarea', rows: 2, required: false },
             ]
@@ -1129,7 +1319,7 @@
         openModal({
             title: 'Buat permintaan penawaran',
             description: isCatalogVendor
-                ? `Permintaan dikirim kepada ${vendor}. Vendor akan menetapkan harga final; setelah harga tersedia, pembayaran dilakukan lewat Midtrans.`
+                ? `Permintaan produk${product ? ` "${product.name}"` : ''} dikirim kepada ${vendor}. Vendor akan membalas dengan harga final di menu Pesanan.`
                 : 'Catat kebutuhan produk. Dalam demo ini, permintaan hanya tersimpan di browser dan tidak dikirim kepada vendor.',
             icon: 'bi-chat-square-text',
             submit: isCatalogVendor ? 'Kirim permintaan penawaran' : 'Simpan permintaan demo',
@@ -1163,6 +1353,7 @@
                 return true;
             },
         });
+
     };
 
     const createGroup = () => {
@@ -1236,7 +1427,7 @@
             ...options.headers,
         };
 
-        if (options.body) {
+        if (options.body && !(options.body instanceof FormData)) {
             headers['Content-Type'] = 'application/json';
         }
 
@@ -1905,31 +2096,132 @@
         });
     };
 
-    const createListing = () => {
+    const inspectProductVideoDuration = (file) => new Promise((resolve) => {
+        const video = document.createElement('video');
+        const objectUrl = URL.createObjectURL(file);
+        const cleanup = () => {
+            URL.revokeObjectURL(objectUrl);
+            video.removeAttribute('src');
+            video.load();
+        };
+
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+            const duration = Number.isFinite(video.duration) ? video.duration : null;
+            cleanup();
+            resolve(duration);
+        };
+        video.onerror = () => {
+            cleanup();
+            resolve(null);
+        };
+        video.src = objectUrl;
+    });
+
+    const createListing = (listingToEdit = null) => {
+        const fields = [
+            { ...modalTextField('name', 'Nama layanan atau produk', 'Contoh: pouch kopi cetak'), value: listingToEdit?.name || '' },
+            { name: 'category', label: 'Jenis layanan', type: 'select', required: true, value: listingToEdit?.category || 'packaging', options: [{ value: 'packaging', label: 'Kemasan' }, { value: 'printing', label: 'Percetakan' }, { value: 'maklon', label: 'Maklon' }] },
+            { ...modalTextField('material', 'Material', 'Contoh: kraft laminasi'), value: listingToEdit?.material || '' },
+            { name: 'moq', label: 'MOQ indikatif (pcs)', placeholder: 'Contoh: 500', type: 'number', min: 1, required: true, value: String(listingToEdit?.minimum_order_quantity || '') },
+            { name: 'description', label: 'Deskripsi produk', placeholder: 'Jelaskan spesifikasi, pilihan, atau kapasitas layanan', type: 'textarea', required: true, rows: 3, value: listingToEdit?.description || '' },
+        ];
+
+        if (authenticatedRole === 'vendor') {
+            fields.push(
+                { name: 'pricing_type', label: 'Jenis penawaran harga', type: 'select', required: true, value: listingToEdit?.pricing_type || 'final', options: [{ value: 'final', label: 'Harga final (tetap)' }, { value: 'negotiable', label: 'Bisa nego' }] },
+                { name: 'price_per_unit', label: 'Harga per pcs (Rp)', placeholder: 'Contoh: 1.500', type: 'number', min: 1, max: 1000000000, step: 1, required: false, value: listingToEdit?.price_per_unit ? String(listingToEdit.price_per_unit) : '', help: 'Untuk harga final wajib diisi. Pada pilihan bisa nego, harga boleh dikosongkan atau diisi sebagai harga awal.' },
+            );
+            fields.push({
+                name: 'media',
+                label: 'Foto, GIF, atau video produk',
+                type: 'file',
+                accept: 'image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm',
+                multiple: true,
+                required: false,
+                help: listingToEdit
+                    ? `Maksimal 4 lampiran total. 10 MB per file; video MP4/WebM maksimal 5 detik.`
+                    : 'Maksimal 4 lampiran, 10 MB per file. Video MP4/WebM maksimal 5 detik.',
+            });
+        }
+
         openModal({
-            title: 'Tambahkan item katalog',
-            description: authenticatedRole === 'vendor'
-                ? 'Katalog disimpan di akun dan menunggu persetujuan admin. Pastikan profil vendor sudah terverifikasi.'
+            title: listingToEdit ? 'Edit katalog aktif' : 'Tambahkan item katalog',
+            description: listingToEdit
+                ? 'Perubahan pada katalog yang sudah aktif langsung tampil di pencarian UMKM tanpa perlu ACC ulang.'
+                : authenticatedRole === 'vendor'
+                    ? 'Tambahkan foto atau video agar UMKM bisa melihat produkmu. Katalog akan aktif setelah disetujui admin.'
                 : 'Informasi akan disimpan lokal sebagai draft demo dan tidak dipublikasikan ke marketplace.',
             icon: 'bi-box-seam',
-            submit: authenticatedRole === 'vendor' ? 'Kirim untuk ditinjau' : 'Simpan draft demo',
-            fields: [
-                modalTextField('name', 'Nama layanan atau produk', 'Contoh: pouch kopi cetak'),
-                { name: 'category', label: 'Jenis layanan', type: 'select', required: true, options: [{ value: 'packaging', label: 'Kemasan' }, { value: 'printing', label: 'Percetakan' }, { value: 'maklon', label: 'Maklon' }] },
-                modalTextField('material', 'Material', 'Contoh: kraft laminasi'),
-                { name: 'moq', label: 'MOQ indikatif (pcs)', placeholder: 'Contoh: 500', type: 'number', min: 1, required: true },
-                { name: 'description', label: 'Deskripsi singkat', placeholder: 'Jelaskan opsi atau kapasitas layanan', type: 'textarea', required: true, rows: 3 },
-            ],
+            submit: listingToEdit ? 'Simpan perubahan' : authenticatedRole === 'vendor' ? 'Kirim untuk ditinjau' : 'Simpan draft demo',
+            fields,
             onSubmit: (values) => {
                 if (authenticatedRole === 'vendor') {
-                    submitVendorListing({
-                        client_reference: window.crypto?.randomUUID?.() || `listing-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    const listing = {
+                        client_reference: listingToEdit?.client_reference || window.crypto?.randomUUID?.() || `listing-${Date.now()}-${Math.random().toString(36).slice(2)}`,
                         name: values.name.trim(),
                         category: values.category,
                         material: values.material.trim() || 'Belum ditentukan',
                         minimum_order_quantity: Number(values.moq),
+                        pricing_type: values.pricing_type,
+                        price_per_unit: values.price_per_unit ? Number(values.price_per_unit) : null,
                         description: values.description.trim(),
-                    }, false);
+                    };
+                    if (listing.pricing_type === 'final'
+                        && (!Number.isSafeInteger(listing.price_per_unit)
+                            || listing.price_per_unit < 1
+                            || listing.price_per_unit > 1000000000)) {
+                        showToast('Masukkan harga final per pcs antara Rp1 dan Rp1.000.000.000.');
+                        return false;
+                    }
+
+                    if (listing.pricing_type === 'negotiable'
+                        && listing.price_per_unit !== null
+                        && (!Number.isSafeInteger(listing.price_per_unit)
+                            || listing.price_per_unit < 1
+                            || listing.price_per_unit > 1000000000)) {
+                        showToast('Harga awal nego harus antara Rp1 dan Rp1.000.000.000.');
+                        return false;
+                    }
+                    const mediaInput = modalForm?.querySelector('[name="media"]');
+                    const mediaFiles = mediaInput instanceof HTMLInputElement && mediaInput.files
+                        ? Array.from(mediaInput.files)
+                        : [];
+
+                    const existingMediaCount = listingToEdit?.media?.length || 0;
+                    const mediaIdsToRemove = Array.from(
+                        modalForm?.querySelectorAll('input[name="remove_media_ids[]"]:checked') || [],
+                    ).map((input) => Number(input.value));
+                    const remainingMediaCount = existingMediaCount - mediaIdsToRemove.length;
+                    if (mediaFiles.length + remainingMediaCount > 4) {
+                        showToast(`Katalog hanya dapat memiliki maksimal 4 lampiran. Slot tersisa: ${Math.max(0, 4 - remainingMediaCount)}.`);
+                        return false;
+                    }
+
+                    if (listingMediaValidationInProgress) {
+                        return false;
+                    }
+
+                    listingMediaValidationInProgress = true;
+                    void (async () => {
+                        try {
+                            for (const file of mediaFiles) {
+                                if (!file.type.startsWith('video/')) {
+                                    continue;
+                                }
+
+                                const duration = await inspectProductVideoDuration(file);
+                                if (duration === null || duration <= 0 || duration > 5) {
+                                    showToast('Setiap video produk harus memiliki durasi lebih dari 0 dan maksimal 5 detik.');
+                                    return;
+                                }
+                            }
+
+                            await submitVendorListing(listing, false, mediaFiles, mediaIdsToRemove);
+                        } finally {
+                            listingMediaValidationInProgress = false;
+                        }
+                    })();
                     return false;
                 }
 
@@ -1947,9 +2239,86 @@
                 return true;
             },
         });
+
+        if (listingToEdit && modalFields) {
+            const mediaSection = textElement('section', 'navora-listing-media-editor', '');
+            const mediaHeading = textElement('strong', '', `Lampiran saat ini (${listingToEdit.media?.length || 0}/4)`);
+            const mediaHelp = textElement('small', '', 'Pilih Hapus pada setiap gambar, GIF, atau video yang ingin dihapus.');
+            const mediaGrid = textElement('div', 'navora-listing-media-editor-grid', '');
+            mediaSection.append(mediaHeading, mediaHelp);
+            const updateMediaCapacity = () => {
+                const remainingCount = (listingToEdit.media?.length || 0)
+                    - modalFields.querySelectorAll('input[name="remove_media_ids[]"]:checked').length;
+                mediaHeading.textContent = `Lampiran tersimpan setelah perubahan (${remainingCount}/4)`;
+
+                const uploadHelp = modalFields.querySelector('[name="media"]')
+                    ?.closest('.navora-modal-field')
+                    ?.querySelector('.navora-modal-field-help');
+                if (uploadHelp) {
+                    uploadHelp.textContent = `Slot lampiran tersedia: ${4 - remainingCount}. Maksimal 10 MB per file; video maksimal 5 detik.`;
+                }
+            };
+
+            (listingToEdit.media || []).forEach((media) => {
+                const mediaCard = textElement('div', 'navora-listing-media-editor-item', '');
+                const removeInput = document.createElement('input');
+                removeInput.type = 'checkbox';
+                removeInput.name = 'remove_media_ids[]';
+                removeInput.value = String(media.id);
+                removeInput.hidden = true;
+
+                if (media.type === 'video') {
+                    const preview = document.createElement('video');
+                    preview.src = media.url;
+                    preview.muted = true;
+                    preview.playsInline = true;
+                    preview.preload = 'metadata';
+                    preview.setAttribute('aria-label', `Pratinjau video ${listingToEdit.name}`);
+                    mediaCard.append(preview);
+                } else {
+                    const preview = document.createElement('img');
+                    preview.src = media.url;
+                    preview.alt = `Lampiran produk ${listingToEdit.name}`;
+                    preview.loading = 'lazy';
+                    mediaCard.append(preview);
+                }
+
+                const removeButton = textElement('button', 'navora-listing-media-remove', 'Hapus');
+                removeButton.type = 'button';
+                removeButton.setAttribute('aria-pressed', 'false');
+                removeButton.addEventListener('click', () => {
+                    removeInput.checked = !removeInput.checked;
+                    mediaCard.classList.toggle('is-marked-for-removal', removeInput.checked);
+                    removeButton.textContent = removeInput.checked ? 'Batal hapus' : 'Hapus';
+                    removeButton.setAttribute('aria-pressed', String(removeInput.checked));
+                    updateMediaCapacity();
+                });
+
+                mediaCard.append(removeInput, removeButton);
+                mediaGrid.append(mediaCard);
+            });
+
+            if ((listingToEdit.media || []).length === 0) {
+                mediaGrid.append(textElement('span', 'navora-listing-media-empty', 'Belum ada lampiran. Kamu dapat menambah gambar, GIF, atau video.'));
+            }
+
+            mediaSection.append(mediaGrid);
+            modalFields?.append(mediaSection);
+            updateMediaCapacity();
+        }
+
+        const pricingTypeInput = modalFields?.querySelector('[name="pricing_type"]');
+        const priceInput = modalFields?.querySelector('[name="price_per_unit"]');
+        if (pricingTypeInput instanceof HTMLSelectElement && priceInput instanceof HTMLInputElement) {
+            const updatePriceRequirement = () => {
+                priceInput.required = pricingTypeInput.value === 'final';
+            };
+            pricingTypeInput.addEventListener('change', updatePriceRequirement);
+            updatePriceRequirement();
+        }
     };
 
-    const submitVendorListing = async (listing, localDraft) => {
+    const submitVendorListing = async (listing, localDraft, mediaFiles = [], removeMediaIds = []) => {
         if (listingSubmissionInProgress) {
             return;
         }
@@ -1961,9 +2330,14 @@
         }
 
         try {
+            const formData = new FormData();
+            Object.entries(listing).forEach(([key, value]) => formData.append(key, value === null ? '' : String(value)));
+            mediaFiles.forEach((file) => formData.append('media[]', file, file.name));
+            removeMediaIds.forEach((id) => formData.append('remove_media_ids[]', String(id)));
+
             const response = await requestOrderData(document.body.dataset.vendorListingsStoreUrl, {
                 method: 'POST',
-                body: JSON.stringify(listing),
+                body: formData,
             });
 
             if (localDraft) {
@@ -2175,6 +2549,17 @@
             checkoutOrder(button.dataset.order || '', button);
         } else if (action === 'rfq') {
             createRfq(button.dataset.vendor || '', button.dataset.vendorUserId || '');
+        } else if (action === 'product-detail') {
+            openProductDetail(button);
+        } else if (action === 'product-request-quote') {
+            if (activeProductContext) {
+                const { vendor, vendorUserId, listing } = activeProductContext;
+                if (productDialog instanceof HTMLDialogElement) {
+                    productDialog.close();
+                }
+                activeProductContext = null;
+                createRfq(vendor, vendorUserId, listing);
+            }
         } else if (action === 'create-rfq') {
             createRfq();
         } else if (action === 'join-group') {
@@ -2183,6 +2568,13 @@
             createGroup();
         } else if (action === 'add-listing') {
             createListing();
+        } else if (action === 'edit-vendor-listing') {
+            const listing = vendorListings.find((item) => String(item.id) === button.dataset.listingReference);
+            if (!listing || listing.status !== 'active') {
+                showToast('Katalog aktif tidak ditemukan. Muat ulang halaman dan coba lagi.');
+            } else {
+                createListing(listing);
+            }
         } else if (action === 'submit-vendor-listing') {
             submitVendorListingFromCard(button);
         } else if (action === 'retry-vendor-listings') {
@@ -2274,6 +2666,11 @@
         }
 
         const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
+        if (target.closest('[data-close-product-dialog]') && productDialog instanceof HTMLDialogElement) {
+            productDialog.close();
+            return;
+        }
+
         if (target.closest('[data-notifications-toggle]') && notificationPopup instanceof HTMLDialogElement) {
             notificationPopup.showModal();
             return;
