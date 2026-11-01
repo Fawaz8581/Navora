@@ -10,8 +10,20 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
+function createVerifiedOrderVendor(): User
+{
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    BusinessProfile::factory()->for($vendor)->create([
+        'completed_at' => now(),
+        'verification_status' => 'approved',
+    ]);
+
+    return $vendor;
+}
+
 it('creates a direct order and records its initial tracking status', function () {
     $buyer = User::factory()->create();
+    $vendor = createVerifiedOrderVendor();
 
     $this->actingAs($buyer)
         ->postJson(route('orders.store'), [
@@ -20,6 +32,7 @@ it('creates a direct order and records its initial tracking status', function ()
             'quantity' => 500,
             'packaging_details' => 'Kraft laminasi, zipper, ukuran 200 gram.',
             'delivery_address' => 'Jalan Melati 10, Bandung',
+            'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated()
         ->assertJsonPath('order.type_label', 'Pesanan langsung')
@@ -35,6 +48,7 @@ it('creates a direct order and records its initial tracking status', function ()
 
 it('requires a delivery address before creating a direct order', function () {
     $buyer = User::factory()->create();
+    $vendor = createVerifiedOrderVendor();
 
     $this->actingAs($buyer)
         ->postJson(route('orders.store'), [
@@ -42,6 +56,7 @@ it('requires a delivery address before creating a direct order', function () {
             'product_name' => 'Pouch kopi khusus',
             'quantity' => 500,
             'packaging_details' => 'Kraft laminasi, zipper.',
+            'vendor_user_id' => $vendor->id,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['delivery_address']);
@@ -52,6 +67,7 @@ it('requires a delivery address before creating a direct order', function () {
 it('creates a group order and starts processing when its target is reached', function () {
     $organizer = User::factory()->create();
     $participant = User::factory()->create();
+    $vendor = createVerifiedOrderVendor();
 
     $creation = $this->actingAs($organizer)
         ->postJson(route('orders.store'), [
@@ -60,6 +76,7 @@ it('creates a group order and starts processing when its target is reached', fun
             'quantity' => 100,
             'initial_quantity' => 40,
             'packaging_details' => 'Pouch standar berbahan kraft dengan zipper.',
+            'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated()
         ->assertJsonPath('order.type', Order::TYPE_GROUP)
@@ -146,7 +163,7 @@ it('does not expose another users direct order', function () {
         ->assertNotFound();
 });
 
-it('creates a tracked simulated order when a verified vendor quote is submitted', function () {
+it('creates a real order quote request for a verified vendor', function () {
     $buyer = User::factory()->create(['role' => 'umkm']);
     $vendor = User::factory()->create(['role' => 'vendor']);
     BusinessProfile::factory()->for($vendor)->create([
@@ -165,22 +182,21 @@ it('creates a tracked simulated order when a verified vendor quote is submitted'
         ])
         ->assertCreated()
         ->assertJsonPath('order.type', Order::TYPE_DIRECT)
-        ->assertJsonPath('order.status', Order::STATUS_PROCESSING)
-        ->assertJsonPath('order.is_simulated', true)
+        ->assertJsonPath('order.status', Order::STATUS_WAITING)
+        ->assertJsonPath('order.is_simulated', false)
+        ->assertJsonPath('order.payment_status', 'awaiting_quote')
         ->assertJsonPath('order.vendor_name', $vendor->businessProfile->business_name);
 
     $order = Order::query()->sole();
 
     expect($order->user_id)->toBe($buyer->id)
         ->and($order->vendor_user_id)->toBe($vendor->id)
-        ->and($order->is_simulated)->toBeTrue()
+        ->and($order->is_simulated)->toBeFalse()
         ->and($order->statusHistory()->orderBy('id')->pluck('status')->all())->toBe([
             Order::STATUS_WAITING,
-            Order::STATUS_PROCESSING,
         ]);
 
-    Queue::assertPushed(AdvanceSimulatedOrder::class, fn (AdvanceSimulatedOrder $job): bool => $job->orderId === $response->json('order.id')
-        && $job->expectedStatus === Order::STATUS_PROCESSING);
+    Queue::assertNothingPushed();
 
     $this->actingAs($vendor)
         ->patchJson(route('orders.status', $response->json('order.id')), ['status' => Order::STATUS_PRODUCTION])
@@ -346,7 +362,7 @@ it('waits for the automatic simulation interval before advancing the next stage'
         && $job->expectedStatus === Order::STATUS_PRODUCTION);
 });
 
-it('starts automatic order tracking after the assigned verified vendor confirms the order', function () {
+it('does not start order tracking until an assigned verified vendor has been paid', function () {
     $buyer = User::factory()->create();
     $vendor = User::factory()->create(['role' => 'vendor']);
     BusinessProfile::factory()->for($vendor)->create([
@@ -378,9 +394,8 @@ it('starts automatic order tracking after the assigned verified vendor confirms 
 
     $this->actingAs($vendor)
         ->patchJson(route('orders.status', $orderId), ['status' => Order::STATUS_PROCESSING])
-        ->assertOk()
-        ->assertJsonPath('order.status', Order::STATUS_PROCESSING)
-        ->assertJsonPath('order.is_simulated', true);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['status']);
 
     $this->actingAs($vendor)
         ->patchJson(route('orders.status', $orderId), ['status' => Order::STATUS_PRODUCTION])
@@ -392,12 +407,10 @@ it('starts automatic order tracking after the assigned verified vendor confirms 
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['status']);
 
-    Queue::assertPushed(AdvanceSimulatedOrder::class, fn (AdvanceSimulatedOrder $job): bool => $job->orderId === $orderId
-        && $job->expectedStatus === Order::STATUS_PROCESSING);
+    Queue::assertNothingPushed();
 
     expect(OrderStatusHistory::query()->where('order_id', $orderId)->orderBy('id')->pluck('status')->all())->toBe([
         Order::STATUS_WAITING,
-        Order::STATUS_PROCESSING,
     ]);
 });
 

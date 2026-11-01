@@ -85,6 +85,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:20,1')
         ->name('orders.quote');
     Route::get('/pesanan/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::post('/pesanan/{order}/penawaran-harga', [OrderController::class, 'setPrice'])
+        ->middleware('throttle:10,1')
+        ->name('orders.price');
+    Route::post('/pesanan/{order}/pembayaran', [OrderController::class, 'checkout'])
+        ->middleware('throttle:10,1')
+        ->name('orders.checkout');
     Route::post('/pesanan/{order}/peserta', [OrderController::class, 'join'])
         ->middleware('throttle:20,1')
         ->name('orders.join');

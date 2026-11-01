@@ -1129,10 +1129,10 @@
         openModal({
             title: 'Buat permintaan penawaran',
             description: isCatalogVendor
-                ? `Permintaan akan dicatat sebagai pesanan simulasi untuk ${vendor}. Tidak ada notifikasi atau konfirmasi vendor; status bergerak otomatis sebagai simulasi, bukan pemenuhan nyata.`
+                ? `Permintaan dikirim kepada ${vendor}. Vendor akan menetapkan harga final; setelah harga tersedia, pembayaran dilakukan lewat Midtrans.`
                 : 'Catat kebutuhan produk. Dalam demo ini, permintaan hanya tersimpan di browser dan tidak dikirim kepada vendor.',
             icon: 'bi-chat-square-text',
-            submit: isCatalogVendor ? 'Buat pesanan terlacak' : 'Simpan permintaan demo',
+            submit: isCatalogVendor ? 'Kirim permintaan penawaran' : 'Simpan permintaan demo',
             fields,
             onSubmit: (values) => {
                 if (isCatalogVendor) {
@@ -1295,6 +1295,8 @@
             : new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
     };
 
+    const formatRupiah = (amount) => `Rp${Number(amount).toLocaleString('id-ID')}`;
+
     const renderOrderCard = (order) => {
         const card = document.createElement('article');
         card.className = 'navora-order-card';
@@ -1336,6 +1338,16 @@
         [
             ['Jumlah', `${Number(order.quantity).toLocaleString('id-ID')} pcs`],
             ['Vendor', order.vendor_name || 'Belum dipilih'],
+            ...(order.unit_price ? [['Harga final', `${formatRupiah(order.unit_price)} / pcs`]] : []),
+            ...(order.total_amount ? [['Total pesanan', formatRupiah(order.total_amount)]] : []),
+            ...(order.current_payment_status && order.current_payment_status !== 'not_required'
+                ? [['Pembayaran', ({
+                    awaiting_quote: 'Menunggu harga final dari vendor',
+                    pending: 'Menunggu pembayaran',
+                    paid: 'Lunas',
+                    failed: 'Pembayaran gagal; silakan coba lagi',
+                })[order.current_payment_status] || 'Status pembayaran tidak dikenal']]
+                : []),
             ['Spesifikasi', order.packaging_details || 'Belum tersedia'],
             ...(order.delivery_address ? [['Alamat pengiriman', order.delivery_address]] : []),
             ...(order.notes ? [['Catatan', order.notes]] : []),
@@ -1377,7 +1389,7 @@
                     participantList.append(textElement(
                         'li',
                         '',
-                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs`,
+                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs${participant.payment_amount ? ` · ${formatRupiah(participant.payment_amount)} · ${participant.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}` : ''}`,
                     ));
                 });
                 group.append(participantList);
@@ -1432,6 +1444,24 @@
 
         const actions = document.createElement('div');
         actions.className = 'navora-order-actions';
+        if (order.can_set_price) {
+            const priceButton = textElement('button', 'btn navora-app-outline', 'Tetapkan harga final');
+            priceButton.type = 'button';
+            priceButton.dataset.action = 'set-order-price';
+            priceButton.dataset.order = String(order.id);
+            actions.append(priceButton);
+        }
+        if (order.can_pay) {
+            const paymentButton = textElement(
+                'button',
+                'btn navora-app-primary',
+                `Bayar ${formatRupiah(order.payment_amount)} via Midtrans`,
+            );
+            paymentButton.type = 'button';
+            paymentButton.dataset.action = 'checkout-order';
+            paymentButton.dataset.order = String(order.id);
+            actions.append(paymentButton);
+        }
         if (order.can_join) {
             const joinButton = textElement('button', 'btn navora-app-primary', 'Ikut patungan');
             joinButton.type = 'button';
@@ -1580,9 +1610,13 @@
         }
 
         await loadOrders();
+        if (!orderVendors.length) {
+            showToast('Belum ada vendor terverifikasi yang dapat menetapkan harga pesanan.');
+            return;
+        }
 
         const vendorOptions = [
-            { value: '', label: orderVendors.length ? 'Tidak memilih vendor' : 'Belum ada vendor terverifikasi' },
+            { value: '', label: 'Pilih vendor untuk menetapkan harga final' },
             ...orderVendors.map((vendor) => ({ value: String(vendor.id), label: vendor.name })),
         ];
         const isGroup = type === 'patungan';
@@ -1593,7 +1627,7 @@
                 ? [{ name: 'initial_quantity', label: 'Jumlah awal yang kamu ambil (pcs)', placeholder: 'Contoh: 100', type: 'number', min: 1, step: 1, required: true }]
                 : []),
             { name: 'packaging_details', label: 'Spesifikasi kemasan', placeholder: 'Ukuran, material, bentuk, atau kebutuhan khusus', type: 'textarea', rows: 3, required: true },
-            { name: 'vendor_user_id', label: 'Vendor terverifikasi (opsional)', type: 'select', required: false, options: vendorOptions },
+            { name: 'vendor_user_id', label: 'Vendor terverifikasi', type: 'select', required: true, options: vendorOptions },
             ...(!isGroup
                 ? [{ name: 'delivery_address', label: 'Alamat pengiriman', placeholder: 'Alamat lengkap penerima', type: 'textarea', rows: 2, required: true }]
                 : []),
@@ -1603,8 +1637,8 @@
         openModal({
             title: isGroup ? 'Buat pesanan patungan' : 'Buat pesanan langsung',
             description: isGroup
-                ? 'Buat pesanan untuk kemasan standar. Pesanan mulai diproses setelah jumlah peserta memenuhi target.'
-                : 'Simpan kebutuhan khusus beserta alamat pengiriman untuk dilacak dari akunmu.',
+                ? 'Pilih vendor yang akan menetapkan harga final. Setelah target terpenuhi, setiap peserta membayar porsinya lewat Midtrans.'
+                : 'Pilih vendor untuk menetapkan harga final. Setelah harga disetujui, pembayaran dilakukan lewat Midtrans.',
             icon: isGroup ? 'bi-people' : 'bi-box-seam',
             submit: isGroup ? 'Buat pesanan patungan' : 'Simpan pesanan',
             fields,
@@ -1739,6 +1773,81 @@
         } catch (requestError) {
             console.error('Navora could not update the order status.', requestError);
             showToast(requestError.message || 'Status tidak dapat diperbarui. Muat ulang dan coba lagi.');
+        }
+    };
+
+    const setOrderPrice = (orderId) => {
+        openModal({
+            title: 'Tetapkan harga final',
+            description: 'Masukkan harga final per pcs dalam rupiah. Total tagihan adalah harga dikali jumlah; masukkan biaya lain yang disepakati ke harga ini.',
+            icon: 'bi-tag',
+            submit: 'Kirim harga ke pembeli',
+            fields: [
+                { name: 'unit_price', label: 'Harga final per pcs (Rp)', placeholder: 'Contoh: 1250', type: 'number', min: 1, max: 1000000000, step: 1, required: true },
+            ],
+            onSubmit: (values) => {
+                const unitPrice = Number(values.unit_price);
+                if (!Number.isSafeInteger(unitPrice) || unitPrice < 1 || unitPrice > 1000000000) {
+                    showToast('Masukkan harga final dalam rupiah sebagai bilangan bulat yang valid.');
+                    return false;
+                }
+
+                submitOrderPrice(orderId, unitPrice);
+                return false;
+            },
+        });
+    };
+
+    const submitOrderPrice = async (orderId, unitPrice) => {
+        if (orderSubmissionInProgress) {
+            return;
+        }
+        orderSubmissionInProgress = true;
+        const submitButton = modalForm?.querySelector('[data-modal-submit]');
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+
+        try {
+            await requestOrderData(orderUrl(document.body.dataset.ordersPriceTemplate, orderId), {
+                method: 'POST',
+                body: JSON.stringify({ unit_price: unitPrice }),
+            });
+            closeModal();
+            showToast('Harga final tersimpan. Pembeli sekarang dapat membayar lewat Midtrans.');
+            await loadOrders();
+        } catch (requestError) {
+            console.error('Navora could not set the final order price.', requestError);
+            showToast(requestError.message || 'Harga final tidak dapat disimpan. Coba lagi.');
+        } finally {
+            orderSubmissionInProgress = false;
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        }
+    };
+
+    const checkoutOrder = async (orderId, button) => {
+        if (orderSubmissionInProgress) {
+            return;
+        }
+        orderSubmissionInProgress = true;
+        button.disabled = true;
+
+        try {
+            const payload = await requestOrderData(orderUrl(document.body.dataset.ordersCheckoutTemplate, orderId), {
+                method: 'POST',
+            });
+            if (!payload.redirect_url) {
+                throw new Error('Midtrans tidak mengembalikan tautan pembayaran.');
+            }
+            window.location.assign(payload.redirect_url);
+        } catch (requestError) {
+            console.error('Navora could not start the Midtrans order checkout.', requestError);
+            showToast(requestError.message || 'Checkout Midtrans gagal dibuat. Coba lagi.');
+            button.disabled = false;
+        } finally {
+            orderSubmissionInProgress = false;
         }
     };
 
@@ -2060,6 +2169,10 @@
             joinOrder(button.dataset.order || '', Number(button.dataset.remaining));
         } else if (action === 'update-order-status') {
             updateOrderStatus(button.dataset.order || '', button.dataset.status || '');
+        } else if (action === 'set-order-price') {
+            setOrderPrice(button.dataset.order || '');
+        } else if (action === 'checkout-order') {
+            checkoutOrder(button.dataset.order || '', button);
         } else if (action === 'rfq') {
             createRfq(button.dataset.vendor || '', button.dataset.vendorUserId || '');
         } else if (action === 'create-rfq') {

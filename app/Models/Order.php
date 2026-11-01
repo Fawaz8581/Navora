@@ -60,6 +60,13 @@ class Order extends Model
         'notes',
         'status',
         'is_simulated',
+        'unit_price',
+        'total_amount',
+        'payment_status',
+        'payment_order_id',
+        'snap_token',
+        'snap_redirect_url',
+        'paid_at',
     ];
 
     public function creator(): BelongsTo
@@ -110,6 +117,9 @@ class Order extends Model
         return [
             'quantity' => 'integer',
             'is_simulated' => 'boolean',
+            'unit_price' => 'integer',
+            'total_amount' => 'integer',
+            'paid_at' => 'datetime',
         ];
     }
 }

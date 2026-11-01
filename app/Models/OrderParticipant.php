@@ -11,6 +11,12 @@ class OrderParticipant extends Model
         'order_id',
         'user_id',
         'quantity',
+        'payment_amount',
+        'payment_status',
+        'payment_order_id',
+        'snap_token',
+        'snap_redirect_url',
+        'paid_at',
     ];
 
     public function order(): BelongsTo
@@ -30,6 +36,8 @@ class OrderParticipant extends Model
     {
         return [
             'quantity' => 'integer',
+            'payment_amount' => 'integer',
+            'paid_at' => 'datetime',
         ];
     }
 }

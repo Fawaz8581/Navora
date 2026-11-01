@@ -26,7 +26,9 @@
     data-orders-quote-url="{{ route('orders.quote') }}"
     data-orders-show-template="{{ route('orders.show', ['order' => '__ORDER__']) }}"
     data-orders-join-template="{{ route('orders.join', ['order' => '__ORDER__']) }}"
-    data-orders-status-template="{{ route('orders.status', ['order' => '__ORDER__']) }}">
+    data-orders-status-template="{{ route('orders.status', ['order' => '__ORDER__']) }}"
+    data-orders-price-template="{{ route('orders.price', ['order' => '__ORDER__']) }}"
+    data-orders-checkout-template="{{ route('orders.checkout', ['order' => '__ORDER__']) }}">
     <a class="navora-skip-link" href="#app-content">Lewati ke konten utama</a>
     <div class="navora-app-shell">
         <header class="navora-app-header">
@@ -220,7 +222,7 @@
                         <button class="btn navora-app-primary" type="button" data-action="create-order" data-order-type="patungan"><i class="bi bi-people"></i> Buat patungan</button>
                     </div>
                 </div>
-                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur status pesanan</strong><p>Menunggu konfirmasi → Diproses → Dalam produksi → Dikirim → Diterima. Vendor yang ditetapkan cukup mengonfirmasi pesanan satu kali; status bergerak otomatis tiap 20 detik sebagai simulasi dan diperbarui berkala selama halaman pelacakan terbuka. UMKM dapat membuat atau membatalkan pesanan, tetapi tidak mengonfirmasi tahap pesanan. Status simulasi bukan konfirmasi produksi, kurir, atau penerimaan nyata. Pesanan patungan menunggu target terpenuhi sebelum dapat dikonfirmasi.</p></div></div>
+                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur pembayaran dan status pesanan</strong><p>Vendor menetapkan harga final sebelum pembeli membayar lewat Midtrans. Pesanan langsung dapat diproses setelah lunas; pesanan patungan menunggu target terpenuhi dan setiap peserta membayar porsinya. Setelah pembayaran diterima, vendor memperbarui tahap pesanan secara nyata. Pesanan lama yang berlabel simulasi tetap bergerak otomatis dan bukan konfirmasi produksi, kurir, atau penerimaan.</p></div></div>
                 <div class="navora-empty-state" data-orders-loading aria-live="polite"><i class="bi bi-arrow-repeat"></i><strong>Memuat pesanan</strong><span>Data diambil dari akunmu.</span></div>
                 <div class="navora-empty-state" data-orders-guest hidden><i class="bi bi-person-lock"></i><strong>Masuk untuk melihat pesanan</strong><span>Pesanan dan pelacakan hanya tersedia untuk akun yang terdaftar.</span><a class="btn navora-app-primary" href="{{ route('login') }}">Masuk ke Navora</a></div>
                 <div class="navora-order-error" data-orders-error role="alert" hidden></div>

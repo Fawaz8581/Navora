@@ -14,6 +14,32 @@ class MidtransSnapService
      */
     public function createTransaction(AdCampaign $campaign, User $vendor): array
     {
+        return $this->requestTransaction(
+            $campaign->order_id,
+            $campaign->amount,
+            $vendor,
+            route('vendor.advertisements.index'),
+        );
+    }
+
+    /**
+     * @return array{token: string, redirect_url: string}
+     */
+    public function createOrderTransaction(string $orderId, int $amount, User $buyer): array
+    {
+        return $this->requestTransaction(
+            $orderId,
+            $amount,
+            $buyer,
+            route('workspace'),
+        );
+    }
+
+    /**
+     * @return array{token: string, redirect_url: string}
+     */
+    private function requestTransaction(string $orderId, int $amount, User $customer, string $finishUrl): array
+    {
         $serverKey = config('services.midtrans.server_key');
 
         if (! is_string($serverKey) || $serverKey === '') {
@@ -32,15 +58,15 @@ class MidtransSnapService
             ->timeout(15)
             ->post($baseUrl.'/snap/v1/transactions', [
                 'transaction_details' => [
-                    'order_id' => $campaign->order_id,
-                    'gross_amount' => $campaign->amount,
+                    'order_id' => $orderId,
+                    'gross_amount' => $amount,
                 ],
                 'customer_details' => [
-                    'first_name' => $vendor->name,
-                    'email' => $vendor->email,
+                    'first_name' => $customer->name,
+                    'email' => $customer->email,
                 ],
                 'callbacks' => [
-                    'finish' => route('vendor.advertisements.index'),
+                    'finish' => $finishUrl,
                 ],
             ]);
 
@@ -52,6 +78,14 @@ class MidtransSnapService
 
         if (! is_string($token) || ! is_string($redirectUrl)) {
             throw new RuntimeException('Midtrans tidak mengembalikan informasi checkout yang valid.');
+        }
+
+        $redirectHost = parse_url($redirectUrl, PHP_URL_HOST);
+        $redirectScheme = parse_url($redirectUrl, PHP_URL_SCHEME);
+
+        if ($redirectScheme !== 'https'
+            || ! in_array($redirectHost, ['app.midtrans.com', 'app.sandbox.midtrans.com'], true)) {
+            throw new RuntimeException('Midtrans mengembalikan alamat checkout yang tidak valid.');
         }
 
         return [
