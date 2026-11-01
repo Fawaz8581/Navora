@@ -32,6 +32,13 @@
     data-orders-quote-decision-template="{{ route('orders.quote-decision', ['order' => '__ORDER__']) }}"
     data-orders-checkout-template="{{ route('orders.checkout', ['order' => '__ORDER__']) }}"
     data-orders-payment-refresh-template="{{ route('orders.payment-refresh', ['order' => '__ORDER__']) }}"
+    data-orders-shipping-rates-template="{{ route('orders.shipping-rates', ['order' => '__ORDER__']) }}"
+    data-orders-shipping-select-template="{{ route('orders.shipping-select', ['order' => '__ORDER__']) }}"
+    data-orders-delivery-details-template="{{ route('orders.delivery-details', ['order' => '__ORDER__']) }}"
+    data-vendor-subscription-checkout-url="{{ route('vendor.subscription.checkout') }}"
+    data-vendor-subscription-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}"
+    data-rajaongkir-locations-url="{{ route('rajaongkir.locations') }}"
+    data-rajaongkir-couriers="{{ implode(',', config('services.rajaongkir.couriers')) }}"
     data-order-messages-template="{{ route('orders.messages.index', ['order' => '__ORDER__']) }}"
     data-order-message-store-template="{{ route('orders.messages.store', ['order' => '__ORDER__']) }}"
     data-vendor-income-url="{{ route('orders.vendor-income') }}">
@@ -48,6 +55,30 @@
                     <input type="search" data-global-search placeholder="Cari kemasan, vendor, bahan..." aria-label="Cari di Navora">
                     <kbd>/</kbd>
                 </div>
+                @if (auth()->user()?->role === 'vendor')
+                    <section class="navora-panel navora-discover-panel" data-role-content="vendor" hidden
+                        data-vendor-subscription
+                        data-checkout-url="{{ route('vendor.subscription.checkout') }}"
+                        data-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}">
+                        <div class="navora-panel-heading">
+                            <div><span class="navora-panel-kicker">PAKET VENDOR</span><h2>Vendor Premium</h2></div>
+                            <div class="navora-subscription-header-actions">
+                                <span class="navora-status-pill {{ $vendorSubscription?->isActive() ? 'status-open' : 'status-waiting' }}">
+                                    {{ $vendorSubscription?->isActive() ? 'Aktif' : 'Gratis' }}
+                                </span>
+                                <button class="navora-subscription-dismiss" type="button" data-vendor-subscription-dismiss aria-label="Tutup informasi Vendor Premium" title="Tutup">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                        @if ($vendorSubscription?->isActive())
+                            <p>Paket aktif sampai {{ $vendorSubscription->ends_at?->format('d M Y') }}. Vendor Premium mendapat badge, prioritas pencarian, dan kuota RFQ tanpa batas.</p>
+                        @else
+                            <p>Rp{{ number_format(config('services.navora.vendor_subscription_amount'), 0, ',', '.') }} / {{ config('services.navora.vendor_subscription_days') }} hari. Dapatkan badge, prioritas pencarian, dan kuota RFQ tanpa batas; akun gratis mendapat {{ config('services.navora.free_vendor_monthly_rfq_limit') }} RFQ per bulan. Verifikasi tetap diperiksa admin.</p>
+                            <button class="btn navora-app-primary" type="button" data-vendor-subscription-checkout>Aktifkan via Midtrans</button>
+                        @endif
+                    </section>
+                @endif
                 <div class="navora-header-actions">
                     @auth
                         <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> AKUN TERHUBUNG</span>
@@ -239,7 +270,7 @@
                         <button class="btn navora-app-outline" type="button" data-action="create-order" data-order-type="langsung"><i class="bi bi-plus-lg"></i> Pesanan langsung</button>
                     </div>
                 </div>
-                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alur pembayaran dan status pesanan</strong><p>Vendor menetapkan harga final, lalu UMKM menyetujui atau menolaknya sebelum pembayaran. Checkout Midtrans tampil sebagai popup di halaman ini. Setelah pembayaran terverifikasi, vendor memperbarui tahap pesanan. Patungan MOQ dikelola terpisah di menu Patungan MOQ.</p></div></div>
+                <div class="navora-group-callout"><span><i class="bi bi-info-circle"></i></span><div><strong>Alamat asal dan tujuan pengiriman</strong><p>Vendor wajib mengisi alamat usaha dan area asal di Profil usaha. UMKM cukup mengisi biodata penerima serta satu alamat lengkap tujuan di pesanan; pilih area kecamatan/kota hanya untuk perhitungan ongkir. Vendor menetapkan harga final, lalu UMKM menyetujui atau menolaknya sebelum memilih kurir dan membayar melalui popup Midtrans.</p></div></div>
                 <div class="navora-empty-state" data-orders-loading aria-live="polite"><i class="bi bi-arrow-repeat"></i><strong>Memuat pesanan</strong><span>Data diambil dari akunmu.</span></div>
                 <div class="navora-empty-state" data-orders-guest hidden><i class="bi bi-person-lock"></i><strong>Masuk untuk melihat pesanan</strong><span>Pesanan dan pelacakan hanya tersedia untuk akun yang terdaftar.</span><a class="btn navora-app-primary" href="{{ route('login') }}">Masuk ke Navora</a></div>
                 <div class="navora-order-error" data-orders-error role="alert" hidden></div>
@@ -291,7 +322,7 @@
 
             <section class="navora-page-panel" data-page-panel="income" role="tabpanel" hidden>
                 <div class="navora-page-title-row">
-                    <div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Pendapatan & produk</span></div><h1>Rekap pendapatan</h1><p>Nilai bruto pesanan yang telah dikonfirmasi Midtrans; belum memperhitungkan potongan biaya layanan atau transfer.</p></div>
+                    <div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Pendapatan & produk</span></div><h1>Rekap pendapatan</h1><p>Nilai subtotal produk yang telah dibayar; ongkir dan biaya platform bukan bagian dari pemasukan vendor.</p></div>
                     <button class="btn navora-app-outline" type="button" data-action="refresh-vendor-income"><i class="bi bi-arrow-repeat"></i> Segarkan</button>
                 </div>
                 <div class="navora-income-summary">
@@ -538,5 +569,7 @@
         <script src="{{ rtrim(config('services.midtrans.base_url'), '/').'/snap/snap.js' }}" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
     @endif
     <script src="{{ asset('js/navora-app.js').'?v='.filemtime(public_path('js/navora-app.js')) }}" defer></script>
+    <script src="{{ asset('js/rajaongkir-location.js').'?v='.filemtime(public_path('js/rajaongkir-location.js')) }}" defer></script>
+    <script src="{{ asset('js/vendor-subscription.js').'?v='.filemtime(public_path('js/vendor-subscription.js')) }}" defer></script>
 </body>
 </html>

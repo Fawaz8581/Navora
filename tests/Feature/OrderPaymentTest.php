@@ -17,6 +17,9 @@ function createPaymentVendor(): User
     BusinessProfile::factory()->for($vendor)->create([
         'completed_at' => now(),
         'verification_status' => 'approved',
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
     ]);
 
     return $vendor;
@@ -64,10 +67,12 @@ it('requires a final vendor price and confirms a direct order only after a signe
             'product_name' => 'Pouch kopi',
             'quantity' => 500,
             'packaging_details' => 'Kraft laminasi dengan zipper.',
-            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'target_unit_price' => 150,
         ])
         ->assertCreated()
-        ->assertJsonPath('order.payment_status', 'awaiting_quote');
+        ->assertJsonPath('order.payment_status', 'awaiting_quote')
+        ->assertJsonPath('order.target_unit_price', 150)
+        ->assertJsonPath('order.delivery_address', null);
     $orderId = $orderResponse->json('order.id');
 
     $this->actingAs($buyer)
@@ -76,10 +81,13 @@ it('requires a final vendor price and confirms a direct order only after a signe
         ->assertJsonValidationErrors(['payment']);
 
     $this->actingAs($vendor)
-        ->postJson(route('orders.price', $orderId), ['unit_price' => 180])
+        ->postJson(route('orders.price', $orderId), [
+            'unit_price' => 180,
+            'shipping_weight_per_unit_grams' => 100,
+        ])
         ->assertOk()
         ->assertJsonPath('order.unit_price', 180)
-        ->assertJsonPath('order.total_amount', 90000)
+        ->assertJsonPath('order.total_amount', 91800)
         ->assertJsonPath('order.payment_status', 'awaiting_approval')
         ->assertJsonPath('order.quote_status', 'pending_buyer');
 
@@ -88,6 +96,24 @@ it('requires a final vendor price and confirms a direct order only after a signe
         ->assertOk()
         ->assertJsonPath('order.quote_status', 'accepted')
         ->assertJsonPath('order.payment_status', 'pending');
+
+    $this->actingAs($buyer)
+        ->putJson(route('orders.delivery-details', $orderId), [
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
+        ])
+        ->assertOk()
+        ->assertJsonPath('order.delivery_contact_name', 'Pembeli Navora')
+        ->assertJsonPath('order.can_select_shipping', true);
+
+    Order::query()->findOrFail($orderId)->forceFill([
+        'shipping_amount' => 0,
+        'shipping_courier' => 'test',
+        'shipping_service' => 'TEST',
+    ])->save();
 
     $this->actingAs($buyer)
         ->postJson(route('orders.checkout', $orderId))
@@ -100,10 +126,10 @@ it('requires a final vendor price and confirms a direct order only after a signe
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions'
         && $request['transaction_details']['order_id'] === $order->payment_order_id
-        && $request['transaction_details']['gross_amount'] === 90000
+        && $request['transaction_details']['gross_amount'] === 91800
         && $request['customer_details']['email'] === $buyer->email);
 
-    $notification = orderPaymentNotification($order->payment_order_id, 90000);
+    $notification = orderPaymentNotification($order->payment_order_id, 91800);
     $this->postJson(route('midtrans.notifications'), [
         ...$notification,
         'signature_key' => 'invalid',
@@ -171,22 +197,37 @@ it('requires each group-order participant to pay their own share before the orde
             'quantity' => 100,
             'initial_quantity' => 40,
             'packaging_details' => 'Pouch standar berbahan kraft.',
+            'delivery_contact_name' => 'Penyelenggara',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
             'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated();
     $orderId = $creation->json('order.id');
 
     $this->actingAs($participant)
-        ->postJson(route('orders.join', $orderId), ['quantity' => 60])
+        ->postJson(route('orders.join', $orderId), [
+            'quantity' => 60,
+            'delivery_contact_name' => 'Peserta',
+            'delivery_contact_phone' => '+6281234567891',
+            'delivery_address' => 'Jalan Melati 12, Bandung',
+            'delivery_area_id' => '201',
+            'delivery_area_name' => 'Sukajadi, Kota Bandung',
+        ])
         ->assertOk();
 
     $this->actingAs($vendor)
-        ->postJson(route('orders.price', $orderId), ['unit_price' => 200])
+        ->postJson(route('orders.price', $orderId), [
+            'unit_price' => 200,
+            'shipping_weight_per_unit_grams' => 100,
+        ])
         ->assertOk()
-        ->assertJsonPath('order.total_amount', 20000)
+        ->assertJsonPath('order.total_amount', 20400)
         ->assertJsonPath('order.payment_status', 'awaiting_approval')
-        ->assertJsonPath('order.participants.0.payment_amount', 8000)
-        ->assertJsonPath('order.participants.1.payment_amount', 12000);
+        ->assertJsonPath('order.participants.0.payment_amount', 8160)
+        ->assertJsonPath('order.participants.1.payment_amount', 12240);
 
     $this->actingAs($organizer)
         ->postJson(route('orders.quote-decision', $orderId), ['decision' => 'accept'])
@@ -203,6 +244,12 @@ it('requires each group-order participant to pay their own share before the orde
         ->assertOk()
         ->assertJsonPath('order.quote_status', 'accepted')
         ->assertJsonPath('order.payment_status', 'pending');
+
+    Order::query()->findOrFail($orderId)->participants()->update([
+        'shipping_amount' => 0,
+        'shipping_courier' => 'test',
+        'shipping_service' => 'TEST',
+    ]);
 
     $this->actingAs($organizer)
         ->postJson(route('orders.checkout', $orderId))
@@ -224,7 +271,7 @@ it('requires each group-order participant to pay their own share before the orde
 
     $this->postJson(
         route('midtrans.notifications'),
-        orderPaymentNotification($organizerPaymentId, 8000),
+        orderPaymentNotification($organizerPaymentId, 8160),
     )->assertOk();
 
     expect($order->fresh()->payment_status)->toBe('pending');
@@ -237,14 +284,14 @@ it('requires each group-order participant to pay their own share before the orde
     $participantPaymentId = $order->participants()->where('user_id', $participant->id)->value('payment_order_id');
     $this->postJson(
         route('midtrans.notifications'),
-        orderPaymentNotification($participantPaymentId, 12000),
+        orderPaymentNotification($participantPaymentId, 12240),
     )->assertOk();
 
     expect($order->fresh()->payment_status)->toBe('paid')
         ->and($order->fresh()->participants()->where('payment_status', 'paid')->count())->toBe(2);
 
-    Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 8000);
-    Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 12000);
+    Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 8160);
+    Http::assertSent(fn (Request $request): bool => $request['transaction_details']['gross_amount'] === 12240);
 });
 
 it('allows a buyer to reject a quote and receive a revised offer before paying', function () {
@@ -263,7 +310,10 @@ it('allows a buyer to reject a quote and receive a revised offer before paying',
         ->json('order.id');
 
     $this->actingAs($vendor)
-        ->postJson(route('orders.price', $orderId), ['unit_price' => 200])
+        ->postJson(route('orders.price', $orderId), [
+            'unit_price' => 200,
+            'shipping_weight_per_unit_grams' => 100,
+        ])
         ->assertOk()
         ->assertJsonPath('order.can_set_price', false);
 
@@ -280,7 +330,10 @@ it('allows a buyer to reject a quote and receive a revised offer before paying',
         ->assertJsonValidationErrors(['payment']);
 
     $this->actingAs($vendor)
-        ->postJson(route('orders.price', $orderId), ['unit_price' => 175])
+        ->postJson(route('orders.price', $orderId), [
+            'unit_price' => 175,
+            'shipping_weight_per_unit_grams' => 100,
+        ])
         ->assertOk()
         ->assertJsonPath('order.unit_price', 175)
         ->assertJsonPath('order.quote_status', 'pending_buyer');

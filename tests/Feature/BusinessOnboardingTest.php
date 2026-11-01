@@ -153,6 +153,9 @@ test('updating vendor images does not invalidate their approved verification', f
         'business_name' => 'Kemasan Prima',
         'category' => 'Manufaktur kemasan',
         'location' => 'Jakarta',
+        'business_address' => 'Jalan Industri No. 10, Jakarta',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Kecamatan Asal, Jakarta',
         'product_categories' => 'Pouch dan botol',
         'minimum_order_quantity' => 500,
         'verification_status' => 'approved',
@@ -164,6 +167,9 @@ test('updating vendor images does not invalidate their approved verification', f
             'business_name' => $profile->business_name,
             'category' => $profile->category,
             'location' => $profile->location,
+            'business_address' => $profile->business_address,
+            'rajaongkir_area_id' => $profile->rajaongkir_area_id,
+            'rajaongkir_area_name' => $profile->rajaongkir_area_name,
             'product_categories' => $profile->product_categories,
             'minimum_order_quantity' => $profile->minimum_order_quantity,
             'confirm_profile' => '1',
@@ -198,6 +204,9 @@ test('vendors must provide MOQ and can complete their profile in one submission'
         'business_name' => 'Kemasan Prima',
         'category' => 'Manufaktur kemasan',
         'location' => 'Jakarta',
+        'business_address' => 'Jalan Industri No. 10, Jakarta',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Kecamatan Asal, Jakarta',
         'product_categories' => 'Pouch dan botol',
         'minimum_order_quantity' => '500',
         'materials' => 'Kraft, PET',
@@ -220,6 +229,7 @@ test('vendors must provide MOQ and can complete their profile in one submission'
     $profile = $user->fresh()->businessProfile;
 
     expect($profile->product_categories)->toBe('Pouch dan botol')
+        ->and($profile->business_address)->toBe('Jalan Industri No. 10, Jakarta')
         ->and($profile->minimum_order_quantity)->toBe(500)
         ->and($profile->monthly_capacity)->toBe(12000)
         ->and($profile->production_lead_time_days)->toBe(14)

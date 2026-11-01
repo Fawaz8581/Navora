@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AdCampaign;
 use App\Models\Order;
 use App\Models\OrderParticipant;
+use App\Models\VendorSubscription;
 use App\Services\MidtransSnapService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -106,6 +107,50 @@ class MidtransNotificationController extends Controller
                         'payment_status' => $transactionStatus === 'capture' ? 'fraud_denied' : $transactionStatus,
                         'status' => AdCampaign::STATUS_PAYMENT_FAILED,
                     ])->save();
+                }
+            });
+
+            return response()->json(['status' => 'ok']);
+        }
+
+        $subscription = VendorSubscription::query()->where('order_id', $validated['order_id'])->first();
+
+        if ($subscription) {
+            abort_unless($this->amountMatches($validated['gross_amount'], $subscription->amount), 422);
+
+            DB::transaction(function () use ($subscription, $validated): void {
+                $lockedSubscription = VendorSubscription::query()->lockForUpdate()->findOrFail($subscription->id);
+                $transactionStatus = $validated['transaction_status'];
+                $paymentDetails = array_filter([
+                    'midtrans_transaction_id' => $validated['transaction_id'] ?? null,
+                    'payment_type' => $validated['payment_type'] ?? null,
+                    'midtrans_transaction_status' => $transactionStatus,
+                ], fn (?string $value): bool => $value !== null && $value !== '');
+
+                if ($lockedSubscription->paid_at) {
+                    $lockedSubscription->forceFill($paymentDetails)->save();
+
+                    return;
+                }
+
+                $outcome = $this->paymentOutcome($validated);
+
+                if ($outcome === 'paid') {
+                    $start = now();
+                    $lockedSubscription->forceFill([
+                        ...$paymentDetails,
+                        'payment_status' => 'paid',
+                        'paid_at' => $start,
+                        'starts_at' => $start,
+                        'ends_at' => $start->copy()->addDays(config('services.navora.vendor_subscription_days')),
+                    ])->save();
+                } elseif ($outcome === 'failed') {
+                    $lockedSubscription->forceFill([
+                        ...$paymentDetails,
+                        'payment_status' => 'failed',
+                    ])->save();
+                } else {
+                    $lockedSubscription->forceFill($paymentDetails)->save();
                 }
             });
 

@@ -56,12 +56,23 @@ class Order extends Model
         'product_name',
         'quantity',
         'packaging_details',
+        'delivery_contact_name',
+        'delivery_contact_phone',
         'delivery_address',
+        'delivery_area_id',
+        'delivery_area_name',
+        'target_unit_price',
         'notes',
         'status',
         'is_simulated',
         'unit_price',
         'total_amount',
+        'subtotal_amount',
+        'shipping_amount',
+        'platform_fee_amount',
+        'shipping_weight_per_unit_grams',
+        'shipping_courier',
+        'shipping_service',
         'payment_status',
         'quote_status',
         'payment_order_id',
@@ -108,6 +119,11 @@ class Order extends Model
         };
     }
 
+    public static function platformFeeFor(int $subtotal): int
+    {
+        return (int) ceil($subtotal * (config('services.navora.platform_fee_percent') / 100));
+    }
+
     public static function simulatedStatusNote(string $status): string
     {
         return match ($status) {
@@ -128,6 +144,10 @@ class Order extends Model
             'is_simulated' => 'boolean',
             'unit_price' => 'integer',
             'total_amount' => 'integer',
+            'subtotal_amount' => 'integer',
+            'shipping_amount' => 'integer',
+            'platform_fee_amount' => 'integer',
+            'shipping_weight_per_unit_grams' => 'integer',
             'paid_at' => 'datetime',
         ];
     }

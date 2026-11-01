@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AdCampaign;
 use App\Models\User;
+use App\Models\VendorSubscription;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -31,6 +32,19 @@ class MidtransSnapService
             $orderId,
             $amount,
             $buyer,
+            route('workspace'),
+        );
+    }
+
+    /**
+     * @return array{token: string, redirect_url: string}
+     */
+    public function createVendorSubscriptionTransaction(VendorSubscription $subscription, User $vendor): array
+    {
+        return $this->requestTransaction(
+            $subscription->order_id,
+            $subscription->amount,
+            $vendor,
             route('workspace'),
         );
     }

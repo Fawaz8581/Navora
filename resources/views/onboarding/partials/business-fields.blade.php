@@ -25,6 +25,30 @@
         </div>
         @error('location')<span class="auth-field-error">{{ $message }}</span>@enderror
     </div>
+    @if ($role === 'vendor')
+        <div class="auth-field">
+            <label for="business_address">Alamat lengkap usaha</label>
+            <textarea class="onboarding-textarea" id="business_address" name="business_address" rows="3" maxlength="1000" autocomplete="street-address" placeholder="Jalan, nomor, kelurahan, kecamatan, kota, dan kode pos" required>{{ old('business_address', $profile->business_address) }}</textarea>
+            <small>Alamat ini menjadi alamat asal vendor. UMKM hanya perlu memasukkan alamat tujuan pesanan.</small>
+            @error('business_address')<span class="auth-field-error">{{ $message }}</span>@enderror
+        </div>
+        <div class="auth-field" data-location-picker>
+            <label for="rajaongkir_area_name">Area asal pengiriman</label>
+            <div class="auth-input-wrap">
+                <i class="bi bi-truck" aria-hidden="true"></i>
+                <input id="rajaongkir_area_name" name="rajaongkir_area_name" type="text"
+                    value="{{ old('rajaongkir_area_name', $profile->rajaongkir_area_name) }}"
+                    placeholder="Cari kecamatan atau kota" maxlength="255"
+                    data-rajaongkir-location autocomplete="off" required>
+            </div>
+            <input type="hidden" name="rajaongkir_area_id"
+                value="{{ old('rajaongkir_area_id', $profile->rajaongkir_area_id) }}"
+                data-rajaongkir-area-id>
+            <small>Pilih hasil lokasi agar ongkir dapat dihitung. Tarif memakai ID area RajaOngkir.</small>
+            @error('rajaongkir_area_id')<span class="auth-field-error">{{ $message }}</span>@enderror
+            @error('rajaongkir_area_name')<span class="auth-field-error">{{ $message }}</span>@enderror
+        </div>
+    @endif
     <div class="auth-field">
         <label for="phone">Nomor kontak <span class="onboarding-optional">Opsional</span></label>
         <div class="auth-input-wrap">

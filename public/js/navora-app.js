@@ -25,6 +25,7 @@
     let orderVendors = [];
     let orderLoadPromise = null;
     let orderListData = [];
+    let groupOrderListData = [];
     let orderNextPageUrl = null;
     let activeWorkspacePage = 'overview';
     let activeChatOrderId = null;
@@ -167,7 +168,8 @@
         });
 
         document.querySelectorAll('[data-role-content]').forEach((item) => {
-            item.hidden = item.dataset.roleContent !== role;
+            item.hidden = item.dataset.roleContent !== role
+                || item.dataset.vendorSubscriptionDismissed === 'true';
         });
 
         document.querySelectorAll('[data-role-select]').forEach((item) => {
@@ -357,6 +359,9 @@
 
     const createModalField = (field) => {
         const wrapper = textElement('div', 'navora-modal-field', '');
+        if (field.type === 'location') {
+            wrapper.dataset.locationPicker = '';
+        }
         const label = textElement('label', 'navora-form-label', field.label);
         const input = document.createElement(field.type === 'textarea' ? 'textarea' : field.type === 'select' ? 'select' : 'input');
         input.name = field.name;
@@ -372,7 +377,7 @@
                 input.append(optionElement);
             });
         } else if (field.type !== 'textarea') {
-            input.type = field.type || 'text';
+            input.type = field.type === 'location' ? 'text' : field.type || 'text';
         }
 
         if (field.accept && input instanceof HTMLInputElement) {
@@ -389,6 +394,26 @@
 
         if (field.value !== undefined) {
             input.value = field.value;
+        }
+
+        if (field.type === 'location') {
+            input.dataset.rajaongkirLocation = '';
+            input.autocomplete = 'off';
+            const areaId = document.createElement('input');
+            areaId.type = 'hidden';
+            areaId.name = field.hiddenName || `${field.name}_id`;
+            areaId.value = field.hiddenValue || '';
+            areaId.dataset.rajaongkirAreaId = '';
+            const validation = textElement(
+                'small',
+                'navora-modal-field-help navora-location-validation',
+                'Pilih salah satu hasil pencarian lokasi agar ongkir dapat dihitung.',
+            );
+            validation.hidden = true;
+            validation.dataset.locationValidation = '';
+            validation.setAttribute('role', 'alert');
+            wrapper.append(label, input, areaId, validation);
+            return wrapper;
         }
 
         if (field.min !== undefined) {
@@ -455,6 +480,28 @@
         if (lastFocusedElement instanceof HTMLElement) {
             lastFocusedElement.focus();
         }
+    };
+
+    const hasSelectedArea = (fieldName) => {
+        const input = modalFields?.querySelector(`[name="${fieldName}"]`);
+        const picker = input?.closest('[data-location-picker]');
+        const areaId = picker?.querySelector('[data-rajaongkir-area-id]');
+        const validation = picker?.querySelector('[data-location-validation]');
+        if (areaId instanceof HTMLInputElement && areaId.value) {
+            if (validation) {
+                validation.hidden = true;
+            }
+            return true;
+        }
+
+        if (validation) {
+            validation.hidden = false;
+        }
+        if (input instanceof HTMLInputElement) {
+            input.setAttribute('aria-invalid', 'true');
+            input.focus();
+        }
+        return false;
     };
 
     const readFormValues = (formData) => Object.fromEntries(formData.entries());
@@ -562,6 +609,9 @@
             textElement('h2', '', vendor.name || 'Vendor'),
             textElement('span', 'navora-vendor-location', vendor.location || 'Lokasi belum diisi'),
         );
+        if (vendor.is_premium) {
+            nameAndLocation.append(textElement('span', 'navora-premium-tag', 'VENDOR PREMIUM'));
+        }
         const details = [
             `MOQ mulai ${Number(vendor.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs`,
             vendor.price_per_unit === null
@@ -1337,7 +1387,7 @@
                     product_name: values.product_name.trim(),
                     quantity: Number(values.quantity),
                     packaging_details: values.packaging_details.trim(),
-                    delivery_address: values.delivery_address.trim(),
+                    target_unit_price: values.target_unit_price ? Number(values.target_unit_price) : null,
                     notes: values.notes?.trim() || null,
                 }),
             });
@@ -1382,7 +1432,7 @@
                             { value: '', label: 'Pilih vendor terverifikasi' },
                             ...orderVendors.map((orderVendor) => ({
                                 value: String(orderVendor.id),
-                                label: orderVendor.name,
+                                label: `${orderVendor.name}${orderVendor.is_premium ? ' · Vendor Premium' : ''}`,
                             })),
                         ],
                     }]
@@ -1390,7 +1440,7 @@
                 { ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: product?.name || '' },
                 { name: 'quantity', label: 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: product ? product.minimum_order_quantity : 1, step: 1, required: true, value: product ? String(product.minimum_order_quantity) : '' },
                 { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true, value: product ? `${product.material}. ${product.description}` : '' },
-                { name: 'delivery_address', label: 'Alamat pengiriman', placeholder: 'Alamat lengkap penerima', type: 'textarea', rows: 2, required: true },
+                { name: 'target_unit_price', label: 'Tawaran harga per pcs (Rp, opsional)', placeholder: 'Contoh: 1.200', type: 'number', min: 1, max: 1000000000, step: 1, required: false },
                 { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan', type: 'textarea', rows: 2, required: false },
             ]
             : [
@@ -1406,8 +1456,8 @@
             title: 'Buat permintaan penawaran',
             description: isRealQuote
                 ? isCatalogVendor
-                    ? `Permintaan produk${product ? ` "${product.name}"` : ''} dikirim kepada ${vendor}. Lanjutkan diskusi dan pembayaran di menu Permintaan penawaran.`
-                    : 'Pilih vendor terverifikasi untuk menerima spesifikasi, mendiskusikan kebutuhan, dan mengirim harga final.'
+                    ? `Permintaan produk${product ? ` "${product.name}"` : ''} dikirim kepada ${vendor}. Masukkan jumlah dan tawaran harga bila ada; data penerima dilengkapi di menu Pesanan.`
+                    : 'Pilih vendor terverifikasi, jelaskan jenis produk, jumlah, dan tawaran harga bila ada. Biodata penerima diisi di menu Pesanan.'
                 : 'Catat kebutuhan produk. Dalam demo ini, permintaan hanya tersimpan di browser dan tidak dikirim kepada vendor.',
             icon: 'bi-chat-square-text',
             submit: isRealQuote ? 'Kirim permintaan penawaran' : 'Simpan permintaan demo',
@@ -1417,6 +1467,12 @@
                     const quantity = Number(values.quantity);
                     if (!Number.isSafeInteger(quantity) || quantity < 1) {
                         showToast('Masukkan jumlah pesanan sebagai bilangan bulat positif.');
+                        return false;
+                    }
+                    const targetPrice = values.target_unit_price ? Number(values.target_unit_price) : null;
+                    if (targetPrice !== null
+                        && (!Number.isSafeInteger(targetPrice) || targetPrice < 1 || targetPrice > 1000000000)) {
+                        showToast('Tawaran harga harus berupa bilangan bulat antara Rp1 dan Rp1.000.000.000 per pcs.');
                         return false;
                     }
                     submitCatalogQuote(isCatalogVendor ? vendorUserId : values.vendor_user_id, values);
@@ -1675,7 +1731,7 @@
         [
             ['Jumlah', `${Number(order.quantity).toLocaleString('id-ID')} pcs`],
             ['Spesifikasi', order.packaging_details || 'Belum diisi'],
-            ['Tujuan', order.delivery_address || 'Alamat tersedia setelah permintaan dibuat'],
+            ...(order.target_unit_price ? [['Tawaran harga', `${formatRupiah(order.target_unit_price)} / pcs`]] : []),
             ...(order.unit_price ? [['Harga final', `${formatRupiah(order.unit_price)} / pcs`]] : []),
         ].forEach(([label, value]) => {
             const item = textElement('span', '', '');
@@ -1704,6 +1760,13 @@
         }
 
         const items = [];
+        if (order.target_unit_price) {
+            items.push(textElement(
+                'p',
+                'navora-order-chat-offer',
+                `Tawaran harga UMKM: ${formatRupiah(order.target_unit_price)} / pcs`,
+            ));
+        }
         if (order.unit_price) {
             items.push(textElement(
                 'p',
@@ -1764,7 +1827,8 @@
             chatRequestController = null;
         }
         activeChatOrderId = String(orderId);
-        const order = orderListData.find((item) => String(item.id) === String(orderId));
+        const order = [...orderListData, ...groupOrderListData]
+            .find((item) => String(item.id) === String(orderId));
         const panel = document.querySelector('[data-order-chat]');
         const form = document.querySelector('[data-order-chat-form]');
         const title = document.querySelector('[data-order-chat-title]');
@@ -1915,8 +1979,17 @@
         [
             ['Jumlah', `${Number(order.quantity).toLocaleString('id-ID')} pcs`],
             ['Vendor', order.vendor_name || 'Belum dipilih'],
+            ...(order.target_unit_price ? [['Tawaran harga UMKM', `${formatRupiah(order.target_unit_price)} / pcs`]] : []),
             ...(order.unit_price ? [['Harga final', `${formatRupiah(order.unit_price)} / pcs`]] : []),
-            ...(order.total_amount ? [['Total pesanan', formatRupiah(order.total_amount)]] : []),
+            ...(order.subtotal_amount ? [['Subtotal produk', formatRupiah(order.subtotal_amount)]] : []),
+            ...(order.shipping_amount !== null && order.shipping_amount !== undefined
+                ? [[`Ongkir${order.shipping_service ? ` (${order.shipping_courier?.toUpperCase()} ${order.shipping_service})` : ''}`, formatRupiah(order.shipping_amount)]]
+                : []),
+            ...(order.platform_fee_amount ? [['Biaya platform', formatRupiah(order.platform_fee_amount)]] : []),
+            ...(order.payment_amount ? [['Total tagihanmu', formatRupiah(order.payment_amount)]] : []),
+            ...(order.delivery_area_name ? [['Area tujuan', order.delivery_area_name]] : []),
+            ...(order.delivery_contact_name ? [['Nama penerima', order.delivery_contact_name]] : []),
+            ...(order.delivery_contact_phone ? [['Telepon penerima', order.delivery_contact_phone]] : []),
             ...(order.current_payment_status && order.current_payment_status !== 'not_required'
                 ? [['Pembayaran', ({
                     awaiting_quote: 'Menunggu harga final dari vendor',
@@ -1927,7 +2000,7 @@
                 })[order.current_payment_status] || 'Status pembayaran tidak dikenal']]
                 : []),
             ['Spesifikasi', order.packaging_details || 'Belum tersedia'],
-            ...(order.delivery_address ? [['Alamat pengiriman', order.delivery_address]] : []),
+            ...(order.delivery_address ? [['Alamat lengkap tujuan pengiriman', order.delivery_address]] : []),
             ...(order.notes ? [['Catatan', order.notes]] : []),
         ].forEach(([label, value]) => {
             const item = document.createElement('div');
@@ -1935,6 +2008,9 @@
             details.append(item);
         });
         card.append(details);
+        if (order.shipping_block_reason) {
+            card.append(textElement('p', 'navora-order-shipping-note', order.shipping_block_reason));
+        }
 
         if (order.payment_receipt) {
             const receipt = document.createElement('section');
@@ -1985,7 +2061,7 @@
                     participantList.append(textElement(
                         'li',
                         '',
-                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs${participant.payment_amount ? ` · ${formatRupiah(participant.payment_amount)} · ${participant.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}` : ''}${receiptDetails}`,
+                        `${participant.name || 'Pengguna'} · ${Number(participant.quantity).toLocaleString('id-ID')} pcs${participant.delivery_area_name ? ` · ${participant.delivery_area_name}` : ''}${participant.payment_amount ? ` · subtotal ${formatRupiah(participant.subtotal_amount || 0)} + ongkir ${formatRupiah(participant.shipping_amount || 0)} + biaya platform ${formatRupiah(participant.platform_fee_amount || 0)} = ${formatRupiah(participant.payment_amount)} · ${participant.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran'}` : ''}${receiptDetails}`,
                     ));
                 });
                 group.append(participantList);
@@ -2040,6 +2116,17 @@
 
         const actions = document.createElement('div');
         actions.className = 'navora-order-actions';
+        if (order.can_edit_delivery_details) {
+            const deliveryDetailsButton = textElement(
+                'button',
+                'btn navora-app-outline',
+                order.delivery_details_complete ? 'Ubah data penerima' : 'Lengkapi biodata & alamat',
+            );
+            deliveryDetailsButton.type = 'button';
+            deliveryDetailsButton.dataset.action = 'edit-delivery-details';
+            deliveryDetailsButton.dataset.order = String(order.id);
+            actions.append(deliveryDetailsButton);
+        }
         if (order.can_set_price) {
             const priceButton = textElement('button', 'btn navora-app-outline', 'Tetapkan harga final');
             priceButton.type = 'button';
@@ -2063,6 +2150,17 @@
                 decisionButton.dataset.decision = decision;
                 actions.append(decisionButton);
             });
+        }
+        if (order.can_select_shipping) {
+            const shippingButton = textElement(
+                'button',
+                'btn navora-app-outline',
+                order.shipping_service ? 'Ubah kurir dan ongkir' : 'Pilih kurir & hitung ongkir',
+            );
+            shippingButton.type = 'button';
+            shippingButton.dataset.action = 'select-order-shipping';
+            shippingButton.dataset.order = String(order.id);
+            actions.append(shippingButton);
         }
         if (order.can_pay) {
             const paymentButton = textElement(
@@ -2098,6 +2196,8 @@
                     ? 'Batalkan pesanan'
                     : transition.status === 'diproses'
                         ? 'Konfirmasi pesanan'
+                        : transition.status === 'diterima'
+                            ? 'Konfirmasi pesanan diterima'
                         : `Tandai ${transition.label.toLowerCase()}`,
             );
             button.type = 'button';
@@ -2157,6 +2257,7 @@
             return;
         }
 
+        groupOrderListData = orders;
         list.replaceChildren(...orders.map(renderOrderCard));
         empty.hidden = orders.length > 0;
     };
@@ -2396,7 +2497,10 @@
 
         const vendorOptions = [
             { value: '', label: 'Pilih vendor untuk menetapkan harga final' },
-            ...orderVendors.map((vendor) => ({ value: String(vendor.id), label: vendor.name })),
+            ...orderVendors.map((vendor) => ({
+                value: String(vendor.id),
+                label: `${vendor.name}${vendor.is_premium ? ' · Vendor Premium' : ''}`,
+            })),
         ];
         const isGroup = type === 'patungan';
         const fields = [
@@ -2407,9 +2511,10 @@
                 : []),
             { name: 'packaging_details', label: 'Spesifikasi kemasan', placeholder: 'Ukuran, material, bentuk, atau kebutuhan khusus', type: 'textarea', rows: 3, required: true },
             { name: 'vendor_user_id', label: 'Vendor terverifikasi', type: 'select', required: true, options: vendorOptions },
-            ...(!isGroup
-                ? [{ name: 'delivery_address', label: 'Alamat pengiriman', placeholder: 'Alamat lengkap penerima', type: 'textarea', rows: 2, required: true }]
-                : []),
+            { name: 'delivery_contact_name', label: 'Nama penerima', placeholder: 'Nama lengkap penerima', type: 'text', required: true },
+            { name: 'delivery_contact_phone', label: 'Nomor telepon penerima', placeholder: 'Contoh: 081234567890', type: 'tel', required: true },
+            { name: 'delivery_address', label: 'Alamat lengkap tujuan pengiriman', placeholder: 'Nama jalan, nomor, kelurahan, kecamatan, kota, dan kode pos', type: 'textarea', rows: 2, required: true },
+            { name: 'delivery_area_name', hiddenName: 'delivery_area_id', label: 'Area tujuan untuk hitung ongkir', placeholder: 'Cari kecamatan atau kota, lalu pilih hasilnya', type: 'location', required: true },
             { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan untuk pesanan', type: 'textarea', rows: 2, required: false },
         ];
 
@@ -2430,6 +2535,10 @@
                     showToast(isGroup
                         ? 'Target dan jumlah awal harus bilangan bulat; jumlah awal tidak boleh melebihi target.'
                         : 'Masukkan jumlah pesanan sebagai bilangan bulat positif.');
+                    return false;
+                }
+                if (!values.delivery_area_id) {
+                    hasSelectedArea('delivery_area_name');
                     return false;
                 }
 
@@ -2460,7 +2569,11 @@
                     initial_quantity: values.initial_quantity ? Number(values.initial_quantity) : undefined,
                     packaging_details: values.packaging_details.trim(),
                     vendor_user_id: values.vendor_user_id || null,
+                    delivery_contact_name: values.delivery_contact_name.trim(),
+                    delivery_contact_phone: values.delivery_contact_phone.trim(),
                     delivery_address: values.delivery_address?.trim() || null,
+                    delivery_area_id: values.delivery_area_id,
+                    delivery_area_name: values.delivery_area_name?.trim() || null,
                     notes: values.notes?.trim() || null,
                 }),
             });
@@ -2497,6 +2610,10 @@
             submit: 'Gabung patungan',
             fields: [
                 { name: 'quantity', label: 'Jumlah yang diambil (pcs)', placeholder: 'Contoh: 100', type: 'number', min: 1, max: remaining, step: 1, required: true },
+                { name: 'delivery_contact_name', label: 'Nama penerima', placeholder: 'Nama lengkap penerima', type: 'text', required: true },
+                { name: 'delivery_contact_phone', label: 'Nomor telepon penerima', placeholder: 'Contoh: 081234567890', type: 'tel', required: true },
+                { name: 'delivery_address', label: 'Alamat lengkap tujuan pengiriman', placeholder: 'Nama jalan, nomor, kelurahan, kecamatan, kota, dan kode pos', type: 'textarea', rows: 2, required: true },
+                { name: 'delivery_area_name', hiddenName: 'delivery_area_id', label: 'Area tujuan untuk hitung ongkir', placeholder: 'Cari kecamatan atau kota, lalu pilih hasilnya', type: 'location', required: true },
             ],
             onSubmit: (values) => {
                 const quantity = Number(values.quantity);
@@ -2504,14 +2621,18 @@
                     showToast(`Jumlah harus bilangan bulat antara 1 dan ${remaining.toLocaleString('id-ID')} pcs.`);
                     return false;
                 }
+                if (!values.delivery_area_id) {
+                    hasSelectedArea('delivery_area_name');
+                    return false;
+                }
 
-                submitOrderJoin(orderId, quantity);
+                submitOrderJoin(orderId, quantity, values);
                 return false;
             },
         });
     };
 
-    const submitOrderJoin = async (orderId, quantity) => {
+    const submitOrderJoin = async (orderId, quantity, values) => {
         if (orderSubmissionInProgress) {
             return;
         }
@@ -2525,7 +2646,14 @@
         try {
             await requestOrderData(orderUrl(document.body.dataset.ordersJoinTemplate, orderId), {
                 method: 'POST',
-                body: JSON.stringify({ quantity }),
+                body: JSON.stringify({
+                    quantity,
+                    delivery_contact_name: values.delivery_contact_name.trim(),
+                    delivery_contact_phone: values.delivery_contact_phone.trim(),
+                    delivery_address: values.delivery_address.trim(),
+                    delivery_area_id: values.delivery_area_id,
+                    delivery_area_name: values.delivery_area_name.trim(),
+                }),
             });
             closeModal();
             showToast('Jumlahmu berhasil ditambahkan ke pesanan patungan.');
@@ -2563,26 +2691,29 @@
     const setOrderPrice = (orderId) => {
         openModal({
             title: 'Tetapkan harga final',
-            description: 'Masukkan harga final per pcs dalam rupiah. Total tagihan adalah harga dikali jumlah; masukkan biaya lain yang disepakati ke harga ini.',
+            description: 'Masukkan harga final dan berat per pcs. Berat maksimal satu paket kurir 30 kg; pesanan yang lebih berat otomatis dibagi ke beberapa paket.',
             icon: 'bi-tag',
             submit: 'Kirim harga ke pembeli',
             fields: [
                 { name: 'unit_price', label: 'Harga final per pcs (Rp)', placeholder: 'Contoh: 1250', type: 'number', min: 1, max: 1000000000, step: 1, required: true },
+                { name: 'shipping_weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 150', type: 'number', min: 1, max: 30000, step: 1, required: true },
             ],
             onSubmit: (values) => {
                 const unitPrice = Number(values.unit_price);
-                if (!Number.isSafeInteger(unitPrice) || unitPrice < 1 || unitPrice > 1000000000) {
-                    showToast('Masukkan harga final dalam rupiah sebagai bilangan bulat yang valid.');
+                const weight = Number(values.shipping_weight_per_unit_grams);
+                if (!Number.isSafeInteger(unitPrice) || unitPrice < 1 || unitPrice > 1000000000
+                    || !Number.isSafeInteger(weight) || weight < 1 || weight > 30000) {
+                    showToast('Masukkan harga dan berat per pcs sebagai bilangan bulat yang valid.');
                     return false;
                 }
 
-                submitOrderPrice(orderId, unitPrice);
+                submitOrderPrice(orderId, unitPrice, weight);
                 return false;
             },
         });
     };
 
-    const submitOrderPrice = async (orderId, unitPrice) => {
+    const submitOrderPrice = async (orderId, unitPrice, weight) => {
         if (orderSubmissionInProgress) {
             return;
         }
@@ -2595,7 +2726,10 @@
         try {
             await requestOrderData(orderUrl(document.body.dataset.ordersPriceTemplate, orderId), {
                 method: 'POST',
-                body: JSON.stringify({ unit_price: unitPrice }),
+                body: JSON.stringify({
+                    unit_price: unitPrice,
+                    shipping_weight_per_unit_grams: weight,
+                }),
             });
             closeModal();
             showToast('Penawaran final dikirim. Pembeli harus menyetujui harga sebelum pembayaran.');
@@ -2608,6 +2742,198 @@
             orderSubmissionInProgress = false;
             if (submitButton) {
                 submitButton.disabled = false;
+            }
+        }
+    };
+
+    const editOrderDeliveryDetails = (orderId) => {
+        const order = orderListData.find((item) => String(item.id) === String(orderId));
+        if (!order) {
+            showToast('Data pesanan belum tersedia. Muat ulang daftar pesanan dan coba lagi.');
+            return;
+        }
+
+        openModal({
+            title: 'Biodata dan alamat penerima',
+            description: 'Isi satu alamat lengkap tujuan pengiriman. Area kecamatan/kota dipilih terpisah hanya untuk perhitungan ongkir.',
+            icon: 'bi-geo-alt',
+            submit: 'Simpan data penerima',
+            fields: [
+                { name: 'delivery_contact_name', label: 'Nama penerima', placeholder: 'Nama lengkap penerima', type: 'text', value: order.delivery_contact_name || '', required: true },
+                { name: 'delivery_contact_phone', label: 'Nomor telepon penerima', placeholder: 'Contoh: 081234567890', type: 'tel', value: order.delivery_contact_phone || '', required: true },
+                { name: 'delivery_address', label: 'Alamat lengkap tujuan pengiriman', placeholder: 'Nama jalan, nomor, kelurahan, kecamatan, kota, dan kode pos', type: 'textarea', rows: 2, value: order.delivery_address || '', required: true },
+                {
+                    name: 'delivery_area_name',
+                    hiddenName: 'delivery_area_id',
+                    hiddenValue: order.delivery_area_id || '',
+                    label: 'Area tujuan untuk hitung ongkir',
+                    placeholder: 'Cari kecamatan atau kota, lalu pilih hasilnya',
+                    type: 'location',
+                    value: order.delivery_area_name || '',
+                    required: true,
+                },
+            ],
+            onSubmit: (values) => {
+                if (!hasSelectedArea('delivery_area_name')) {
+                    return false;
+                }
+
+                submitOrderDeliveryDetails(orderId, values);
+                return false;
+            },
+        });
+    };
+
+    const submitOrderDeliveryDetails = async (orderId, values) => {
+        if (orderSubmissionInProgress) {
+            return;
+        }
+        orderSubmissionInProgress = true;
+        const submitButton = modalForm?.querySelector('[data-modal-submit]');
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+
+        try {
+            await requestOrderData(
+                orderUrl(document.body.dataset.ordersDeliveryDetailsTemplate, orderId),
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        delivery_contact_name: values.delivery_contact_name.trim(),
+                        delivery_contact_phone: values.delivery_contact_phone.trim(),
+                        delivery_address: values.delivery_address.trim(),
+                        delivery_area_id: values.delivery_area_id,
+                        delivery_area_name: values.delivery_area_name.trim(),
+                    }),
+                },
+            );
+            closeModal();
+            showToast('Biodata dan lokasi penerima berhasil disimpan.');
+            await loadOrders();
+            await loadGroupOrders();
+        } catch (requestError) {
+            console.error('Navora could not save the order delivery details.', requestError);
+            showToast(requestError.message || 'Data penerima tidak dapat disimpan. Periksa kembali isianmu.');
+        } finally {
+            orderSubmissionInProgress = false;
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        }
+    };
+
+    const selectOrderShipping = (orderId) => {
+        const couriers = (document.body.dataset.rajaongkirCouriers || '')
+            .split(',')
+            .map((courier) => courier.trim())
+            .filter(Boolean);
+
+        if (couriers.length === 0) {
+            showToast('Pilihan kurir RajaOngkir belum dikonfigurasi.');
+            return;
+        }
+
+        openModal({
+            title: 'Pilih kurir pengiriman',
+            description: 'Tarif dihitung ulang dari lokasi vendor, area penerima, berat per pcs, dan jumlah pesanan.',
+            icon: 'bi-truck',
+            submit: 'Lihat tarif',
+            fields: [{
+                name: 'courier',
+                label: 'Kurir',
+                type: 'select',
+                required: true,
+                options: couriers.map((courier) => ({
+                    value: courier,
+                    label: courier.toUpperCase(),
+                })),
+            }],
+            onSubmit: (values) => {
+                loadOrderShippingRates(orderId, values.courier);
+                return false;
+            },
+        });
+    };
+
+    const loadOrderShippingRates = async (orderId, courier) => {
+        if (orderSubmissionInProgress) {
+            return;
+        }
+        orderSubmissionInProgress = true;
+        const button = modalForm?.querySelector('[data-modal-submit]');
+        if (button) {
+            button.disabled = true;
+        }
+
+        try {
+            const url = `${orderUrl(document.body.dataset.ordersShippingRatesTemplate, orderId)}?courier=${encodeURIComponent(courier)}`;
+            const payload = await requestOrderData(url);
+            if (!Array.isArray(payload.rates) || payload.rates.length === 0) {
+                showToast('Kurir ini belum menyediakan layanan untuk lokasi dan berat pesanan tersebut.');
+                return;
+            }
+
+            openModal({
+                title: 'Pilih layanan pengiriman',
+                description: `Berat kiriman ${Number(payload.weight_grams).toLocaleString('id-ID')} gram dalam ${Number(payload.package_count).toLocaleString('id-ID')} paket. Ongkir dibayar UMKM bersama subtotal produk dan biaya platform.`,
+                icon: 'bi-truck',
+                submit: 'Simpan pengiriman',
+                fields: [{
+                    name: 'service',
+                    label: 'Layanan dan tarif',
+                    type: 'select',
+                    required: true,
+                    options: payload.rates.map((rate) => ({
+                        value: rate.service,
+                        label: `${rate.service} · ${rate.description} · ${formatRupiah(rate.cost)}${rate.etd ? ` · ${rate.etd}` : ''}`,
+                    })),
+                }],
+                onSubmit: (selection) => {
+                    saveOrderShipping(orderId, courier, selection.service);
+                    return false;
+                },
+            });
+        } catch (requestError) {
+            console.error('Navora could not calculate RajaOngkir rates.', requestError);
+            showToast(requestError.message || 'Tarif pengiriman belum berhasil dihitung.');
+        } finally {
+            orderSubmissionInProgress = false;
+            if (button?.isConnected) {
+                button.disabled = false;
+            }
+        }
+    };
+
+    const saveOrderShipping = async (orderId, courier, service) => {
+        if (orderSubmissionInProgress) {
+            return;
+        }
+        orderSubmissionInProgress = true;
+        const button = modalForm?.querySelector('[data-modal-submit]');
+        if (button) {
+            button.disabled = true;
+        }
+
+        try {
+            const result = await requestOrderData(
+                orderUrl(document.body.dataset.ordersShippingSelectTemplate, orderId),
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ courier, service }),
+                },
+            );
+            closeModal();
+            showToast(`Ongkir ${result.service} sebesar ${formatRupiah(result.shipping_amount)} berhasil ditambahkan.`);
+            await loadOrders();
+            await loadGroupOrders();
+        } catch (requestError) {
+            console.error('Navora could not save the selected shipping service.', requestError);
+            showToast(requestError.message || 'Pilihan pengiriman tidak dapat disimpan.');
+        } finally {
+            orderSubmissionInProgress = false;
+            if (button) {
+                button.disabled = false;
             }
         }
     };
@@ -3221,6 +3547,10 @@
             updateOrderStatus(button.dataset.order || '', button.dataset.status || '');
         } else if (action === 'set-order-price') {
             setOrderPrice(button.dataset.order || '');
+        } else if (action === 'edit-delivery-details') {
+            editOrderDeliveryDetails(button.dataset.order || '');
+        } else if (action === 'select-order-shipping') {
+            selectOrderShipping(button.dataset.order || '');
         } else if (action === 'checkout-order') {
             checkoutOrder(button.dataset.order || '', button);
         } else if (action === 'decide-order-quote') {

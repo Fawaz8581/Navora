@@ -50,12 +50,16 @@ test('a signed-in user sees the workspace for their saved role without the demo 
         ->assertSee('Katalog aktif dapat diedit tanpa ACC ulang.')
         ->assertSee('Perubahan katalog yang sudah aktif langsung ditampilkan tanpa ACC ulang.')
         ->assertSee('Vendor')
+        ->assertSee('data-vendor-subscription-dismiss', false)
         ->assertDontSee('data-role-select', false);
 });
 
 test('vendors without approved verification can only continue through the verification flow', function () {
     $vendor = User::factory()->create(['role' => 'vendor']);
     BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
         'verification_status' => 'rejected',
         'verification_notes' => 'Perbarui foto tempat produksi.',
     ]);

@@ -31,7 +31,11 @@ it('creates a direct order and records its initial tracking status', function ()
             'product_name' => 'Pouch kopi khusus',
             'quantity' => 500,
             'packaging_details' => 'Kraft laminasi, zipper, ukuran 200 gram.',
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
             'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
             'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated()
@@ -77,6 +81,11 @@ it('creates a group order and starts processing when its target is reached', fun
             'quantity' => 100,
             'initial_quantity' => 40,
             'packaging_details' => 'Pouch standar berbahan kraft dengan zipper.',
+            'delivery_contact_name' => 'Penyelenggara',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
             'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated()
@@ -100,7 +109,14 @@ it('creates a group order and starts processing when its target is reached', fun
         ->assertJsonPath('orders.0.type', Order::TYPE_GROUP);
 
     $this->actingAs($participant)
-        ->postJson(route('orders.join', $orderId), ['quantity' => 60])
+        ->postJson(route('orders.join', $orderId), [
+            'quantity' => 60,
+            'delivery_contact_name' => 'Peserta Navora',
+            'delivery_contact_phone' => '+6281234567891',
+            'delivery_address' => 'Jalan Melati 12, Bandung',
+            'delivery_area_id' => '201',
+            'delivery_area_name' => 'Sukajadi, Kota Bandung',
+        ])
         ->assertOk()
         ->assertJsonPath('order.status', Order::STATUS_WAITING)
         ->assertJsonPath('order.committed_quantity', 100)
@@ -136,7 +152,14 @@ it('rejects group contributions that exceed the remaining target', function () {
     $order->participants()->create(['user_id' => $organizer->id, 'quantity' => 40]);
 
     $this->actingAs($participant)
-        ->postJson(route('orders.join', $order), ['quantity' => 61])
+        ->postJson(route('orders.join', $order), [
+            'quantity' => 61,
+            'delivery_contact_name' => 'Peserta Navora',
+            'delivery_contact_phone' => '+6281234567891',
+            'delivery_address' => 'Jalan Melati 12, Bandung',
+            'delivery_area_id' => '201',
+            'delivery_area_name' => 'Sukajadi, Kota Bandung',
+        ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['quantity']);
 
@@ -384,7 +407,11 @@ it('does not start order tracking until an assigned verified vendor has been pai
             'product_name' => 'Pouch kopi',
             'quantity' => 200,
             'packaging_details' => 'Kraft dengan zipper.',
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
             'delivery_address' => 'Jalan Merdeka 2, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
             'vendor_user_id' => $vendor->id,
         ])
         ->assertCreated();
@@ -450,6 +477,31 @@ it('does not allow the buyer to confirm an order without an assigned vendor', fu
         ->and($order->fresh()->is_simulated)->toBeFalse();
 });
 
+it('allows the UMKM buyer to confirm receipt after the vendor ships a paid order', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createVerifiedOrderVendor();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'vendor_user_id' => $vendor->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi',
+        'quantity' => 100,
+        'packaging_details' => 'Kraft.',
+        'delivery_address' => 'Bandung.',
+        'status' => Order::STATUS_SHIPPED,
+        'payment_status' => 'paid',
+        'paid_at' => now(),
+    ]);
+
+    $this->actingAs($buyer)
+        ->patchJson(route('orders.status', $order), ['status' => Order::STATUS_RECEIVED])
+        ->assertOk()
+        ->assertJsonPath('order.status', Order::STATUS_RECEIVED)
+        ->assertJsonPath('order.history.0.note', 'UMKM mengonfirmasi pesanan telah diterima.');
+
+    expect($order->fresh()->status)->toBe(Order::STATUS_RECEIVED);
+});
+
 it('rejects an unverified vendor and a vendor role from creating or joining orders', function () {
     $buyer = User::factory()->create();
     $unverifiedVendor = User::factory()->create(['role' => 'vendor']);
@@ -460,7 +512,11 @@ it('rejects an unverified vendor and a vendor role from creating or joining orde
             'product_name' => 'Pouch',
             'quantity' => 10,
             'packaging_details' => 'Kraft.',
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
             'delivery_address' => 'Jalan Merdeka 2, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
             'vendor_user_id' => $unverifiedVendor->id,
         ])
         ->assertUnprocessable()
@@ -486,7 +542,14 @@ it('rejects an unverified vendor and a vendor role from creating or joining orde
         ->assertForbidden();
 
     $this->actingAs($unverifiedVendor)
-        ->postJson(route('orders.join', $group), ['quantity' => 10])
+        ->postJson(route('orders.join', $group), [
+            'quantity' => 10,
+            'delivery_contact_name' => 'Vendor',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Coblong, Kota Bandung',
+        ])
         ->assertForbidden();
 });
 

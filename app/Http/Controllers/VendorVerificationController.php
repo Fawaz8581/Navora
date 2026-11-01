@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BusinessProfile;
+use App\Models\VendorSubscription;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -23,6 +24,11 @@ class VendorVerificationController extends Controller
 
         return view('vendor.verification', [
             'profile' => $profile,
+            'vendorSubscription' => VendorSubscription::query()
+                ->where('vendor_user_id', $request->user()->id)
+                ->where('payment_status', 'paid')
+                ->latest('id')
+                ->first(),
         ]);
     }
 
@@ -34,6 +40,18 @@ class VendorVerificationController extends Controller
 
         if (! $profile?->completed_at) {
             return redirect()->route('onboarding.index');
+        }
+
+        if (! filled($profile->business_address)) {
+            return redirect()
+                ->route('onboarding.step', ['step' => 1])
+                ->withErrors(['business_address' => 'Isi alamat lengkap usaha sebelum mengajukan verifikasi vendor.']);
+        }
+
+        if (! filled($profile->rajaongkir_area_id) || ! filled($profile->rajaongkir_area_name)) {
+            return redirect()
+                ->route('onboarding.step', ['step' => 1])
+                ->withErrors(['rajaongkir_area_name' => 'Pilih area asal pengiriman vendor sebelum mengajukan verifikasi.']);
         }
 
         abort_unless(in_array($profile->verification_status, ['not_submitted', 'rejected'], true), 409);

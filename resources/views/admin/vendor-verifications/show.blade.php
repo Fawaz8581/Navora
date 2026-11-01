@@ -37,6 +37,7 @@
             'Nomor kontak' => $profile->phone,
             'Bidang usaha' => $profile->category,
             'Lokasi' => $profile->location,
+            'Alamat lengkap usaha' => $profile->business_address,
             'Tentang usaha' => $profile->description,
             'Jenis kemasan atau layanan' => $profile->product_categories,
             'Bahan' => $profile->materials,

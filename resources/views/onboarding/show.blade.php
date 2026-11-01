@@ -85,6 +85,7 @@
                 'Nama usaha' => $profile->business_name,
                 'Bidang usaha' => $profile->category,
                 'Lokasi' => $profile->location,
+                ...($roleLabel === 'Vendor' ? ['Alamat lengkap usaha' => $profile->business_address] : []),
                 'Nomor kontak' => $profile->phone,
                 'Tentang usaha' => $profile->description,
             ];

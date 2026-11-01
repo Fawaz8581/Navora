@@ -46,6 +46,11 @@ class VendorCatalogController extends Controller
             ->whereHas('user', fn (Builder $users) => $users->where('role', 'vendor'))
             ->with([
                 'user:id,name',
+                'user.vendorSubscriptions' => fn (HasMany $subscriptions) => $subscriptions
+                    ->where('payment_status', 'paid')
+                    ->where('ends_at', '>', now())
+                    ->latest('id')
+                    ->limit(1),
                 'user.vendorListings' => fn (HasMany $listings) => $listings
                     ->where('status', VendorListing::STATUS_ACTIVE)
                     ->latest('id')
@@ -109,6 +114,7 @@ class VendorCatalogController extends Controller
             return [
                 'id' => $profile->user_id,
                 'name' => $profile->business_name ?: $profile->user?->name ?: 'Vendor',
+                'is_premium' => $profile->user?->vendorSubscriptions->isNotEmpty() ?? false,
                 'category' => $profile->product_categories,
                 'description' => $profile->description,
                 'profile_image_url' => $profile->profile_image_path
@@ -157,10 +163,10 @@ class VendorCatalogController extends Controller
                 ->filter(fn (array $vendor) => $vendor['distance_km'] !== null
                     && $vendor['distance_km'] <= (float) $validated['distance_km']))
             ->sortBy(fn (array $vendor): array => match ($validated['sort'] ?? 'recommended') {
-                'price' => [$vendor['price_per_unit'] === null, $vendor['price_per_unit'] ?? PHP_INT_MAX, $vendor['name']],
-                'moq' => [$vendor['minimum_order_quantity'] ?? PHP_INT_MAX, $vendor['name']],
-                'distance' => [$vendor['distance_km'] ?? PHP_INT_MAX, $vendor['name']],
-                default => [0, $vendor['name']],
+                'price' => [! $vendor['is_premium'], $vendor['price_per_unit'] === null, $vendor['price_per_unit'] ?? PHP_INT_MAX, $vendor['name']],
+                'moq' => [! $vendor['is_premium'], $vendor['minimum_order_quantity'] ?? PHP_INT_MAX, $vendor['name']],
+                'distance' => [! $vendor['is_premium'], $vendor['distance_km'] ?? PHP_INT_MAX, $vendor['name']],
+                default => [! $vendor['is_premium'], $vendor['name']],
             })
             ->values()
             ->map(function (array $vendor): array {

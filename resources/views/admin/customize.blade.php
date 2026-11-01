@@ -25,10 +25,15 @@
 
     <section class="admin-panel admin-customize-section">
         <div class="admin-panel-heading">
-            <div><span class="admin-eyebrow">PEMASUKAN</span><h2>Pendapatan iklan</h2></div>
+            <div><span class="admin-eyebrow">PEMASUKAN</span><h2>Pendapatan iklan dan pemasukan lainnya</h2></div>
         </div>
-        <p class="admin-ad-income">Rp{{ number_format($verifiedIncome, 0, ',', '.') }}</p>
-        <p class="admin-customize-copy">Total pembayaran iklan yang terverifikasi dan belum tercatat sebagai refund selesai.</p>
+        <p class="admin-ad-income">Rp{{ number_format($totalIncome, 0, ',', '.') }}</p>
+        <p class="admin-customize-copy">Pendapatan terkonfirmasi dari iklan, biaya platform, dan paket vendor premium.</p>
+        <div class="admin-income-breakdown">
+            <p><span>Iklan</span><strong>Rp{{ number_format($verifiedIncome, 0, ',', '.') }}</strong></p>
+            <p><span>Biaya platform 2%</span><strong>Rp{{ number_format($platformFeeIncome, 0, ',', '.') }}</strong></p>
+            <p><span>Paket Vendor Premium</span><strong>Rp{{ number_format($subscriptionIncome, 0, ',', '.') }}</strong></p>
+        </div>
     </section>
 
     <section class="admin-panel admin-customize-section">

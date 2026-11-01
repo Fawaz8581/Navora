@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="@yield('meta-description', 'Masuk atau buat akun Navora untuk menjelajahi marketplace kemasan UMKM.')">
     <title>@yield('title') — Navora</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +14,7 @@
     <link href="{{ asset('css/auth.css') }}" rel="stylesheet">
     <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
-<body class="navora-auth-body">
+<body class="navora-auth-body" data-rajaongkir-locations-url="{{ route('rajaongkir.locations') }}">
     <main class="auth-layout">
         <section class="auth-panel">
             <header class="auth-header">
@@ -49,5 +50,10 @@
             <div class="auth-aside-mark"><i class="bi bi-box-seam"></i><span>NAVORA</span></div>
         </aside>
     </main>
+    @if (config('services.midtrans.client_key'))
+        <script src="{{ config('services.midtrans.base_url') }}/snap/snap.js" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
+    @endif
+    <script src="{{ asset('js/rajaongkir-location.js').'?v='.filemtime(public_path('js/rajaongkir-location.js')) }}" defer></script>
+    <script src="{{ asset('js/vendor-subscription.js').'?v='.filemtime(public_path('js/vendor-subscription.js')) }}" defer></script>
 </body>
 </html>

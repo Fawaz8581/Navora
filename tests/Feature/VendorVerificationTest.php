@@ -24,7 +24,11 @@ function fakePngUpload(string $name): UploadedFile
 test('vendors can submit their NIB and verification documents for admin review', function () {
     Storage::fake('local');
     $vendor = User::factory()->create(['role' => 'vendor']);
-    $profile = BusinessProfile::factory()->for($vendor)->create();
+    $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
+    ]);
 
     $this->actingAs($vendor)
         ->post(route('vendor.verification.submit'), [
@@ -67,10 +71,33 @@ test('vendors can submit their NIB and verification documents for admin review',
         ->assertStatus(409);
 });
 
+test('vendors must complete their business address before submitting verification', function () {
+    $vendor = User::factory()->create(['role' => 'vendor']);
+    BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => null,
+        'rajaongkir_area_id' => null,
+        'rajaongkir_area_name' => null,
+    ]);
+
+    $this->actingAs($vendor)
+        ->get(route('vendor.verification.index'))
+        ->assertOk()
+        ->assertSee('Alamat asal vendor belum lengkap')
+        ->assertSee(route('onboarding.step', ['step' => 1]));
+
+    $this->actingAs($vendor)
+        ->post(route('vendor.verification.submit'), [])
+        ->assertRedirect(route('onboarding.step', ['step' => 1]))
+        ->assertSessionHasErrors('business_address');
+});
+
 test('verification documents are only downloadable by an admin and admins can approve a vendor', function () {
     Storage::fake('local');
     $vendor = User::factory()->create(['role' => 'vendor']);
     $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
         'verification_status' => 'pending',
         'nib_document_path' => 'vendor-verification/nib.pdf',
         'work_sample_paths' => ['vendor-verification/sample.png'],
@@ -129,6 +156,9 @@ test('admin rejection requires a reason and vendors can resubmit after review', 
     Storage::fake('local');
     $vendor = User::factory()->create(['role' => 'vendor']);
     $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
         'verification_status' => 'pending',
         'nib_document_path' => 'vendor-verification/nib.pdf',
         'work_sample_paths' => [
@@ -218,6 +248,9 @@ test('changing verified vendor details returns verification to the submission st
     $vendor = User::factory()->create(['role' => 'vendor']);
     $admin = User::factory()->create(['role' => 'admin']);
     $profile = BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Jakarta',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
         'verification_status' => 'approved',
         'verification_notes' => 'Approved',
         'verification_submitted_at' => now()->subDay(),
@@ -231,6 +264,9 @@ test('changing verified vendor details returns verification to the submission st
             'phone' => $profile->phone,
             'category' => $profile->category,
             'location' => $profile->location,
+            'business_address' => $profile->business_address,
+            'rajaongkir_area_id' => $profile->rajaongkir_area_id,
+            'rajaongkir_area_name' => $profile->rajaongkir_area_name,
             'description' => $profile->description,
             'product_categories' => $profile->product_categories,
             'materials' => $profile->materials,
@@ -250,7 +286,11 @@ test('changing verified vendor details returns verification to the submission st
 test('verification routes enforce user roles and required document data', function () {
     $umkm = User::factory()->create(['role' => 'umkm']);
     $vendor = User::factory()->create(['role' => 'vendor']);
-    BusinessProfile::factory()->for($vendor)->create();
+    BusinessProfile::factory()->for($vendor)->create([
+        'business_address' => 'Jalan Industri No. 10, Bandung',
+        'rajaongkir_area_id' => '100',
+        'rajaongkir_area_name' => 'Coblong, Kota Bandung',
+    ]);
 
     $this->get(route('admin.vendor-verifications.index'))->assertRedirect(route('login'));
 

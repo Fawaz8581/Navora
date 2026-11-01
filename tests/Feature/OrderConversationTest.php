@@ -45,11 +45,14 @@ it('shares persisted quote messages between the requesting UMKM and assigned ven
             'product_name' => 'Pouch kopi 200 g',
             'quantity' => 500,
             'packaging_details' => 'Kraft laminasi dengan zipper.',
-            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'target_unit_price' => 1250,
             'notes' => 'Mohon opsi sampel sebelum produksi.',
         ])
         ->assertCreated()
-        ->assertJsonPath('order.is_quote_request', true);
+        ->assertJsonPath('order.is_quote_request', true)
+        ->assertJsonPath('order.target_unit_price', 1250)
+        ->assertJsonPath('order.delivery_address', null)
+        ->assertJsonPath('order.delivery_contact_phone', null);
 
     $order = Order::query()->findOrFail($response->json('order.id'));
 
@@ -57,7 +60,7 @@ it('shares persisted quote messages between the requesting UMKM and assigned ven
         ->getJson(route('orders.messages.index', $order))
         ->assertOk()
         ->assertJsonPath('messages.0.is_mine', true)
-        ->assertJsonPath('messages.0.message', "Permintaan penawaran untuk Pouch kopi 200 g sejumlah 500 pcs.\nMohon opsi sampel sebelum produksi.");
+        ->assertJsonPath('messages.0.message', "Permintaan penawaran untuk Pouch kopi 200 g sejumlah 500 pcs.\nSpesifikasi: Kraft laminasi dengan zipper.\nTarget harga: Rp1.250 per pcs.\nMohon opsi sampel sebelum produksi.");
 
     $this->actingAs($vendor)
         ->getJson(route('orders.index'))
@@ -127,9 +130,12 @@ it('publishes the vendor final offer in the shared conversation', function () {
     $order = createConversationOrder($buyer, $vendor);
 
     $this->actingAs($vendor)
-        ->postJson(route('orders.price', $order), ['unit_price' => 1250])
+        ->postJson(route('orders.price', $order), [
+            'unit_price' => 1250,
+            'shipping_weight_per_unit_grams' => 100,
+        ])
         ->assertOk()
-        ->assertJsonPath('order.total_amount', 125000)
+        ->assertJsonPath('order.total_amount', 127500)
         ->assertJsonPath('order.payment_status', 'awaiting_approval')
         ->assertJsonPath('order.quote_status', 'pending_buyer');
 
@@ -137,10 +143,10 @@ it('publishes the vendor final offer in the shared conversation', function () {
         ->getJson(route('orders.messages.index', $order))
         ->assertOk()
         ->assertJsonPath('messages.0.sender_name', $vendor->name)
-        ->assertJsonPath('messages.0.message', 'Penawaran final: Rp1.250 per pcs, total Rp125.000.');
+        ->assertJsonPath('messages.0.message', 'Penawaran final: Rp1.250 per pcs; subtotal produk Rp125.000 dan biaya platform 2% (ongkir dihitung setelah memilih kurir).');
 
     expect($order->fresh()->unit_price)->toBe(1250)
-        ->and($order->fresh()->total_amount)->toBe(125000);
+        ->and($order->fresh()->total_amount)->toBe(127500);
 });
 
 it('reports only paid orders belonging to the signed-in vendor', function () {

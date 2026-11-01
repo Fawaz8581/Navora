@@ -39,6 +39,16 @@
 
     <section class="onboarding-review-section">
         <h3>Status verifikasi: {{ $verificationLabels[$profile->verification_status] ?? 'Belum diajukan' }}</h3>
+        @if (! filled($profile->business_address) || ! filled($profile->rajaongkir_area_id))
+            <div class="auth-alert auth-alert-error" role="alert">
+                <i class="bi bi-exclamation-circle"></i>
+                <div>
+                    <strong>Alamat asal vendor belum lengkap.</strong>
+                    <p>Isi alamat lengkap usaha dan pilih area asal pengiriman di Profil usaha sebelum mengajukan verifikasi.</p>
+                    <a href="{{ route('onboarding.step', ['step' => 1]) }}">Lengkapi Profil usaha</a>
+                </div>
+            </div>
+        @endif
         @if ($profile->verification_submitted_at)
             <p>Terakhir dikirim {{ $profile->verification_submitted_at->format('d M Y, H:i') }}.</p>
         @endif
@@ -57,7 +67,28 @@
         @endif
     </section>
 
-    @if (in_array($profile->verification_status, ['not_submitted', 'rejected'], true))
+    <section class="onboarding-review-section"
+        data-vendor-subscription
+        data-checkout-url="{{ route('vendor.subscription.checkout') }}"
+        data-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}"
+        data-active="{{ $vendorSubscription?->isActive() ? 'true' : 'false' }}"
+        data-ends-at="{{ $vendorSubscription?->ends_at?->format('d M Y') }}"
+        data-amount="{{ config('services.navora.vendor_subscription_amount') }}"
+        data-duration="{{ config('services.navora.vendor_subscription_days') }}">
+        <h3>Paket Vendor Premium</h3>
+        @if ($vendorSubscription?->isActive())
+            <p>Paket aktif sampai {{ $vendorSubscription->ends_at?->format('d M Y') }}. Profil tetap harus disetujui admin untuk tampil sebagai vendor terverifikasi.</p>
+        @else
+            <p>Rp{{ number_format(config('services.navora.vendor_subscription_amount'), 0, ',', '.') }} untuk {{ config('services.navora.vendor_subscription_days') }} hari. Paket memberi badge premium, prioritas tampil di pencarian vendor, dan kuota permintaan penawaran tanpa batas. Akun gratis mendapat {{ config('services.navora.free_vendor_monthly_rfq_limit') }} RFQ per bulan. Paket tidak menggantikan pemeriksaan verifikasi admin.</p>
+            <button class="auth-submit" type="button" data-vendor-subscription-checkout>
+                Aktifkan Premium via Midtrans <i class="bi bi-credit-card"></i>
+            </button>
+        @endif
+    </section>
+
+    @if (in_array($profile->verification_status, ['not_submitted', 'rejected'], true)
+        && filled($profile->business_address)
+        && filled($profile->rajaongkir_area_id))
         <form action="{{ route('vendor.verification.submit') }}" method="post" class="auth-form" enctype="multipart/form-data">
             @csrf
             @error('documents')<div class="auth-alert auth-alert-error" role="alert">{{ $message }}</div>@enderror

@@ -11,7 +11,17 @@ class OrderParticipant extends Model
         'order_id',
         'user_id',
         'quantity',
+        'delivery_contact_name',
+        'delivery_contact_phone',
+        'delivery_address',
+        'delivery_area_id',
+        'delivery_area_name',
         'payment_amount',
+        'subtotal_amount',
+        'shipping_amount',
+        'platform_fee_amount',
+        'shipping_courier',
+        'shipping_service',
         'payment_status',
         'quote_status',
         'payment_order_id',
@@ -41,6 +51,9 @@ class OrderParticipant extends Model
         return [
             'quantity' => 'integer',
             'payment_amount' => 'integer',
+            'subtotal_amount' => 'integer',
+            'shipping_amount' => 'integer',
+            'platform_fee_amount' => 'integer',
             'paid_at' => 'datetime',
         ];
     }

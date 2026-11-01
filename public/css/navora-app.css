@@ -34,7 +34,7 @@ body.navora-app-body {
 .navora-app-shell {
     width: 100%;
     min-height: 100vh;
-    zoom: 1.25;
+    zoom: 1.5;
 }
 
 .navora-app-body button,
@@ -640,6 +640,29 @@ body.navora-app-body {
     margin-bottom: 13px;
 }
 
+.navora-subscription-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.navora-subscription-dismiss {
+    display: inline-grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border: 1px solid var(--navora-app-line);
+    border-radius: 50%;
+    background: #fff;
+    color: #718493;
+    cursor: pointer;
+}
+
+.navora-subscription-dismiss:hover {
+    background: #f2f6f9;
+    color: var(--navora-app-ink);
+}
+
 .navora-panel-heading h2 {
     margin: 0;
     color: var(--navora-app-ink);
@@ -1110,6 +1133,21 @@ body.navora-app-body {
     color: #4f8178;
     font-size: 8px;
     font-weight: 800;
+}
+
+.navora-premium-tag {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    margin-top: 4px;
+    padding: 3px 7px;
+    border: 1px solid #e8cf85;
+    border-radius: 999px;
+    background: #fff8df;
+    color: #80600b;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .06em;
 }
 
 .navora-vendor-content {
@@ -2514,12 +2552,57 @@ body.navora-app-body {
     display: block;
 }
 
+.navora-modal-fields .navora-modal-field[data-location-picker] {
+    position: relative;
+}
+
+.navora-location-suggestions {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% - 1px);
+    left: 0;
+    width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #dce6eb;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 12px 28px rgb(21 48 65 / 14%);
+}
+
+.navora-location-option,
+.navora-location-empty {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 9px 12px;
+    border: 0;
+    background: transparent;
+    color: #284354;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+}
+
+.navora-location-option:hover,
+.navora-location-option:focus {
+    background: #eff8f6;
+}
+
 .navora-modal-field-help {
     display: block;
     margin-top: 5px;
     color: #758b97;
     font-size: 9px;
     line-height: 1.5;
+}
+
+.navora-location-validation {
+    color: #a6403b;
+}
+
+.navora-modal-field input[aria-invalid="true"] {
+    border-color: #c97068;
 }
 
 .navora-listing-media-editor {
@@ -3535,6 +3618,13 @@ body.navora-app-body {
 
 .navora-order-actions {
     padding-top: 12px;
+}
+
+.navora-order-shipping-note {
+    margin: 11px 0 0;
+    color: #8a6743;
+    font-size: 11px;
+    line-height: 1.55;
 }
 
 .navora-order-actions .btn,

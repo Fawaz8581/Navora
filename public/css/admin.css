@@ -272,6 +272,22 @@
     font-weight: 800;
 }
 
+.admin-income-breakdown {
+    display: grid;
+    gap: 7px;
+    max-width: 440px;
+    margin-top: 14px;
+}
+
+.admin-income-breakdown p {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0;
+    color: #50677a;
+    font-size: 12px;
+}
+
 .admin-ad-payment-proof {
     display: grid;
     gap: 5px;

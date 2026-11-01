@@ -57,4 +57,20 @@ return [
         ),
     ],
 
+    'rajaongkir' => [
+        'api_key' => env('RAJAONGKIR_API_KEY'),
+        'base_url' => env('RAJAONGKIR_BASE_URL', 'https://rajaongkir.komerce.id/api/v1'),
+        'couriers' => array_filter(array_map(
+            'trim',
+            explode(',', env('RAJAONGKIR_COURIERS', 'jne,pos,tiki,jnt,sicepat')),
+        )),
+    ],
+
+    'navora' => [
+        'vendor_subscription_amount' => (int) env('NAVORA_VENDOR_SUBSCRIPTION_AMOUNT', 500000),
+        'vendor_subscription_days' => (int) env('NAVORA_VENDOR_SUBSCRIPTION_DAYS', 30),
+        'platform_fee_percent' => (int) env('NAVORA_PLATFORM_FEE_PERCENT', 2),
+        'free_vendor_monthly_rfq_limit' => (int) env('NAVORA_FREE_VENDOR_MONTHLY_RFQ_LIMIT', 10),
+    ],
+
 ];

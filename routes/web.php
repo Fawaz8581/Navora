@@ -16,11 +16,14 @@ use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderMessageController;
+use App\Http\Controllers\RajaOngkirController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorListingController;
+use App\Http\Controllers\VendorSubscriptionController;
 use App\Http\Controllers\VendorVerificationController;
 use App\Models\AdCampaign;
+use App\Models\VendorSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -59,8 +62,16 @@ Route::get('/ruang-kerja', function (Request $request, VendorAdvertisementContro
     $workspaceData = $user?->role === 'vendor'
         ? $vendorAdvertisements->workspaceData($request)
         : [];
+    $vendorSubscription = $user?->role === 'vendor'
+        ? VendorSubscription::query()
+            ->where('vendor_user_id', $user->id)
+            ->where('payment_status', 'paid')
+            ->latest('id')
+            ->first()
+        : null;
 
     return view('workspace', [
+        'vendorSubscription' => $vendorSubscription,
         'advertisementNotices' => $user?->role === 'vendor'
             ? $user->adCampaigns()
                 ->whereIn('status', [AdCampaign::STATUS_ACTIVE, AdCampaign::STATUS_REJECTED])
@@ -101,6 +112,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/katalog/vendor/produk/{vendorListing}/media/{vendorListingMedia}', [VendorCatalogController::class, 'showListingMedia'])
         ->name('vendors.catalog.listing-media');
     Route::get('/pesanan', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/rajaongkir/lokasi', [RajaOngkirController::class, 'locations'])
+        ->middleware('throttle:30,1')
+        ->name('rajaongkir.locations');
+    Route::get('/pesanan/{order}/ongkir', [RajaOngkirController::class, 'rates'])
+        ->middleware('throttle:20,1')
+        ->name('orders.shipping-rates');
+    Route::post('/pesanan/{order}/ongkir', [RajaOngkirController::class, 'selectRate'])
+        ->middleware('throttle:10,1')
+        ->name('orders.shipping-select');
+    Route::put('/pesanan/{order}/data-pengiriman', [OrderController::class, 'updateDeliveryDetails'])
+        ->middleware('throttle:10,1')
+        ->name('orders.delivery-details');
+    Route::post('/vendor/langganan/pembayaran', [VendorSubscriptionController::class, 'checkout'])
+        ->middleware('throttle:5,1')
+        ->name('vendor.subscription.checkout');
+    Route::post('/vendor/langganan/{vendorSubscription}/periksa', [VendorSubscriptionController::class, 'refresh'])
+        ->middleware('throttle:10,1')
+        ->name('vendor.subscription.refresh');
     Route::get('/vendor/pendapatan', [OrderController::class, 'vendorIncome'])->name('orders.vendor-income');
     Route::post('/pesanan', [OrderController::class, 'store'])
         ->middleware('throttle:20,1')

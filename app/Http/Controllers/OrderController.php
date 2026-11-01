@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Jobs\AdvanceSimulatedOrder;
 use App\Models\BusinessProfile;
 use App\Models\Order;
+use App\Models\OrderParticipant;
 use App\Models\User;
+use App\Models\VendorSubscription;
 use App\Services\MidtransSnapService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +49,7 @@ class OrderController extends Controller
             ->with([
                 'creator:id,name',
                 'vendor:id,name',
-                'vendor.businessProfile:id,user_id,business_name',
+                'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name',
                 'participants.user:id,name',
                 'statusHistory.actor:id,name',
             ])
@@ -65,12 +68,20 @@ class OrderController extends Controller
                 ->whereHas('businessProfile', fn (Builder $profile) => $profile
                     ->where('verification_status', 'approved')
                     ->whereNotNull('completed_at'))
-                ->with('businessProfile:id,user_id,business_name')
+                ->with([
+                    'businessProfile:id,user_id,business_name',
+                    'vendorSubscriptions' => fn (HasMany $subscriptions) => $subscriptions
+                        ->where('payment_status', 'paid')
+                        ->where('ends_at', '>', now())
+                        ->latest('id')
+                        ->limit(1),
+                ])
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (User $vendor): array => [
                     'id' => $vendor->id,
                     'name' => $vendor->businessProfile?->business_name ?: $vendor->name,
+                    'is_premium' => $vendor->vendorSubscriptions->isNotEmpty(),
                 ])
                 ->values()
             : collect();
@@ -112,15 +123,33 @@ class OrderController extends Controller
                 'quantity',
                 'unit_price',
                 'total_amount',
+                'subtotal_amount',
                 'paid_at',
             ])
             ->latest('paid_at')
             ->paginate(50);
 
+        $directRevenue = Order::query()
+            ->where('vendor_user_id', $user->id)
+            ->where('type', Order::TYPE_DIRECT)
+            ->where('payment_status', 'paid')
+            ->sum(DB::raw('COALESCE(subtotal_amount, total_amount)'));
+        $paidGroupParticipants = OrderParticipant::query()
+            ->where('payment_status', 'paid')
+            ->whereHas('order', fn (Builder $query) => $query
+                ->where('vendor_user_id', $user->id)
+                ->where('type', Order::TYPE_GROUP));
+
         return response()->json([
             'summary' => [
-                'total_revenue' => (int) (clone $paidOrders)->sum('total_amount'),
-                'completed_orders' => (clone $paidOrders)->count(),
+                'total_revenue' => (int) $directRevenue
+                    + (int) (clone $paidGroupParticipants)->sum(DB::raw('COALESCE(subtotal_amount, payment_amount)')),
+                'completed_orders' => Order::query()
+                    ->where('vendor_user_id', $user->id)
+                    ->where('type', Order::TYPE_DIRECT)
+                    ->where('payment_status', 'paid')
+                    ->count()
+                    + (clone $paidGroupParticipants)->count(),
             ],
             'sales' => $sales->getCollection()->map(fn (Order $order): array => [
                 'id' => $order->id,
@@ -128,7 +157,7 @@ class OrderController extends Controller
                 'buyer_name' => $order->creator?->businessProfile?->business_name ?: $order->creator?->name,
                 'quantity' => $order->quantity,
                 'unit_price' => $order->unit_price,
-                'total_amount' => $order->total_amount,
+                'total_amount' => $order->subtotal_amount ?? $order->total_amount,
                 'paid_at' => $order->paid_at?->toIso8601String(),
             ])->values(),
             'next_page_url' => $sales->nextPageUrl(),
@@ -145,7 +174,7 @@ class OrderController extends Controller
         $order->load([
             'creator:id,name',
             'vendor:id,name',
-            'vendor.businessProfile:id,user_id,business_name',
+            'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name',
             'participants.user:id,name',
             'statusHistory.actor:id,name',
         ]);
@@ -163,7 +192,11 @@ class OrderController extends Controller
             'product_name' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'between:1,10000000'],
             'packaging_details' => ['required', 'string', 'max:2000'],
-            'delivery_address' => ['required_if:type,'.Order::TYPE_DIRECT, 'nullable', 'string', 'max:1000'],
+            'delivery_contact_name' => ['required', 'string', 'max:255'],
+            'delivery_contact_phone' => ['required', 'string', 'max:40', 'regex:/^[0-9+().\\s-]{8,40}$/'],
+            'delivery_address' => ['required', 'string', 'max:1000'],
+            'delivery_area_id' => ['required', 'string', 'max:32'],
+            'delivery_area_name' => ['required', 'string', 'max:255'],
             'vendor_user_id' => ['required', 'integer', Rule::exists('users', 'id')->where('role', 'vendor')],
             'initial_quantity' => [
                 Rule::requiredIf($request->input('type') === Order::TYPE_GROUP),
@@ -177,7 +210,12 @@ class OrderController extends Controller
             'quantity.required' => 'Jumlah pesanan wajib diisi.',
             'quantity.between' => 'Jumlah pesanan harus antara 1 dan 10.000.000 pcs.',
             'packaging_details.required' => 'Spesifikasi kemasan wajib diisi.',
-            'delivery_address.required_if' => 'Alamat pengiriman wajib diisi untuk pesanan langsung.',
+            'delivery_contact_name.required' => 'Nama penerima wajib diisi.',
+            'delivery_contact_phone.required' => 'Nomor telepon penerima wajib diisi.',
+            'delivery_contact_phone.regex' => 'Nomor telepon penerima tidak valid.',
+            'delivery_address.required' => 'Alamat lengkap tujuan pengiriman wajib diisi.',
+            'delivery_area_id.required' => 'Pilih area tujuan pengiriman dari hasil pencarian lokasi.',
+            'delivery_area_name.required' => 'Area tujuan pengiriman wajib dipilih.',
             'initial_quantity.required' => 'Jumlah awal patungan wajib diisi.',
             'initial_quantity.min' => 'Jumlah awal patungan minimal 1 pcs.',
         ]);
@@ -187,6 +225,7 @@ class OrderController extends Controller
                 'vendor_user_id' => 'Pilih vendor yang sudah menyelesaikan profil dan verifikasi.',
             ]);
         }
+        $this->assertVendorRfqCapacity((int) $validated['vendor_user_id']);
 
         if (($validated['type'] ?? null) === Order::TYPE_GROUP
             && (int) ($validated['initial_quantity'] ?? 0) > (int) $validated['quantity']) {
@@ -209,9 +248,11 @@ class OrderController extends Controller
                 'product_name' => $validated['product_name'],
                 'quantity' => $validated['quantity'],
                 'packaging_details' => $validated['packaging_details'],
-                'delivery_address' => $validated['type'] === Order::TYPE_DIRECT
-                    ? ($validated['delivery_address'] ?? null)
-                    : null,
+                'delivery_contact_name' => $validated['delivery_contact_name'],
+                'delivery_contact_phone' => $validated['delivery_contact_phone'],
+                'delivery_address' => $validated['delivery_address'],
+                'delivery_area_id' => $validated['delivery_area_id'],
+                'delivery_area_name' => $validated['delivery_area_name'],
                 'notes' => $validated['notes'] ?? null,
                 'status' => Order::STATUS_WAITING,
                 'is_simulated' => false,
@@ -231,13 +272,18 @@ class OrderController extends Controller
                 $order->participants()->create([
                     'user_id' => $user->id,
                     'quantity' => $initialQuantity,
+                    'delivery_contact_name' => $validated['delivery_contact_name'],
+                    'delivery_contact_phone' => $validated['delivery_contact_phone'],
+                    'delivery_address' => $validated['delivery_address'],
+                    'delivery_area_id' => $validated['delivery_area_id'],
+                    'delivery_area_name' => $validated['delivery_area_name'],
                 ]);
             }
 
             return $order;
         });
 
-        $order->load(['creator:id,name', 'vendor:id,name', 'vendor.businessProfile:id,user_id,business_name', 'participants.user:id,name', 'statusHistory.actor:id,name']);
+        $order->load(['creator:id,name', 'vendor:id,name', 'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name', 'participants.user:id,name', 'statusHistory.actor:id,name']);
 
         return response()->json(['order' => $this->presentOrder($order, $user)], 201);
     }
@@ -252,7 +298,7 @@ class OrderController extends Controller
             'product_name' => ['required', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'between:1,10000000'],
             'packaging_details' => ['required', 'string', 'max:2000'],
-            'delivery_address' => ['required', 'string', 'max:1000'],
+            'target_unit_price' => ['nullable', 'integer', 'between:1,1000000000'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'vendor_user_id.required' => 'Pilih vendor yang menerima permintaan.',
@@ -260,7 +306,6 @@ class OrderController extends Controller
             'quantity.required' => 'Jumlah pesanan wajib diisi.',
             'quantity.between' => 'Jumlah pesanan harus antara 1 dan 10.000.000 pcs.',
             'packaging_details.required' => 'Spesifikasi kemasan wajib diisi.',
-            'delivery_address.required' => 'Alamat pengiriman wajib diisi.',
         ]);
 
         if (! $this->isVerifiedVendor((int) $validated['vendor_user_id'])) {
@@ -268,6 +313,7 @@ class OrderController extends Controller
                 'vendor_user_id' => 'Vendor tidak lagi memiliki profil yang terverifikasi.',
             ]);
         }
+        $this->assertVendorRfqCapacity((int) $validated['vendor_user_id']);
 
         $order = DB::transaction(function () use ($validated, $user): Order {
             $order = Order::create([
@@ -277,7 +323,7 @@ class OrderController extends Controller
                 'product_name' => $validated['product_name'],
                 'quantity' => $validated['quantity'],
                 'packaging_details' => $validated['packaging_details'],
-                'delivery_address' => $validated['delivery_address'],
+                'target_unit_price' => $validated['target_unit_price'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'status' => Order::STATUS_WAITING,
                 'is_simulated' => false,
@@ -294,15 +340,104 @@ class OrderController extends Controller
                 'user_id' => $user->id,
                 'message' => 'Permintaan penawaran untuk '.$order->product_name.' sejumlah '
                     .number_format($order->quantity, 0, ',', '.').' pcs.'
+                    ."\nSpesifikasi: ".$order->packaging_details
+                    .($order->target_unit_price
+                        ? "\nTarget harga: Rp".number_format($order->target_unit_price, 0, ',', '.').' per pcs.'
+                        : '')
                     .(filled($order->notes) ? "\n".$order->notes : ''),
             ]);
 
             return $order;
         });
 
-        $order->load(['creator:id,name', 'vendor:id,name', 'vendor.businessProfile:id,user_id,business_name', 'participants.user:id,name', 'statusHistory.actor:id,name']);
+        $order->load(['creator:id,name', 'vendor:id,name', 'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name', 'participants.user:id,name', 'statusHistory.actor:id,name']);
 
         return response()->json(['order' => $this->presentOrder($order, $user)], 201);
+    }
+
+    public function updateDeliveryDetails(Request $request, Order $order): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'umkm', 403);
+        $participant = $order->type === Order::TYPE_GROUP
+            ? $order->participants()->where('user_id', $user->id)->first()
+            : null;
+        abort_unless(
+            ($order->type === Order::TYPE_DIRECT && $order->user_id === $user->id)
+                || ($order->type === Order::TYPE_GROUP && $participant !== null),
+            404,
+        );
+
+        $validated = $request->validate([
+            'delivery_contact_name' => ['required', 'string', 'max:255'],
+            'delivery_contact_phone' => ['required', 'string', 'max:40', 'regex:/^[0-9+().\\s-]{8,40}$/'],
+            'delivery_address' => ['required', 'string', 'max:1000'],
+            'delivery_area_id' => ['required', 'string', 'max:32'],
+            'delivery_area_name' => ['required', 'string', 'max:255'],
+        ], [
+            'delivery_contact_name.required' => 'Nama penerima wajib diisi.',
+            'delivery_contact_phone.required' => 'Nomor telepon penerima wajib diisi.',
+            'delivery_contact_phone.regex' => 'Nomor telepon penerima tidak valid.',
+            'delivery_address.required' => 'Alamat lengkap tujuan pengiriman wajib diisi.',
+            'delivery_area_id.required' => 'Pilih area tujuan dari hasil pencarian lokasi.',
+            'delivery_area_name.required' => 'Pilih area tujuan pengiriman.',
+        ]);
+
+        DB::transaction(function () use ($order, $participant, $validated): void {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            if ($lockedOrder->status !== Order::STATUS_WAITING) {
+                throw ValidationException::withMessages([
+                    'order' => 'Data penerima hanya dapat diubah saat pesanan masih menunggu.',
+                ]);
+            }
+
+            if ($participant) {
+                $lockedParticipant = $lockedOrder->participants()->lockForUpdate()->findOrFail($participant->id);
+                if ($lockedParticipant->payment_status === 'paid'
+                    || ($lockedParticipant->payment_status === 'pending' && filled($lockedParticipant->payment_order_id))) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Data penerima tidak dapat diubah setelah pembayaran dimulai.',
+                    ]);
+                }
+
+                $subtotal = (int) ($lockedParticipant->subtotal_amount ?? 0);
+                $fee = (int) ($lockedParticipant->platform_fee_amount ?? 0);
+                $lockedParticipant->forceFill([
+                    ...$validated,
+                    'shipping_amount' => null,
+                    'shipping_courier' => null,
+                    'shipping_service' => null,
+                    'payment_amount' => $lockedOrder->unit_price === null ? null : $subtotal + $fee,
+                ])->save();
+                if ($lockedOrder->unit_price !== null) {
+                    $lockedOrder->forceFill([
+                        'subtotal_amount' => (int) $lockedOrder->participants()->sum('subtotal_amount'),
+                        'shipping_amount' => (int) $lockedOrder->participants()->sum('shipping_amount'),
+                        'platform_fee_amount' => (int) $lockedOrder->participants()->sum('platform_fee_amount'),
+                        'total_amount' => (int) $lockedOrder->participants()->sum('payment_amount'),
+                    ])->save();
+                }
+            } else {
+                if ($lockedOrder->payment_status === 'paid'
+                    || ($lockedOrder->payment_status === 'pending' && filled($lockedOrder->payment_order_id))) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Data penerima tidak dapat diubah setelah pembayaran dimulai.',
+                    ]);
+                }
+
+                $subtotal = (int) ($lockedOrder->subtotal_amount ?? 0);
+                $fee = (int) ($lockedOrder->platform_fee_amount ?? 0);
+                $lockedOrder->forceFill([
+                    ...$validated,
+                    'shipping_amount' => null,
+                    'shipping_courier' => null,
+                    'shipping_service' => null,
+                    'total_amount' => $lockedOrder->unit_price === null ? null : $subtotal + $fee,
+                ])->save();
+            }
+        });
+
+        return $this->show($request, $order->refresh());
     }
 
     public function setPrice(Request $request, Order $order): JsonResponse
@@ -313,6 +448,9 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'unit_price' => ['required', 'integer', 'between:1,1000000000'],
+            'shipping_weight_per_unit_grams' => ['required', 'integer', 'between:1,30000'],
+        ], [
+            'shipping_weight_per_unit_grams.between' => 'Berat per pcs harus antara 1 gram dan 30 kg agar dapat dihitung sebagai paket kurir.',
         ]);
 
         $order = DB::transaction(function () use ($order, $user, $validated): Order {
@@ -337,7 +475,9 @@ class OrderController extends Controller
             }
 
             $unitPrice = (int) $validated['unit_price'];
-            $totalAmount = $unitPrice * $lockedOrder->quantity;
+            $subtotal = $unitPrice * $lockedOrder->quantity;
+            $platformFee = Order::platformFeeFor($subtotal);
+            $totalAmount = $subtotal + $platformFee;
 
             if ($totalAmount > 9007199254740991) {
                 throw ValidationException::withMessages([
@@ -347,6 +487,12 @@ class OrderController extends Controller
 
             $lockedOrder->forceFill([
                 'unit_price' => $unitPrice,
+                'subtotal_amount' => $subtotal,
+                'shipping_amount' => null,
+                'platform_fee_amount' => $platformFee,
+                'shipping_weight_per_unit_grams' => $validated['shipping_weight_per_unit_grams'],
+                'shipping_courier' => null,
+                'shipping_service' => null,
                 'total_amount' => $totalAmount,
                 'payment_status' => $lockedOrder->type === Order::TYPE_DIRECT
                     ? 'awaiting_approval'
@@ -356,8 +502,15 @@ class OrderController extends Controller
 
             if ($lockedOrder->type === Order::TYPE_GROUP) {
                 $lockedOrder->participants()->get()->each(function ($participant) use ($unitPrice): void {
+                    $subtotal = $unitPrice * $participant->quantity;
+                    $fee = Order::platformFeeFor($subtotal);
                     $participant->forceFill([
-                        'payment_amount' => $unitPrice * $participant->quantity,
+                        'subtotal_amount' => $subtotal,
+                        'shipping_amount' => null,
+                        'platform_fee_amount' => $fee,
+                        'shipping_courier' => null,
+                        'shipping_service' => null,
+                        'payment_amount' => $subtotal + $fee,
                         'payment_status' => 'awaiting_approval',
                         'quote_status' => 'pending_buyer',
                     ])->save();
@@ -373,7 +526,8 @@ class OrderController extends Controller
                 $lockedOrder->messages()->create([
                     'user_id' => $user->id,
                     'message' => 'Penawaran final: Rp'.number_format($unitPrice, 0, ',', '.')
-                        .' per pcs, total Rp'.number_format($totalAmount, 0, ',', '.').'.',
+                        .' per pcs; subtotal produk Rp'.number_format($subtotal, 0, ',', '.')
+                        .' dan biaya platform '.config('services.navora.platform_fee_percent').'% (ongkir dihitung setelah memilih kurir).',
                 ]);
             }
 
@@ -383,7 +537,7 @@ class OrderController extends Controller
         $order->load([
             'creator:id,name',
             'vendor:id,name',
-            'vendor.businessProfile:id,user_id,business_name',
+            'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name',
             'participants.user:id,name',
             'statusHistory.actor:id,name',
         ]);
@@ -532,6 +686,21 @@ class OrderController extends Controller
                     throw ValidationException::withMessages(['payment' => 'Pesanan ini sudah dibayar.']);
                 }
 
+                if (! filled($lockedOrder->delivery_contact_name)
+                    || ! filled($lockedOrder->delivery_contact_phone)
+                    || ! filled($lockedOrder->delivery_address)
+                    || ! filled($lockedOrder->delivery_area_id)) {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Lengkapi biodata penerima dan lokasi pengiriman di tab Pesanan sebelum membayar.',
+                    ]);
+                }
+
+                if (! $lockedOrder->shipping_service || $lockedOrder->shipping_amount === null) {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Pilih layanan kurir dan hitung ongkir sebelum membayar.',
+                    ]);
+                }
+
                 if (! in_array($lockedOrder->payment_status, ['pending', 'failed'], true)) {
                     throw ValidationException::withMessages(['payment' => 'Pembayaran pesanan belum tersedia.']);
                 }
@@ -574,8 +743,23 @@ class OrderController extends Controller
                 throw ValidationException::withMessages(['payment' => 'Bagian pesananmu sudah dibayar.']);
             }
 
+            if (! filled($participant->delivery_contact_name)
+                || ! filled($participant->delivery_contact_phone)
+                || ! filled($participant->delivery_address)
+                || ! filled($participant->delivery_area_id)) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Lengkapi biodata penerima dan lokasi pengiriman bagianmu sebelum membayar.',
+                ]);
+            }
+
             if ($participant->payment_amount === null || $participant->payment_amount < 1) {
                 throw ValidationException::withMessages(['payment' => 'Nominal pembayaran bagian pesanan tidak valid.']);
+            }
+
+            if (! $participant->shipping_service || $participant->shipping_amount === null) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Pilih layanan kurir dan hitung ongkir bagianmu sebelum membayar.',
+                ]);
             }
 
             if (! in_array($participant->payment_status, ['pending', 'failed'], true)) {
@@ -745,7 +929,7 @@ class OrderController extends Controller
         $order->refresh()->load([
             'creator:id,name',
             'vendor:id,name',
-            'vendor.businessProfile:id,user_id,business_name',
+            'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name',
             'participants.user:id,name',
             'statusHistory.actor:id,name',
         ]);
@@ -765,9 +949,20 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'between:1,10000000'],
+            'delivery_contact_name' => ['required', 'string', 'max:255'],
+            'delivery_contact_phone' => ['required', 'string', 'max:40', 'regex:/^[0-9+().\\s-]{8,40}$/'],
+            'delivery_address' => ['required', 'string', 'max:1000'],
+            'delivery_area_id' => ['required', 'string', 'max:32'],
+            'delivery_area_name' => ['required', 'string', 'max:255'],
         ], [
             'quantity.required' => 'Jumlah yang ingin diambil wajib diisi.',
             'quantity.between' => 'Jumlah harus antara 1 dan 10.000.000 pcs.',
+            'delivery_contact_name.required' => 'Nama penerima wajib diisi.',
+            'delivery_contact_phone.required' => 'Nomor telepon penerima wajib diisi.',
+            'delivery_contact_phone.regex' => 'Nomor telepon penerima tidak valid.',
+            'delivery_address.required' => 'Alamat lengkap tujuan pengiriman wajib diisi.',
+            'delivery_area_id.required' => 'Pilih area tujuan dari hasil pencarian lokasi.',
+            'delivery_area_name.required' => 'Pilih area tujuan pengiriman.',
         ]);
 
         DB::transaction(function () use ($order, $user, $validated): void {
@@ -799,6 +994,11 @@ class OrderController extends Controller
             $lockedOrder->participants()->create([
                 'user_id' => $user->id,
                 'quantity' => $quantity,
+                'delivery_contact_name' => $validated['delivery_contact_name'],
+                'delivery_contact_phone' => $validated['delivery_contact_phone'],
+                'delivery_address' => $validated['delivery_address'],
+                'delivery_area_id' => $validated['delivery_area_id'],
+                'delivery_area_name' => $validated['delivery_area_name'],
             ]);
 
             if ($committedQuantity + $quantity === $lockedOrder->quantity) {
@@ -844,6 +1044,7 @@ class OrderController extends Controller
             $note = match (true) {
                 $startsSimulation => 'Pesanan dikonfirmasi; simulasi status otomatis dimulai.',
                 $validated['status'] === Order::STATUS_PROCESSING => 'Pesanan dikonfirmasi vendor setelah pembayaran diterima.',
+                $validated['status'] === Order::STATUS_RECEIVED && $user->role === 'umkm' => 'UMKM mengonfirmasi pesanan telah diterima.',
                 default => $validated['note'] ?? null,
             };
             $lockedOrder->statusHistory()->create([
@@ -943,6 +1144,31 @@ class OrderController extends Controller
             ->exists();
     }
 
+    private function assertVendorRfqCapacity(int $vendorUserId): void
+    {
+        $hasActiveSubscription = VendorSubscription::query()
+            ->where('vendor_user_id', $vendorUserId)
+            ->where('payment_status', 'paid')
+            ->where('ends_at', '>', now())
+            ->exists();
+
+        if ($hasActiveSubscription) {
+            return;
+        }
+
+        $monthlyLimit = (int) config('services.navora.free_vendor_monthly_rfq_limit');
+        $monthlyRequests = Order::query()
+            ->where('vendor_user_id', $vendorUserId)
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->count();
+
+        if ($monthlyRequests >= $monthlyLimit) {
+            throw ValidationException::withMessages([
+                'vendor_user_id' => 'Kuota permintaan vendor gratis bulan ini sudah penuh. Vendor perlu mengaktifkan Premium untuk menerima permintaan tanpa batas.',
+            ]);
+        }
+    }
+
     private function canView(Order $order, User $user): bool
     {
         if ($order->user_id === $user->id || $order->vendor_user_id === $user->id) {
@@ -1007,7 +1233,12 @@ class OrderController extends Controller
             return [];
         }
 
-        if ($order->user_id === $user->id) {
+        if ($order->user_id === $user->id && $user->role === 'umkm') {
+            if ($order->status === Order::STATUS_SHIPPED
+                && $order->payment_status === 'paid') {
+                return [Order::STATUS_RECEIVED];
+            }
+
             if ($order->payment_status === 'paid'
                 || ($order->payment_status === 'pending' && $this->hasPaymentAttempt($order))) {
                 return [];
@@ -1059,6 +1290,49 @@ class OrderController extends Controller
         $currentParticipant = $order->participants->firstWhere('user_id', $user->id);
         $isGroupTargetMet = $order->type === Order::TYPE_GROUP
             && $participantQuantity === $order->quantity;
+        $shippingService = $order->type === Order::TYPE_DIRECT
+            ? $order->shipping_service
+            : $currentParticipant?->shipping_service;
+        $shippingAmount = $order->type === Order::TYPE_DIRECT
+            ? $order->shipping_amount
+            : $currentParticipant?->shipping_amount;
+        $currentPaymentStatus = $order->type === Order::TYPE_DIRECT
+            ? $order->payment_status
+            : $currentParticipant?->payment_status;
+        $deliveryContactName = $order->type === Order::TYPE_DIRECT
+            ? $order->delivery_contact_name
+            : $currentParticipant?->delivery_contact_name;
+        $deliveryContactPhone = $order->type === Order::TYPE_DIRECT
+            ? $order->delivery_contact_phone
+            : $currentParticipant?->delivery_contact_phone;
+        $deliveryAddress = $order->type === Order::TYPE_DIRECT
+            ? $order->delivery_address
+            : $currentParticipant?->delivery_address;
+        $deliveryAreaId = $order->type === Order::TYPE_DIRECT
+            ? $order->delivery_area_id
+            : $currentParticipant?->delivery_area_id;
+        $deliveryDetailsComplete = filled($deliveryContactName)
+            && filled($deliveryContactPhone)
+            && filled($deliveryAddress)
+            && filled($deliveryAreaId);
+        $vendorOriginConfigured = filled($order->vendor?->businessProfile?->business_address)
+            && filled($order->vendor?->businessProfile?->rajaongkir_area_id);
+        $canSelectShipping = $user->role === 'umkm'
+            && $order->status === Order::STATUS_WAITING
+            && $order->quote_status === 'accepted'
+            && in_array($currentPaymentStatus, ['pending', 'failed'], true)
+            && $deliveryDetailsComplete
+            && $vendorOriginConfigured;
+        $canEditDeliveryDetails = $user->role === 'umkm'
+            && ($order->type === Order::TYPE_DIRECT
+                ? $isBuyer
+                : $currentParticipant !== null)
+            && $order->status === Order::STATUS_WAITING
+            && $currentPaymentStatus !== 'paid'
+            && ($order->type === Order::TYPE_DIRECT
+                ? ! ($order->payment_status === 'pending' && filled($order->payment_order_id))
+                : ! ($currentParticipant?->payment_status === 'pending'
+                    && filled($currentParticipant?->payment_order_id)));
 
         return [
             'id' => $order->id,
@@ -1071,15 +1345,41 @@ class OrderController extends Controller
             'product_name' => $order->product_name,
             'quantity' => $order->quantity,
             'packaging_details' => $order->packaging_details,
+            'target_unit_price' => $order->target_unit_price,
+            'delivery_contact_name' => $isBuyer || $isAssignedVendor
+                ? $deliveryContactName
+                : null,
+            'delivery_contact_phone' => $isBuyer || $isAssignedVendor
+                ? $deliveryContactPhone
+                : null,
+            'delivery_area_id' => ($isBuyer || $isAssignedVendor)
+                ? $deliveryAreaId
+                : null,
             'delivery_address' => $order->type === Order::TYPE_DIRECT && ($isBuyer || $isAssignedVendor)
                 ? $order->delivery_address
-                : null,
+                : ($currentParticipant && ($isBuyer || $isAssignedVendor)
+                    ? $currentParticipant->delivery_address
+                    : null),
+            'delivery_area_name' => $order->type === Order::TYPE_DIRECT
+                ? $order->delivery_area_name
+                : $currentParticipant?->delivery_area_name,
             'notes' => $order->notes,
             'status' => $order->status,
             'status_label' => Order::STATUS_LABELS[$order->status] ?? 'Status tidak dikenal',
             'is_simulated' => $order->is_simulated,
             'unit_price' => $order->unit_price,
             'total_amount' => $order->total_amount,
+            'subtotal_amount' => $order->type === Order::TYPE_DIRECT
+                ? $order->subtotal_amount
+                : $currentParticipant?->subtotal_amount,
+            'shipping_amount' => $shippingAmount,
+            'platform_fee_amount' => $order->type === Order::TYPE_DIRECT
+                ? $order->platform_fee_amount
+                : $currentParticipant?->platform_fee_amount,
+            'shipping_service' => $shippingService,
+            'shipping_courier' => $order->type === Order::TYPE_DIRECT
+                ? $order->shipping_courier
+                : $currentParticipant?->shipping_courier,
             'payment_status' => $order->payment_status,
             'quote_status' => $order->quote_status,
             'payment_receipt' => ($isBuyer || $isAssignedVendor) && $order->payment_status === 'paid'
@@ -1094,6 +1394,20 @@ class OrderController extends Controller
             'payment_amount' => $order->type === Order::TYPE_DIRECT
                 ? $order->total_amount
                 : $currentParticipant?->payment_amount,
+            'vendor_origin_configured' => $vendorOriginConfigured,
+            'delivery_details_complete' => $deliveryDetailsComplete,
+            'can_edit_delivery_details' => $canEditDeliveryDetails,
+            'shipping_block_reason' => $user->role === 'umkm'
+                && $order->status === Order::STATUS_WAITING
+                && $order->quote_status === 'accepted'
+                && in_array($currentPaymentStatus, ['pending', 'failed'], true)
+                    ? (! $vendorOriginConfigured
+                        ? 'Vendor perlu melengkapi alamat lengkap dan area asal pengiriman di Profil usaha sebelum ongkir dapat dihitung.'
+                        : (! $deliveryDetailsComplete
+                            ? 'Lengkapi biodata penerima dan lokasi pengiriman di tab Pesanan sebelum memilih kurir.'
+                            : null))
+                    : null,
+            'can_select_shipping' => $canSelectShipping,
             'can_set_price' => $isAssignedVendor
                 && $order->status === Order::STATUS_WAITING
                 && ! $order->is_simulated
@@ -1107,6 +1421,8 @@ class OrderController extends Controller
                     : $currentParticipant?->quote_status === 'pending_buyer'),
             'can_pay' => $user->role === 'umkm'
                 && $order->status === Order::STATUS_WAITING
+                && filled($shippingService)
+                && $shippingAmount !== null
                 && ($order->type === Order::TYPE_DIRECT
                     ? $isBuyer && in_array($order->payment_status, ['pending', 'failed'], true)
                     : $currentParticipant !== null
@@ -1129,6 +1445,27 @@ class OrderController extends Controller
                     : null,
                 'payment_amount' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
                     ? $participant->payment_amount
+                    : null,
+                'subtotal_amount' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->subtotal_amount
+                    : null,
+                'shipping_amount' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->shipping_amount
+                    : null,
+                'platform_fee_amount' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->platform_fee_amount
+                    : null,
+                'delivery_area_name' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->delivery_area_name
+                    : null,
+                'delivery_contact_name' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->delivery_contact_name
+                    : null,
+                'delivery_contact_phone' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->delivery_contact_phone
+                    : null,
+                'delivery_address' => $isBuyer || $isAssignedVendor || $participant->user_id === $user->id
+                    ? $participant->delivery_address
                     : null,
                 'payment_receipt' => ($isBuyer || $isAssignedVendor || $participant->user_id === $user->id)
                     && $participant->payment_status === 'paid'

@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
 use App\Models\AdPlacementSetting;
+use App\Models\Order;
+use App\Models\OrderParticipant;
+use App\Models\VendorSubscription;
 use App\Services\MidtransSnapService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
@@ -22,6 +25,17 @@ class AdvertisementController extends Controller
 {
     public function index(): View
     {
+        $directPlatformFees = Order::query()
+            ->where('type', Order::TYPE_DIRECT)
+            ->where('payment_status', 'paid')
+            ->sum('platform_fee_amount');
+        $groupPlatformFees = OrderParticipant::query()
+            ->where('payment_status', 'paid')
+            ->sum('platform_fee_amount');
+        $subscriptionIncome = VendorSubscription::query()
+            ->where('payment_status', 'paid')
+            ->sum('amount');
+
         return view('admin.customize', [
             'campaigns' => AdCampaign::query()
                 ->with(['vendor:id,name,email', 'reviewedBy:id,name'])
@@ -30,6 +44,11 @@ class AdvertisementController extends Controller
             'verifiedIncome' => AdCampaign::query()
                 ->where('payment_status', 'paid')
                 ->sum('amount'),
+            'platformFeeIncome' => (int) $directPlatformFees + (int) $groupPlatformFees,
+            'subscriptionIncome' => (int) $subscriptionIncome,
+            'totalIncome' => (int) AdCampaign::query()
+                ->where('payment_status', 'paid')
+                ->sum('amount') + (int) $directPlatformFees + (int) $groupPlatformFees + (int) $subscriptionIncome,
             'slotSettings' => AdPlacementSetting::query()->get()->keyBy('placement'),
             'activeTopCount' => $this->activeCampaigns(['top', 'global'])->count(),
             'activeSidebarCount' => $this->activeCampaigns(['sidebar'])->count(),

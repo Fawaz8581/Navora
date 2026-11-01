@@ -33,6 +33,7 @@
                     </div>
                     <div class="onboarding-review-row"><span>Pemilik akun</span><strong>{{ $profile->user->name }}</strong></div>
                     <div class="onboarding-review-row"><span>Lokasi</span><strong>{{ $profile->location ?: 'Belum diisi' }}</strong></div>
+                    <div class="onboarding-review-row"><span>Alamat lengkap usaha</span><strong>{{ $profile->business_address ?: 'Belum diisi' }}</strong></div>
                     <div class="onboarding-review-row"><span>Status</span><strong>{{ ucfirst($profile->verification_status) }}</strong></div>
                     <div class="onboarding-review-row"><span>Dikirim</span><strong>{{ $profile->verification_submitted_at?->format('d M Y, H:i') ?: '—' }}</strong></div>
                 </section>
