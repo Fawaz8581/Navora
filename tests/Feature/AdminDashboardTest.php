@@ -3,6 +3,7 @@
 use App\Models\BusinessProfile;
 use App\Models\Feedback;
 use App\Models\User;
+use App\Models\VendorListing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -16,6 +17,15 @@ test('admins can open the dashboard and review platform statistics', function ()
         'business_name' => 'Vendor Menunggu',
         'verification_status' => 'pending',
         'verification_submitted_at' => now(),
+    ]);
+    $pendingVendor->vendorListings()->create([
+        'client_reference' => 'admin-dashboard-listing',
+        'name' => 'Katalog menunggu ACC',
+        'category' => 'packaging',
+        'material' => 'Kraft',
+        'minimum_order_quantity' => 500,
+        'description' => 'Menunggu tinjauan admin.',
+        'status' => VendorListing::STATUS_PENDING,
     ]);
 
     $approvedVendor = User::factory()->create(['role' => 'vendor']);
@@ -40,10 +50,12 @@ test('admins can open the dashboard and review platform statistics', function ()
         ->assertSee('PERLU TINDAK LANJUT')
         ->assertSee('Akses cepat')
         ->assertSee('Paket dan iklan')
+        ->assertSee('Persetujuan katalog')
         ->assertSee('Vendor Menunggu')
         ->assertSee('Tinjau pengajuan')
         ->assertSee(route('admin.dashboard'), false)
         ->assertSee(route('admin.vendor-verifications.index'), false)
+        ->assertSee(route('admin.vendor-listings.index'), false)
         ->assertSee(route('admin.feedback.index'), false);
 });
 

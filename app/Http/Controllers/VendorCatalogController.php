@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\BusinessProfile;
+use App\Models\VendorListing;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -41,14 +43,29 @@ class VendorCatalogController extends Controller
             ->where('verification_status', 'approved')
             ->whereNotNull('completed_at')
             ->whereHas('user', fn (Builder $users) => $users->where('role', 'vendor'))
-            ->with('user:id,name')
+            ->with([
+                'user:id,name',
+                'user.vendorListings' => fn (HasMany $listings) => $listings
+                    ->where('status', VendorListing::STATUS_ACTIVE)
+                    ->latest('id')
+                    ->limit(10),
+            ])
             ->when($validated['search'] ?? null, function (Builder $query, string $search): void {
                 $query->where(function (Builder $matches) use ($search): void {
                     $matches
                         ->where('business_name', 'like', '%'.$search.'%')
                         ->orWhere('product_categories', 'like', '%'.$search.'%')
                         ->orWhere('materials', 'like', '%'.$search.'%')
-                        ->orWhere('description', 'like', '%'.$search.'%');
+                        ->orWhere('description', 'like', '%'.$search.'%')
+                        ->orWhereHas('user.vendorListings', fn (Builder $listings) => $listings
+                            ->where('status', VendorListing::STATUS_ACTIVE)
+                            ->where(function (Builder $matches) use ($search): void {
+                                $matches
+                                    ->where('name', 'like', '%'.$search.'%')
+                                    ->orWhere('category', 'like', '%'.$search.'%')
+                                    ->orWhere('material', 'like', '%'.$search.'%')
+                                    ->orWhere('description', 'like', '%'.$search.'%');
+                            }));
                 });
             })
             ->when($validated['category'] ?? null, fn (Builder $query, string $category) => $query
@@ -105,6 +122,16 @@ class VendorCatalogController extends Controller
                 'has_sample' => count($profile->work_sample_paths ?? []) > 0,
                 'certificate_count' => count($profile->certificate_paths ?? []),
                 'distance_km' => $distance,
+                'listings' => $profile->user?->vendorListings
+                    ->map(fn (VendorListing $listing): array => [
+                        'name' => $listing->name,
+                        'category' => $listing->category,
+                        'material' => $listing->material,
+                        'minimum_order_quantity' => $listing->minimum_order_quantity,
+                        'description' => $listing->description,
+                    ])
+                    ->values()
+                    ->all() ?? [],
             ];
         })
             ->when(isset($validated['distance_km']), fn ($results) => $results

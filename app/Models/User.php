@@ -47,6 +47,11 @@ class User extends Authenticatable
         return $this->hasMany(AdCampaign::class, 'vendor_user_id');
     }
 
+    public function vendorListings(): HasMany
+    {
+        return $this->hasMany(VendorListing::class, 'vendor_user_id');
+    }
+
     /**
      * Get the attributes that should be cast.
      *

@@ -36,6 +36,9 @@
             <a href="{{ route('admin.vendor-verifications.index') }}" @class(['is-active' => request()->routeIs('admin.vendor-verifications.*')])>
                 <i class="bi bi-patch-check"></i> Verifikasi vendor
             </a>
+            <a href="{{ route('admin.vendor-listings.index') }}" @class(['is-active' => request()->routeIs('admin.vendor-listings.*')])>
+                <i class="bi bi-box-seam"></i> Persetujuan katalog
+            </a>
             <a href="{{ route('admin.customize.index') }}" @class(['is-active' => request()->routeIs('admin.customize.*')])>
                 <i class="bi bi-sliders"></i> Customize
             </a>

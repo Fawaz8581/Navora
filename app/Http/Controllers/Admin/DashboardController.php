@@ -7,6 +7,7 @@ use App\Models\AdCampaign;
 use App\Models\BusinessProfile;
 use App\Models\Feedback;
 use App\Models\User;
+use App\Models\VendorListing;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -25,6 +26,9 @@ class DashboardController extends Controller
                 'pending_verifications' => (clone $vendorProfiles)->where('verification_status', 'pending')->count(),
                 'feedback' => Feedback::query()->count(),
                 'pending_ad_payments' => AdCampaign::query()->where('status', AdCampaign::STATUS_PAID)->count(),
+                'pending_vendor_listings' => VendorListing::query()
+                    ->where('status', VendorListing::STATUS_PENDING)
+                    ->count(),
             ],
             'recentVerifications' => (clone $vendorProfiles)
                 ->with('user:id,name,email')

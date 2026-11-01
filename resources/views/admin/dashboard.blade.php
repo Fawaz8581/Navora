@@ -14,6 +14,9 @@
                     <a class="admin-dashboard-primary-action" href="{{ route('admin.vendor-verifications.index', ['status' => 'pending']) }}">
                         Tinjau pengajuan <i class="bi bi-arrow-up-right"></i>
                     </a>
+                    <a class="admin-dashboard-secondary-action" href="{{ route('admin.vendor-listings.index') }}">
+                        ACC katalog @if ($stats['pending_vendor_listings'] > 0)({{ number_format($stats['pending_vendor_listings']) }})@endif <i class="bi bi-arrow-up-right"></i>
+                    </a>
                     <a class="admin-dashboard-secondary-action" href="{{ route('admin.feedback.index') }}">
                         Buka masukan <i class="bi bi-arrow-right"></i>
                     </a>
@@ -25,8 +28,8 @@
                 <div class="admin-welcome-summary">
                     <span class="admin-welcome-summary-icon"><i class="bi bi-activity"></i></span>
                     <span class="admin-welcome-summary-label">PERLU TINDAK LANJUT</span>
-                    <strong>{{ number_format($stats['pending_verifications'] + $stats['pending_ad_payments']) }}</strong>
-                    <span class="admin-welcome-summary-copy">pengajuan vendor dan pembayaran iklan</span>
+                    <strong>{{ number_format($stats['pending_verifications'] + $stats['pending_ad_payments'] + $stats['pending_vendor_listings']) }}</strong>
+                    <span class="admin-welcome-summary-copy">verifikasi, katalog vendor, dan pembayaran iklan</span>
                 </div>
                 <div class="admin-welcome-floating-icon admin-welcome-floating-icon-one"><i class="bi bi-shop"></i></div>
                 <div class="admin-welcome-floating-icon admin-welcome-floating-icon-two"><i class="bi bi-megaphone"></i></div>
@@ -67,6 +70,11 @@
                     <div class="admin-stat-card-heading"><span>Pembayaran iklan</span><span class="admin-stat-icon admin-stat-gold"><i class="bi bi-megaphone"></i></span></div>
                     <strong>{{ number_format($stats['pending_ad_payments']) }}</strong>
                     <small>Menunggu pemeriksaan</small>
+                </article>
+                <article class="admin-stat-card admin-stat-pending">
+                    <div class="admin-stat-card-heading"><span>Katalog vendor</span><span class="admin-stat-icon admin-stat-blue"><i class="bi bi-box-seam"></i></span></div>
+                    <strong>{{ number_format($stats['pending_vendor_listings']) }}</strong>
+                    <small>Menunggu ACC admin</small>
                 </article>
             </div>
         </section>
@@ -118,6 +126,12 @@
                     <span class="admin-quick-icon"><i class="bi bi-patch-check"></i></span>
                     <span><strong>Verifikasi vendor</strong><small>Tinjau profil dan dokumen</small></span>
                     @if ($stats['pending_verifications'] > 0)<span class="admin-quick-count">{{ number_format($stats['pending_verifications']) }}</span>@endif
+                    <i class="bi bi-arrow-up-right"></i>
+                </a>
+                <a href="{{ route('admin.vendor-listings.index') }}">
+                    <span class="admin-quick-icon"><i class="bi bi-box-seam"></i></span>
+                    <span><strong>Persetujuan katalog</strong><small>ACC produk sebelum tayang</small></span>
+                    @if ($stats['pending_vendor_listings'] > 0)<span class="admin-quick-count">{{ number_format($stats['pending_vendor_listings']) }}</span>@endif
                     <i class="bi bi-arrow-up-right"></i>
                 </a>
                 <a href="{{ route('admin.feedback.index') }}">

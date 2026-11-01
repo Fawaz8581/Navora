@@ -26,6 +26,10 @@
     let orderListData = [];
     let orderNextPageUrl = null;
     let orderSubmissionInProgress = false;
+    let vendorListings = [];
+    let vendorListingsVerified = false;
+    let vendorListingsLoadPromise = null;
+    let listingSubmissionInProgress = false;
     let vendorCatalogTimer = 0;
     let vendorOrigin = null;
     let vendorCatalogRequestController = null;
@@ -231,7 +235,7 @@
         setText('[data-account-type]', roleLabel(role));
         setText('[data-account-location]', accountLocation);
         setText('[data-account-avatar]', accountName.trim().charAt(0).toUpperCase() || 'N');
-        setText('[data-stat-listings]', String(3 + state.listings.length));
+        setText('[data-stat-listings]', String(vendorListings.length + state.listings.length));
         setText('[data-stat-incoming]', String(2 + state.quotes.length));
         setText('[data-verification-summary]', state.verificationRequested ? 'Demo dikirim' : 'Draft');
 
@@ -287,6 +291,10 @@
 
         if (page === 'vendors') {
             updateVendorFilters();
+        }
+
+        if (page === 'listings') {
+            loadVendorListings();
         }
     };
 
@@ -493,7 +501,22 @@
             vendor.has_sample ? 'Sampel tersedia' : 'Sampel belum tersedia',
             vendor.certificate_count ? `${vendor.certificate_count} sertifikat terdaftar` : 'Tidak ada sertifikat terdaftar',
         ].filter(Boolean).forEach((tag) => tags.append(textElement('span', '', tag)));
-        content.append(heading, textElement('p', '', vendor.description || 'Vendor belum menambahkan deskripsi.'), tags);
+        content.append(heading, textElement('p', '', vendor.description || 'Vendor belum menambahkan deskripsi.'));
+        if (Array.isArray(vendor.listings) && vendor.listings.length) {
+            const activeProducts = textElement('div', 'navora-vendor-active-listings', '');
+            activeProducts.append(textElement('strong', '', 'Produk tersedia'));
+            const productList = document.createElement('ul');
+            vendor.listings.forEach((listing) => {
+                productList.append(textElement(
+                    'li',
+                    '',
+                    `${listing.name} · MOQ ${Number(listing.minimum_order_quantity).toLocaleString('id-ID')} pcs`,
+                ));
+            });
+            activeProducts.append(productList);
+            content.append(activeProducts);
+        }
+        content.append(tags);
 
         const specs = textElement('div', 'navora-vendor-specs', '');
         details.forEach((detail) => specs.append(textElement('span', '', detail)));
@@ -739,18 +762,30 @@
         }));
     };
 
-    const renderStoredListings = () => {
+    const renderVendorListings = () => {
         const container = document.querySelector('[data-vendor-listings]');
 
         if (!container) {
             return;
         }
 
-        container.querySelectorAll('[data-stored-listing]').forEach((card) => card.remove());
-        state.listings.forEach((listing) => {
+        container.replaceChildren();
+
+        const listings = [
+            ...vendorListings.map((listing) => ({ ...listing, localDraft: false })),
+            ...state.listings.map((listing) => ({
+                ...listing,
+                client_reference: listing.id,
+                minimum_order_quantity: listing.moq,
+                localDraft: true,
+                status: 'draft',
+            })),
+        ];
+
+        listings.forEach((listing) => {
             const card = document.createElement('article');
             card.className = 'navora-listing-card';
-            card.dataset.storedListing = 'true';
+            card.dataset.serverListing = String(!listing.localDraft);
             const productDetails = `${listing.name} ${listing.description} ${listing.material}`.toLocaleLowerCase('id');
             const imageSource = productDetails.includes('botol')
                 ? '/images/products/bottle.jpg'
@@ -763,17 +798,118 @@
             productImage.alt = `Foto referensi produk ${listing.name}`;
             productImage.loading = 'lazy';
             art.append(productImage);
+            const statusLabel = listing.status === 'active'
+                ? 'Aktif'
+                : listing.status === 'pending'
+                    ? 'Menunggu ACC admin'
+                    : 'Draft';
             const content = textElement('div', '', '');
             content.append(
                 textElement('h2', '', listing.name),
-                textElement('p', '', `MOQ ${Number(listing.moq).toLocaleString('id-ID')} pcs · ${listing.material} · ${listing.description}`),
-                textElement('small', '', 'Tersimpan lokal · belum dipublikasikan'),
+                textElement('p', '', `MOQ ${Number(listing.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs · ${listing.material} · ${listing.description}`),
+                textElement('small', '', listing.localDraft
+                    ? 'Draft demo tersimpan di browser ini, belum masuk ke admin'
+                    : listing.status === 'pending'
+                        ? 'Sudah diajukan dan menunggu pemeriksaan admin'
+                        : 'Tersimpan di akun vendor'),
             );
-            card.append(art, content, textElement('span', 'navora-status-pill status-waiting', 'Draft'));
-            container.prepend(card);
+            const isActive = listing.status === 'active';
+            card.append(
+                art,
+                content,
+                textElement('span', `navora-status-pill ${isActive ? 'status-open' : 'status-waiting'}`, statusLabel),
+            );
+
+            if (!isActive && authenticatedRole === 'vendor'
+                && (listing.localDraft || listing.status === 'draft' || listing.status === 'rejected')
+                && vendorListingsVerified) {
+                const submitButton = textElement(
+                    'button',
+                    'btn navora-app-outline navora-listing-review-submit',
+                    'Kirim ke admin',
+                );
+                submitButton.type = 'button';
+                submitButton.dataset.action = 'submit-vendor-listing';
+                submitButton.dataset.listingReference = String(listing.localDraft ? listing.client_reference : listing.id);
+                submitButton.dataset.localDraft = String(listing.localDraft);
+                card.append(submitButton);
+            }
+
+            container.append(card);
         });
 
-        setText('[data-stat-listings]', String(3 + state.listings.length));
+        const empty = document.querySelector('[data-vendor-listings-empty]');
+        if (empty) {
+            empty.hidden = listings.length > 0;
+        }
+
+        setText('[data-stat-listings]', String(listings.length));
+    };
+
+    const renderStoredListings = () => {
+        renderVendorListings();
+    };
+
+    const loadVendorListings = async () => {
+        if (authenticatedRole !== 'vendor' || !authenticatedUserId) {
+            return;
+        }
+
+        if (vendorListingsLoadPromise) {
+            return vendorListingsLoadPromise;
+        }
+
+        const loading = document.querySelector('[data-vendor-listings-loading]');
+        const error = document.querySelector('[data-vendor-listings-error]');
+        if (loading) {
+            loading.hidden = false;
+        }
+        if (error) {
+            error.hidden = true;
+            error.replaceChildren();
+        }
+
+        vendorListingsLoadPromise = (async () => {
+            try {
+                const payload = await requestOrderData(document.body.dataset.vendorListingsUrl);
+                vendorListings = Array.isArray(payload.listings) ? payload.listings : [];
+                vendorListingsVerified = Boolean(payload.verified);
+                renderVendorListings();
+
+                const notice = document.querySelector('[data-vendor-listing-notice] div');
+                if (notice) {
+                    notice.replaceChildren(
+                        textElement('strong', '', vendorListingsVerified
+                            ? 'Profil terverifikasi · katalog menunggu ACC admin'
+                            : 'Tunggu verifikasi profil sebelum mengajukan katalog'),
+                        textElement('p', '', vendorListingsVerified
+                            ? 'Produk baru perlu ditinjau admin. Produk hanya aktif dan terlihat UMKM setelah disetujui.'
+                            : 'Lengkapi dokumen usaha dan tunggu persetujuan admin atas profil vendor.'),
+                    );
+                }
+            } catch (requestError) {
+                console.error('Navora could not load vendor listings.', requestError);
+                if (error) {
+                    error.replaceChildren(textElement(
+                        'span',
+                        '',
+                        requestError.message || 'Katalog tidak dapat dimuat. Coba muat ulang.',
+                    ));
+                    const retry = textElement('button', 'navora-text-action', 'Coba lagi');
+                    retry.type = 'button';
+                    retry.dataset.action = 'retry-vendor-listings';
+                    error.append(retry);
+                    error.hidden = false;
+                }
+            } finally {
+                if (loading) {
+                    loading.hidden = true;
+                }
+                vendorListingsLoadPromise = null;
+            }
+        })();
+
+        return vendorListingsLoadPromise;
     };
 
     const renderStoredRfqs = () => {
@@ -1663,9 +1799,11 @@
     const createListing = () => {
         openModal({
             title: 'Tambahkan item katalog',
-            description: 'Informasi akan disimpan lokal sebagai draft dan tidak dipublikasikan ke marketplace.',
+            description: authenticatedRole === 'vendor'
+                ? 'Katalog disimpan di akun dan menunggu persetujuan admin. Pastikan profil vendor sudah terverifikasi.'
+                : 'Informasi akan disimpan lokal sebagai draft demo dan tidak dipublikasikan ke marketplace.',
             icon: 'bi-box-seam',
-            submit: 'Simpan draft demo',
+            submit: authenticatedRole === 'vendor' ? 'Kirim untuk ditinjau' : 'Simpan draft demo',
             fields: [
                 modalTextField('name', 'Nama layanan atau produk', 'Contoh: pouch kopi cetak'),
                 { name: 'category', label: 'Jenis layanan', type: 'select', required: true, options: [{ value: 'packaging', label: 'Kemasan' }, { value: 'printing', label: 'Percetakan' }, { value: 'maklon', label: 'Maklon' }] },
@@ -1674,6 +1812,18 @@
                 { name: 'description', label: 'Deskripsi singkat', placeholder: 'Jelaskan opsi atau kapasitas layanan', type: 'textarea', required: true, rows: 3 },
             ],
             onSubmit: (values) => {
+                if (authenticatedRole === 'vendor') {
+                    submitVendorListing({
+                        client_reference: window.crypto?.randomUUID?.() || `listing-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                        name: values.name.trim(),
+                        category: values.category,
+                        material: values.material.trim() || 'Belum ditentukan',
+                        minimum_order_quantity: Number(values.moq),
+                        description: values.description.trim(),
+                    }, false);
+                    return false;
+                }
+
                 state.listings.unshift({
                     id: `listing-${Date.now()}`,
                     name: values.name.trim(),
@@ -1688,6 +1838,76 @@
                 return true;
             },
         });
+    };
+
+    const submitVendorListing = async (listing, localDraft) => {
+        if (listingSubmissionInProgress) {
+            return;
+        }
+
+        listingSubmissionInProgress = true;
+        const submitButton = modalForm?.querySelector('[data-modal-submit]');
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+
+        try {
+            const response = await requestOrderData(document.body.dataset.vendorListingsStoreUrl, {
+                method: 'POST',
+                body: JSON.stringify(listing),
+            });
+
+            if (localDraft) {
+                state.listings = state.listings.filter((item) => item.id !== listing.client_reference);
+                saveState();
+            } else {
+                closeModal();
+            }
+
+            vendorListings = [
+                response.listing,
+                ...vendorListings.filter((item) => item.id !== response.listing.id),
+            ];
+            renderVendorListings();
+            showToast(response.listing.status === 'pending'
+                ? 'Katalog sudah dikirim ke admin dan akan aktif setelah disetujui.'
+                : 'Katalog berhasil disimpan.');
+        } catch (requestError) {
+            console.error('Navora could not save the vendor listing.', requestError);
+            showToast(requestError.message || 'Katalog tidak dapat disimpan. Coba lagi.');
+        } finally {
+            listingSubmissionInProgress = false;
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        }
+    };
+
+    const submitVendorListingFromCard = (button) => {
+        const isLocalDraft = button.dataset.localDraft === 'true';
+        const reference = button.dataset.listingReference;
+
+        if (!reference || listingSubmissionInProgress) {
+            return;
+        }
+
+        const listing = isLocalDraft
+            ? state.listings.find((item) => item.id === reference)
+            : vendorListings.find((item) => String(item.id) === reference);
+
+        if (!listing) {
+            showToast('Draft katalog tidak ditemukan. Muat ulang halaman dan coba lagi.');
+            return;
+        }
+
+        submitVendorListing({
+            client_reference: isLocalDraft ? listing.id : listing.client_reference,
+            name: listing.name,
+            category: listing.category,
+            material: listing.material || 'Belum ditentukan',
+            minimum_order_quantity: Number(listing.minimum_order_quantity || listing.moq),
+            description: listing.description,
+        }, isLocalDraft);
     };
 
     const createVendorQuote = (rfqId) => {
@@ -1850,6 +2070,10 @@
             createGroup();
         } else if (action === 'add-listing') {
             createListing();
+        } else if (action === 'submit-vendor-listing') {
+            submitVendorListingFromCard(button);
+        } else if (action === 'retry-vendor-listings') {
+            loadVendorListings();
         } else if (action === 'respond-rfq') {
             createVendorQuote(button.dataset.rfq || 'rfq-demo-1');
         } else if (action === 'quote-detail') {
@@ -2075,6 +2299,9 @@
         state.role = requestedRole;
     }
     updateRoleContent();
+    if (authenticatedRole === 'vendor') {
+        loadVendorListings();
+    }
 
     const requestedPage = urlParams.get('tab');
     const requestedSearch = urlParams.get('q');

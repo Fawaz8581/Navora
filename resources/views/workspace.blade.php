@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="{{ asset('css/navora-app.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/navora-app.css').'?v='.filemtime(public_path('css/navora-app.css')) }}" rel="stylesheet">
     <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
 </head>
 <body class="navora-app-body"
@@ -19,6 +19,8 @@
     data-auth-name="{{ auth()->user()->name ?? '' }}"
     data-auth-user-id="{{ auth()->id() ?? '' }}"
     data-vendor-catalog-url="{{ route('vendors.catalog') }}"
+    data-vendor-listings-url="{{ route('vendor.listings.index') }}"
+    data-vendor-listings-store-url="{{ route('vendor.listings.store') }}"
     data-orders-url="{{ route('orders.index') }}"
     data-orders-store-url="{{ route('orders.store') }}"
     data-orders-quote-url="{{ route('orders.quote') }}"
@@ -121,7 +123,7 @@
                     <article><span class="navora-stat-icon stat-lilac"><i class="bi bi-lightbulb"></i></span><div><span>Ide kemasan</span><strong>Siap</strong><small>Asisten berbasis demo</small></div></article>
                 </div>
                 <div class="navora-overview-stats" data-role-content="vendor" hidden>
-                    <article><span class="navora-stat-icon stat-blue"><i class="bi bi-box-seam"></i></span><div><span>Katalog demo</span><strong data-stat-listings>3</strong><small>Produk ditampilkan</small></div></article>
+                    <article><span class="navora-stat-icon stat-blue"><i class="bi bi-box-seam"></i></span><div><span>Katalog saya</span><strong data-stat-listings>0</strong><small>Produk ditampilkan</small></div></article>
                     <article><span class="navora-stat-icon stat-teal"><i class="bi bi-chat-square-text"></i></span><div><span>RFQ masuk</span><strong data-stat-incoming>2</strong><small>Contoh permintaan</small></div></article>
                     <article><span class="navora-stat-icon stat-gold"><i class="bi bi-people"></i></span><div><span>Patungan relevan</span><strong>2</strong><small>Peluang kolaborasi</small></div></article>
                     <article><span class="navora-stat-icon stat-lilac"><i class="bi bi-patch-check"></i></span><div><span>Status profil</span><strong data-verification-summary>Draft</strong><small>Verifikasi belum nyata</small></div></article>
@@ -268,19 +270,18 @@
             </section>
 
             <section class="navora-page-panel" data-page-panel="listings" role="tabpanel" hidden>
-                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Katalog saya</span></div><h1>Tampilkan layanan bisnismu</h1><p>Kelola contoh katalog dan profil vendor pada sesi demo ini.</p></div><button class="btn navora-app-primary" type="button" data-action="add-listing"><i class="bi bi-plus-lg"></i> Tambah katalog</button></div>
-                <div class="navora-vendor-setup"><span><i class="bi bi-patch-check"></i></span><div><strong>Lengkapi profil sebelum menerima permintaan</strong><p>Ajukan dokumen usaha untuk diperiksa admin Navora. Persetujuan verifikasi akan ditampilkan di profil vendor.</p></div>
+                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Katalog saya</span></div><h1>Tampilkan layanan bisnismu</h1><p>Kirim katalog untuk ditinjau admin. Produk baru aktif setelah disetujui.</p></div><button class="btn navora-app-primary" type="button" data-action="add-listing"><i class="bi bi-plus-lg"></i> Tambah katalog</button></div>
+                <div class="navora-vendor-setup" data-vendor-listing-notice><span><i class="bi bi-patch-check"></i></span><div><strong data-vendor-listing-notice-copy>Katalog perlu persetujuan admin</strong><p>Produk baru perlu ditinjau admin. Produk hanya aktif dan terlihat UMKM setelah disetujui.</p></div>
                     @if (auth()->check() && auth()->user()->role === 'vendor')
                         <a class="btn navora-app-outline" href="{{ route('vendor.verification.index') }}">Verifikasi profil <i class="bi bi-arrow-right"></i></a>
                     @else
-                        <button class="btn navora-app-outline" type="button" data-action="verify-profile">Lihat status demo <i class="bi bi-arrow-right"></i></button>
+                        <a class="btn navora-app-outline" href="{{ route('login') }}">Masuk untuk mengajukan <i class="bi bi-arrow-right"></i></a>
                     @endif
                 </div>
-                <div class="navora-vendor-listings" data-vendor-listings>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-pouch"><img src="{{ asset('images/products/coffee.jpg') }}" alt="Foto referensi kemasan pouch kopi" loading="lazy"></span><div><h2>Standing pouch custom</h2><p>MOQ 500 pcs · Pouch laminasi · Sampel tersedia</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-box"><img src="{{ asset('images/products/cardboard.jpg') }}" alt="Foto referensi kotak kemasan karton" loading="lazy"></span><div><h2>Box kemasan makanan</h2><p>MOQ 1.000 pcs · Kraft paper · Cetak satu warna</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
-                    <article class="navora-listing-card" data-listing-card><span class="navora-listing-art art-bottle"><img src="{{ asset('images/products/bottle.jpg') }}" alt="Foto referensi botol kemasan" loading="lazy"></span><div><h2>Konsultasi kemasan awal</h2><p>Diskusi kebutuhan · Rekomendasi material · Sesi sampel</p><small><i class="bi bi-eye"></i> Aktif di katalog demo</small></div><span class="navora-status-pill status-open">Aktif</span><button class="navora-more-button" type="button" aria-label="Opsi katalog"><i class="bi bi-three-dots"></i></button></article>
-                </div>
+                <div class="navora-empty-state" data-vendor-listings-loading hidden><i class="bi bi-arrow-repeat"></i><strong>Memuat katalog</strong><span>Menyiapkan layanan yang tersimpan di akunmu.</span></div>
+                <div class="navora-order-error" data-vendor-listings-error role="alert" hidden></div>
+                <div class="navora-empty-state" data-vendor-listings-empty hidden><i class="bi bi-box-seam"></i><strong>Belum ada katalog</strong><span>Tambahkan produk atau layanan untuk diajukan ke admin.</span></div>
+                <div class="navora-vendor-listings" data-vendor-listings></div>
             </section>
 
             <section class="navora-page-panel" data-page-panel="programs" role="tabpanel" hidden>
@@ -393,6 +394,6 @@
         </section>
     </div>
     <div class="navora-toast" role="status" aria-live="polite" data-toast></div>
-    <script src="{{ asset('js/navora-app.js') }}" defer></script>
+    <script src="{{ asset('js/navora-app.js').'?v='.filemtime(public_path('js/navora-app.js')) }}" defer></script>
 </body>
 </html>

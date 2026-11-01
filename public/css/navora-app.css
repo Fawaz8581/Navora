@@ -1150,6 +1150,31 @@ body.navora-app-body {
     font-weight: 600;
 }
 
+.navora-vendor-active-listings {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0;
+    padding: 9px 10px;
+    border: 1px solid #e4eee9;
+    border-radius: 8px;
+    background: #f7fbf8;
+}
+
+.navora-vendor-active-listings > strong {
+    color: #477d68;
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.navora-vendor-active-listings ul {
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    padding-left: 14px;
+    color: #647d8e;
+    font-size: 8px;
+}
+
 .navora-vendor-specs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1882,6 +1907,13 @@ body.navora-app-body {
 
 .navora-listing-card > .navora-status-pill {
     margin-left: auto;
+}
+
+.navora-listing-review-submit {
+    flex: none;
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 9px;
 }
 
 .navora-program-grid {

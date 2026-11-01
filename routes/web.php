@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AdminAccountSetupController;
 use App\Http\Controllers\Admin\AdvertisementController as AdminAdvertisementController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
+use App\Http\Controllers\Admin\VendorListingController as AdminVendorListingController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\AdvertisementAssetController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
+use App\Http\Controllers\VendorListingController;
 use App\Http\Controllers\VendorVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,6 +70,10 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/katalog/vendor', VendorCatalogController::class)->name('vendors.catalog');
+    Route::get('/vendor/katalog-saya', [VendorListingController::class, 'index'])->name('vendor.listings.index');
+    Route::post('/vendor/katalog-saya', [VendorListingController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('vendor.listings.store');
     Route::get('/katalog/vendor/{businessProfile}/foto/{index}', [VendorCatalogController::class, 'showSample'])
         ->whereNumber('index')
         ->name('vendors.catalog.image');
@@ -123,6 +129,15 @@ Route::middleware('auth')->group(function () {
             Route::get('/{businessProfile}/documents/{type}/{index}', [AdminVendorVerificationController::class, 'download'])
                 ->whereNumber('index')
                 ->name('documents');
+        });
+
+    Route::prefix('admin/vendor-listings')
+        ->name('admin.vendor-listings.')
+        ->middleware('admin')
+        ->group(function () {
+            Route::get('/', [AdminVendorListingController::class, 'index'])->name('index');
+            Route::post('/{vendorListing}/approve', [AdminVendorListingController::class, 'approve'])
+                ->name('approve');
         });
 
     Route::get('/admin', AdminDashboardController::class)

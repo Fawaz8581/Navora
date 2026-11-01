@@ -13,6 +13,8 @@ test('the workspace route renders the Navora marketplace demo and its assets', f
         ->assertSee('Cari vendor')
         ->assertSee('Patungan MOQ')
         ->assertSee('Pesanan dan pelacakan')
+        ->assertSee('Kirim katalog untuk ditinjau admin.')
+        ->assertSee('Masuk untuk mengajukan')
         ->assertSee(route('orders.index'), false)
         ->assertSee('Permintaan penawaran')
         ->assertSee('Asisten kemasan')
@@ -42,6 +44,7 @@ test('a signed-in user sees the workspace for their saved role without the demo 
         ->assertOk()
         ->assertSee('data-auth-role="vendor"', false)
         ->assertSee('data-auth-name="Vendor Navora"', false)
+        ->assertSee('Produk baru perlu ditinjau admin.')
         ->assertSee('Vendor')
         ->assertDontSee('data-role-select', false);
 });
