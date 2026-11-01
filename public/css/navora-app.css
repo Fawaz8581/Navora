@@ -265,6 +265,41 @@ body.navora-app-body {
     background: #d78a6e;
 }
 
+.navora-mail-notification {
+    color: #63788a;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.navora-tab-count {
+    display: inline-grid;
+    min-width: 17px;
+    height: 17px;
+    place-items: center;
+    margin-left: 3px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #e8f2ed;
+    color: #28735a;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.navora-icon-button > .navora-notification-count {
+    top: -6px;
+    right: -7px;
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: #d78a6e;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+}
+
 .navora-role-select {
     min-width: 89px;
     padding: 8px 27px 8px 10px;

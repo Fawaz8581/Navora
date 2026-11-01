@@ -1,3 +1,28 @@
+.ad-page-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.ad-page-navigation a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    border: 1px solid #e4ebf0;
+    border-radius: 9px;
+    color: #355a4b;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.ad-page-navigation a:hover {
+    border-color: #b7d4c6;
+    background: #f3f8f5;
+}
+
 .navora-ad-banner {
     position: relative;
     width: min(100% - 32px, 1180px);
@@ -11,13 +36,13 @@
 .navora-ad-banner img {
     display: block;
     width: 100%;
-    max-height: 300px;
-    object-fit: contain;
+    height: 100%;
+    object-fit: fill;
 }
 
-.navora-ad-banner > a,
-.navora-ad-sidebar > a {
+.navora-ad-banner > a {
     display: block;
+    aspect-ratio: 4 / 1;
 }
 
 .navora-ad-promo {
@@ -91,8 +116,13 @@
 .navora-ad-sidebar img {
     display: block;
     width: 100%;
-    max-height: 480px;
-    object-fit: contain;
+    height: 100%;
+    object-fit: fill;
+}
+
+.navora-ad-sidebar > a {
+    display: block;
+    aspect-ratio: 1 / 3;
 }
 
 .navora-ad-sidebar-promo {
@@ -277,6 +307,161 @@
 .ad-campaign-form .auth-submit {
     width: 100%;
     margin-top: 8px;
+}
+
+.ad-campaign-edit-form {
+    display: grid;
+    max-width: 520px;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid #e5eaf0;
+    border-radius: 10px;
+    background: #fbfcfd;
+}
+
+.ad-campaign-edit-form input:not([type="file"]) {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #dfe7ec;
+    border-radius: 8px;
+}
+
+.ad-campaign-edit-form > label {
+    margin-top: 5px;
+    color: #50677a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.ad-campaign-edit-form .auth-submit {
+    width: auto;
+}
+
+.ad-workspace-section {
+    margin-bottom: 18px;
+    padding: 20px;
+}
+
+.ad-workspace-section > p {
+    color: #718493;
+    font-size: 13px;
+}
+
+.ad-campaign-form {
+    display: grid;
+    max-width: 650px;
+    gap: 9px;
+}
+
+.ad-campaign-form select,
+.ad-campaign-form input:not([type="file"]) {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid #dfe7ec;
+    border-radius: 8px;
+    background: #fff;
+    color: #18384b;
+}
+
+.ad-campaign-form .navora-app-primary {
+    width: fit-content;
+    margin-top: 6px;
+}
+
+.ad-notification-card {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 14px;
+    margin: 10px 0;
+    padding: 16px;
+    color: #38536a;
+    text-align: left;
+}
+
+.ad-notification-card:hover,
+.ad-notification-popup-item:hover {
+    border-color: #b7d4c6;
+    background: #f5faf7;
+}
+
+.ad-notification-icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    place-items: center;
+    border-radius: 10px;
+    background: #eaf4ef;
+    color: #28735a;
+    font-size: 18px;
+}
+
+.ad-notification-copy {
+    display: grid;
+    flex: 1;
+    gap: 4px;
+}
+
+.ad-notification-copy > span {
+    color: #718493;
+    font-size: 12px;
+}
+
+.ad-notifications-popup {
+    width: min(440px, calc(100vw - 32px));
+    max-height: min(620px, calc(100vh - 40px));
+    margin: auto;
+    padding: 20px;
+    overflow: auto;
+    border: 1px solid #e2eae6;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(20, 45, 59, .24);
+    color: #244253;
+}
+
+.ad-notifications-popup::backdrop {
+    background: rgba(17, 36, 48, .48);
+    backdrop-filter: blur(3px);
+}
+
+.ad-notifications-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.ad-notifications-popup-header h2 {
+    margin: 3px 0 0;
+    font-family: 'Manrope', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.ad-notification-popup-item {
+    display: grid;
+    width: 100%;
+    gap: 5px;
+    padding: 13px 10px;
+    border: 1px solid transparent;
+    border-bottom-color: #edf1f3;
+    background: #fff;
+    color: #38536a;
+    text-align: left;
+}
+
+.ad-notification-popup-item span,
+.ad-notification-popup-empty {
+    color: #718493;
+    font-size: 12px;
+}
+
+.ad-notifications-open-all {
+    width: 100%;
+    margin-top: 14px;
 }
 
 @media (max-width: 640px) {

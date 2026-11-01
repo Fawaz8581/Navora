@@ -17,14 +17,13 @@
     <a class="skip-link" href="#konten-utama">Lewati ke konten utama</a>
     <div class="home-shell navora-landing">
         <div class="navora-topline">
-            <div class="container d-flex justify-content-between align-items-center gap-3">
+            <div class="container d-flex justify-content-center align-items-center gap-3">
                 <span><i class="bi bi-stars me-2"></i>Temukan vendor kemasan yang cocok untuk bisnismu</span>
-                <a href="{{ route('workspace') }}">Jelajahi demo <i class="bi bi-arrow-up-right ms-1"></i></a>
             </div>
         </div>
         <nav class="navbar navbar-expand-xl navora-navbar sticky-top" aria-label="Navigasi utama">
             <div class="container">
-                <a class="navbar-brand navora-wordmark" href="{{ route('home') }}" aria-label="Navora beranda">
+                <a class="navbar-brand navora-wordmark" href="{{ route('workspace') }}" aria-label="Ruang kerja Navora">
                     <span class="navora-logo"><i class="bi bi-box-seam"></i></span>Navora<span class="navora-wordmark-dot">.</span>
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navoraHomeNav" aria-controls="navoraHomeNav" aria-expanded="false" aria-label="Buka navigasi">
@@ -38,7 +37,7 @@
                     </ul>
                     <div class="d-flex flex-column flex-xl-row gap-2 navora-nav-actions">
                         @auth
-                            <span class="navora-nav-login">Hai, {{ Auth::user()->name }}</span>
+                            <a class="navora-nav-login" href="{{ route('workspace') }}">Hai, {{ Auth::user()->name }}</a>
                             <form action="{{ route('logout') }}" method="post">
                                 @csrf
                                 <button class="navora-nav-login navora-nav-logout" type="submit">Keluar</button>
@@ -60,18 +59,35 @@
                         <span class="navora-eyebrow"><span></span> Marketplace kemasan untuk UMKM Indonesia</span>
                         <h1>Kemasan yang tepat, <em>tanpa harus pesan berlebihan.</em></h1>
                         <p class="navora-hero-description">Temukan vendor kemasan dan maklon, bandingkan penawaran, atau patungan dengan UMKM lain agar kebutuhan MOQ lebih terjangkau.</p>
-                        <form class="navora-search" action="{{ route('workspace') }}" method="get" role="search">
-                            <i class="bi bi-search"></i>
-                            <label class="visually-hidden" for="navora-home-search">Cari kemasan atau vendor</label>
-                            <input id="navora-home-search" type="search" name="q" placeholder="Cari pouch, botol, vendor..." autocomplete="off">
-                            <button class="btn navora-button navora-button-primary" type="submit">Cari vendor <i class="bi bi-arrow-right"></i></button>
+                        <form class="navora-search" action="{{ ! auth()->check() ? route('login') : (Auth::user()->role === 'vendor' ? route('workspace', ['page' => 'listings']) : route('workspace')) }}" method="get" role="search">
+                            @if (! auth()->check() || Auth::user()->role === 'umkm')
+                                <i class="bi bi-search"></i>
+                                <label class="visually-hidden" for="navora-home-search">Cari kemasan atau vendor</label>
+                                <input id="navora-home-search" type="search" name="q" placeholder="Cari pouch, botol, vendor..." autocomplete="off">
+                            @else
+                                <i class="bi bi-box-seam"></i>
+                            @endif
+                            <button class="btn navora-button navora-button-primary" type="submit">
+                                @if (! auth()->check())
+                                    Masuk untuk mencari
+                                @elseif (Auth::user()->role === 'umkm')
+                                    Cari vendor
+                                @elseif (Auth::user()->role === 'vendor')
+                                    Kelola katalog saya
+                                @else
+                                    Buka ruang kerja
+                                @endif
+                                <i class="bi bi-arrow-right"></i>
+                            </button>
                         </form>
+                        @if (! auth()->check() || Auth::user()->role === 'umkm')
                         <div class="navora-search-hints">
                             <span>Populer:</span>
-                            <a href="{{ route('workspace', ['q' => 'pouch']) }}">Pouch</a>
-                            <a href="{{ route('workspace', ['q' => 'botol']) }}">Botol</a>
-                            <a href="{{ route('workspace', ['q' => 'maklon']) }}">Maklon</a>
+                            <a href="{{ auth()->check() ? route('workspace', ['q' => 'pouch']) : route('login') }}">Pouch</a>
+                            <a href="{{ auth()->check() ? route('workspace', ['q' => 'botol']) : route('login') }}">Botol</a>
+                            <a href="{{ auth()->check() ? route('workspace', ['q' => 'maklon']) : route('login') }}">Maklon</a>
                         </div>
+                        @endif
                         <div class="navora-hero-proof">
                             <span><i class="bi bi-check-circle-fill"></i> Vendor terkurasi</span>
                             <span><i class="bi bi-check-circle-fill"></i> MOQ transparan</span>
@@ -124,7 +140,7 @@
                         <p>MOQ besar dan informasi vendor yang tersebar bisa menghambat produk bagus untuk berkembang. Navora membantu mempertemukan kebutuhan UMKM dengan pilihan vendor yang relevan.</p>
                     </div>
                     <div class="row g-3 g-lg-4 navora-problem-grid">
-                        <div class="col-md-4" data-reveal><article class="navora-feature-card"><span class="navora-card-icon"><i class="bi bi-search"></i></span><span class="navora-card-number">01</span><h3>Cari lebih terarah</h3><p>Telusuri kemasan, percetakan, dan jasa maklon dengan filter MOQ, bahan, lokasi, serta kebutuhan sertifikasi.</p><a href="{{ route('workspace') }}">Cari vendor <i class="bi bi-arrow-right"></i></a></article></div>
+                        <div class="col-md-4" data-reveal><article class="navora-feature-card"><span class="navora-card-icon"><i class="bi bi-search"></i></span><span class="navora-card-number">01</span><h3>Cari lebih terarah</h3><p>Telusuri kemasan, percetakan, dan jasa maklon dengan filter MOQ, bahan, lokasi, serta kebutuhan sertifikasi.</p><a href="{{ ! auth()->check() ? route('login') : (Auth::user()->role === 'vendor' ? route('workspace', ['page' => 'listings']) : route('workspace', ['page' => 'vendors'])) }}">{{ ! auth()->check() ? 'Masuk untuk mencari vendor' : (Auth::user()->role === 'vendor' ? 'Kelola katalog saya' : 'Cari vendor') }} <i class="bi bi-arrow-right"></i></a></article></div>
                         <div class="col-md-4" data-reveal><article class="navora-feature-card navora-feature-card-highlight"><span class="navora-card-icon"><i class="bi bi-people"></i></span><span class="navora-card-number">02</span><h3>Patungan capai MOQ</h3><p>Gabungkan kebutuhan dengan UMKM lain pada penawaran yang cocok untuk mencapai jumlah minimum vendor.</p><a href="{{ route('workspace', ['tab' => 'groups']) }}">Lihat patungan <i class="bi bi-arrow-right"></i></a></article></div>
                         <div class="col-md-4" data-reveal><article class="navora-feature-card"><span class="navora-card-icon"><i class="bi bi-chat-square-text"></i></span><span class="navora-card-number">03</span><h3>Bandingkan penawaran</h3><p>Kirim satu permintaan kebutuhan dan tinjau harga, kapasitas, waktu produksi, serta syarat dari vendor.</p><a href="{{ route('workspace', ['tab' => 'rfq']) }}">Buat permintaan <i class="bi bi-arrow-right"></i></a></article></div>
                     </div>
@@ -180,7 +196,7 @@
         </main>
         <footer class="navora-footer">
             <div class="container navora-footer-inner">
-                <a class="navora-wordmark navora-footer-brand" href="{{ route('home') }}"><span class="navora-logo"><i class="bi bi-box-seam"></i></span>Navora<span class="navora-wordmark-dot">.</span></a>
+                <a class="navora-wordmark navora-footer-brand" href="{{ route('workspace') }}"><span class="navora-logo"><i class="bi bi-box-seam"></i></span>Navora<span class="navora-wordmark-dot">.</span></a>
                 <p>Marketplace kemasan dan maklon untuk ekosistem UMKM Indonesia.</p>
                 <small>Konsep dan interaksi pada demo ini menggunakan data simulasi; ketersediaan vendor dan transaksi nyata belum terhubung.</small>
                 <span>© {{ date('Y') }} Navora · Prototype</span>

@@ -13,7 +13,7 @@
     const toast = document.querySelector('[data-toast]');
     const urlParams = new URLSearchParams(window.location.search);
     const knownRoles = ['umkm', 'vendor', 'partner'];
-    const knownPages = ['overview', 'vendors', 'listings', 'groups', 'orders', 'rfq', 'assistant', 'programs', 'account'];
+    const knownPages = ['overview', 'vendors', 'listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq', 'assistant', 'programs', 'account'];
     const orderStatuses = [
         { status: 'menunggu_konfirmasi', label: 'Menunggu konfirmasi' },
         { status: 'diproses', label: 'Diproses' },
@@ -243,7 +243,7 @@
             const page = panel.dataset.pagePanel;
             const rolePageAllowed = page === 'overview' || page === 'account'
                 || (role === 'umkm' && ['vendors', 'groups', 'orders', 'rfq', 'assistant'].includes(page))
-                || (role === 'vendor' && ['listings', 'groups', 'orders', 'rfq'].includes(page))
+                || (role === 'vendor' && ['listings', 'advertisements', 'notifications', 'groups', 'orders', 'rfq'].includes(page))
                 || (role === 'partner' && page === 'programs');
             const tab = document.querySelector(`[data-page="${page}"]`);
 
@@ -2273,6 +2273,25 @@
             return;
         }
 
+        const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
+        if (target.closest('[data-notifications-toggle]') && notificationPopup instanceof HTMLDialogElement) {
+            notificationPopup.showModal();
+            return;
+        }
+
+        if (target.closest('[data-close-ad-notifications]') && notificationPopup instanceof HTMLDialogElement) {
+            notificationPopup.close();
+            return;
+        }
+
+        if (target.closest('[data-notification-item], [data-open-notifications]')) {
+            if (notificationPopup instanceof HTMLDialogElement && notificationPopup.open) {
+                notificationPopup.close();
+            }
+            showPage('notifications');
+            return;
+        }
+
         const tab = target.closest('[data-page]');
 
         if (tab instanceof HTMLButtonElement) {
@@ -2416,7 +2435,7 @@
         loadVendorListings();
     }
 
-    const requestedPage = urlParams.get('tab');
+    const requestedPage = urlParams.get('tab') || urlParams.get('page');
     const requestedSearch = urlParams.get('q');
 
     if (requestedSearch) {
@@ -2438,5 +2457,20 @@
         showPage(requestedPage);
     } else if (requestedSearch && state.role === 'umkm') {
         showPage('vendors');
+    }
+
+    const latestAdvertisementNotice = document.body.dataset.latestAdNotice;
+    const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
+    if (latestAdvertisementNotice && notificationPopup instanceof HTMLDialogElement) {
+        const seenKey = `navora-last-ad-notification:${authenticatedUserId}`;
+        try {
+            if (window.sessionStorage.getItem(seenKey) !== latestAdvertisementNotice
+                && requestedPage !== 'notifications') {
+                notificationPopup.showModal();
+                window.sessionStorage.setItem(seenKey, latestAdvertisementNotice);
+            }
+        } catch (error) {
+            console.error('Navora could not remember the last advertisement notification.', error);
+        }
     }
 })();

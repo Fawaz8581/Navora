@@ -18,7 +18,7 @@ class MidtransSnapService
             $campaign->order_id,
             $campaign->amount,
             $vendor,
-            route('vendor.advertisements.index'),
+            route('workspace', ['page' => 'advertisements']),
         );
     }
 

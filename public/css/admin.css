@@ -137,6 +137,31 @@
     font-size: 13px;
 }
 
+.admin-ad-slot-settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 14px;
+}
+
+.admin-ad-slot-settings label {
+    display: grid;
+    min-width: 190px;
+    gap: 7px;
+    color: #526a7a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-ad-slot-settings input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #dfe7ec;
+    border-radius: 8px;
+    background: #fff;
+    color: #18384b;
+}
+
 .admin-notice {
     margin: 18px 0;
     padding: 12px 16px;
@@ -210,13 +235,22 @@
 .admin-ad-preview img {
     display: block;
     width: 100%;
-    max-height: 280px;
-    object-fit: contain;
+    height: 100%;
+    object-fit: fill;
     background: #f5f8fc;
 }
 
 .admin-ad-preview > a {
     display: block;
+    aspect-ratio: 4 / 1;
+}
+
+.admin-ad-preview.is-sidebar {
+    width: min(100%, 180px);
+}
+
+.admin-ad-preview.is-sidebar > a {
+    aspect-ratio: 1 / 3;
 }
 
 .admin-ad-preview > span {

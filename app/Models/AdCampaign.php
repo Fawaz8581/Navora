@@ -15,6 +15,10 @@ class AdCampaign extends Model
 
     public const DEFAULT_BANNER_HEIGHT = 300;
 
+    public const SIDEBAR_BANNER_WIDTH = 300;
+
+    public const SIDEBAR_BANNER_HEIGHT = 900;
+
     public const STATUS_PENDING_PAYMENT = 'pending_payment';
 
     public const STATUS_PAYMENT_FAILED = 'payment_failed';
@@ -93,6 +97,16 @@ class AdCampaign extends Model
     public static function priceForPlacement(string $placement): int
     {
         return $placement === 'sidebar' ? self::SIDEBAR_PRICE : self::TOP_PRICE;
+    }
+
+    /**
+     * @return array{width: int, height: int}
+     */
+    public static function dimensionsForPlacement(string $placement): array
+    {
+        return $placement === 'sidebar'
+            ? ['width' => self::SIDEBAR_BANNER_WIDTH, 'height' => self::SIDEBAR_BANNER_HEIGHT]
+            : ['width' => self::DEFAULT_BANNER_WIDTH, 'height' => self::DEFAULT_BANNER_HEIGHT];
     }
 
     protected function casts(): array

@@ -12,12 +12,13 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="{{ asset('css/navora-app.css').'?v='.filemtime(public_path('css/navora-app.css')) }}" rel="stylesheet">
-    <link href="{{ asset('css/advertisements.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/advertisements.css').'?v='.filemtime(public_path('css/advertisements.css')) }}" rel="stylesheet">
 </head>
 <body class="navora-app-body"
     data-auth-role="{{ auth()->user()->role ?? '' }}"
     data-auth-name="{{ auth()->user()->name ?? '' }}"
     data-auth-user-id="{{ auth()->id() ?? '' }}"
+    data-latest-ad-notice="{{ $advertisementNotices->first()?->id ?? '' }}"
     data-vendor-catalog-url="{{ route('vendors.catalog') }}"
     data-vendor-listings-url="{{ route('vendor.listings.index') }}"
     data-vendor-listings-store-url="{{ route('vendor.listings.store') }}"
@@ -48,7 +49,14 @@
                     @else
                         <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> MODE DEMO</span>
                     @endauth
-                    <button class="navora-icon-button" type="button" aria-label="Notifikasi demo"><i class="bi bi-bell"></i><span></span></button>
+                    @if (Auth::check() && Auth::user()->role === 'vendor')
+                        <button class="navora-icon-button navora-mail-notification" type="button" data-notifications-toggle aria-label="Notifikasi{{ $advertisementNotices->isNotEmpty() ? ', '.$advertisementNotices->count().' notifikasi' : '' }}" aria-haspopup="dialog">
+                            <i class="bi bi-envelope"></i>
+                            @if ($advertisementNotices->isNotEmpty())
+                                <span class="navora-notification-count">{{ $advertisementNotices->count() }}</span>
+                            @endif
+                        </button>
+                    @endif
                     @auth
                         <span class="navora-auth-user" title="{{ Auth::user()->email }}">{{ Auth::user()->name }}</span>
                         <form class="navora-logout-form" action="{{ route('logout') }}" method="post">
@@ -87,7 +95,8 @@
                         <button class="navora-page-link" type="button" data-page="listings" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-box-seam"></i> Katalog saya</button>
                         @auth
                             @if (Auth::user()->role === 'vendor')
-                                <a class="navora-page-link" href="{{ route('vendor.advertisements.index') }}"><i class="bi bi-megaphone"></i> Iklan saya</a>
+                                <button class="navora-page-link" type="button" data-page="advertisements" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-megaphone"></i> Iklan</button>
+                                <button class="navora-page-link" type="button" data-page="notifications" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-envelope"></i> Notifikasi @if ($advertisementNotices->isNotEmpty())<span class="navora-tab-count">{{ $advertisementNotices->count() }}</span>@endif</button>
                             @endif
                         @endauth
                         <button class="navora-page-link" type="button" data-page="groups" data-roles="umkm,vendor" role="tab" aria-selected="false"><i class="bi bi-people"></i> Patungan MOQ</button>
@@ -105,31 +114,6 @@
 
         <main class="navora-app-main container-fluid" id="app-content">
             @include('advertisements.banner')
-            @if (Auth::check() && Auth::user()->role === 'vendor' && $advertisementNotices->isNotEmpty())
-                <section class="ad-dashboard-notices" aria-label="Notifikasi keputusan iklan">
-                    <h2>Notifikasi iklan</h2>
-                    @foreach ($advertisementNotices as $notice)
-                        <article class="ad-campaign-review-notice" role="status">
-                            <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}: {{ $notice->ad_title ?: $notice->package_name }}</strong>
-                            @if ($notice->review_reason)
-                                <span>Catatan admin: {{ $notice->review_reason }}</span>
-                            @endif
-                            @if ($notice->status === 'rejected')
-                                <span>Status refund: {{ match ($notice->refund_status) {
-                                    'requested' => 'Permintaan refund diterima Midtrans',
-                                    'refunded' => 'Refund selesai',
-                                    'partially_refunded' => 'Refund sebagian',
-                                    'cancel_requested' => 'Pembatalan transaksi diterima Midtrans',
-                                    'cancelled' => 'Pembayaran berhasil dibatalkan',
-                                    'failed' => 'Refund gagal diajukan; admin akan mencoba kembali',
-                                    default => 'Sedang diproses',
-                                } }}</span>
-                            @endif
-                        </article>
-                    @endforeach
-                    <a href="{{ route('vendor.advertisements.index') }}">Lihat bukti pembayaran dan status iklan <i class="bi bi-arrow-right"></i></a>
-                </section>
-            @endif
             <div class="navora-app-content-layout">
                 <div class="navora-app-panels">
             <section class="navora-page-panel is-active" data-page-panel="overview" role="tabpanel">
@@ -311,6 +295,45 @@
                 <div class="navora-vendor-listings" data-vendor-listings></div>
             </section>
 
+            @auth
+                @if (Auth::user()->role === 'vendor')
+                    @include('vendor.advertisements.workspace')
+                    <section class="navora-page-panel" data-page-panel="notifications" role="tabpanel" hidden>
+                        <div class="navora-page-title-row">
+                            <div>
+                                <div class="navora-breadcrumb"><span>Ruang vendor</span><i class="bi bi-chevron-right"></i><span>Notifikasi</span></div>
+                                <h1>Notifikasi iklan</h1>
+                                <p>Keputusan admin, status penayangan, dan informasi iklanmu.</p>
+                            </div>
+                        </div>
+                        @forelse ($advertisementNotices as $notice)
+                            <button class="navora-panel ad-notification-card" type="button" data-notification-item>
+                                <span class="ad-notification-icon"><i class="bi {{ $notice->status === 'active' ? 'bi-check-circle' : 'bi-exclamation-circle' }}"></i></span>
+                                <span class="ad-notification-copy">
+                                    <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}</strong>
+                                    <span>{{ $notice->ad_title ?: $notice->package_name }} · {{ $notice->reviewed_at?->format('d M Y H:i') }}</span>
+                                    @if ($notice->review_reason)<span>Catatan admin: {{ $notice->review_reason }}</span>@endif
+                                    @if ($notice->status === 'rejected')
+                                        <span>Status refund: {{ match ($notice->refund_status) {
+                                            'requested' => 'Permintaan refund diterima Midtrans',
+                                            'refunded' => 'Refund selesai',
+                                            'partially_refunded' => 'Refund sebagian',
+                                            'cancel_requested' => 'Pembatalan transaksi diterima Midtrans',
+                                            'cancelled' => 'Pembayaran berhasil dibatalkan',
+                                            'failed' => 'Refund gagal diajukan; admin akan mencoba kembali',
+                                            default => 'Sedang diproses',
+                                        } }}</span>
+                                    @endif
+                                </span>
+                                <i class="bi bi-arrow-right"></i>
+                            </button>
+                        @empty
+                            <div class="navora-empty-state"><i class="bi bi-envelope-open"></i><strong>Belum ada notifikasi</strong><span>Informasi keputusan iklan akan muncul di sini.</span></div>
+                        @endforelse
+                    </section>
+                @endif
+            @endauth
+
             <section class="navora-page-panel" data-page-panel="programs" role="tabpanel" hidden>
                 <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Ruang mitra</span><i class="bi bi-chevron-right"></i><span>Program</span></div><h1>Dukung usaha bertumbuh bersama</h1><p>Contoh ruang bagi pendamping, inkubator, komunitas, dan mitra ekosistem UMKM.</p></div><span class="navora-ai-demo-chip"><i class="bi bi-buildings"></i> PROGRAM SIMULASI</span></div>
                 <div class="navora-program-grid">
@@ -407,6 +430,26 @@
             </footer>
         </main>
     </div>
+
+    @auth
+        @if (Auth::user()->role === 'vendor')
+            <dialog class="ad-notifications-popup" data-ad-notifications-popup aria-labelledby="ad-notifications-title">
+                <div class="ad-notifications-popup-header">
+                    <div><span class="navora-panel-kicker">RUANG VENDOR</span><h2 id="ad-notifications-title">Notifikasi iklan</h2></div>
+                    <button class="navora-modal-close" type="button" data-close-ad-notifications aria-label="Tutup notifikasi"><i class="bi bi-x-lg"></i></button>
+                </div>
+                @forelse ($advertisementNotices as $notice)
+                    <button class="ad-notification-popup-item" type="button" data-notification-item>
+                        <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}</strong>
+                        <span>{{ $notice->ad_title ?: $notice->package_name }}</span>
+                    </button>
+                @empty
+                    <p class="ad-notification-popup-empty">Notifikasi keputusan iklan akan muncul di sini.</p>
+                @endforelse
+                <button class="btn navora-app-outline ad-notifications-open-all" type="button" data-open-notifications>Semua notifikasi</button>
+            </dialog>
+        @endif
+    @endauth
 
     <div class="navora-modal" data-modal hidden>
         <button class="navora-modal-backdrop" type="button" data-close-modal aria-label="Tutup dialog"></button>

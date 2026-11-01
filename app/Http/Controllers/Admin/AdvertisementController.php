@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdCampaign;
+use App\Models\AdPlacementSetting;
 use App\Services\MidtransSnapService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\RedirectResponse;
@@ -12,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -27,7 +30,29 @@ class AdvertisementController extends Controller
             'verifiedIncome' => AdCampaign::query()
                 ->where('payment_status', 'paid')
                 ->sum('amount'),
+            'slotSettings' => AdPlacementSetting::query()->get()->keyBy('placement'),
+            'activeTopCount' => $this->activeCampaigns(['top', 'global'])->count(),
+            'activeSidebarCount' => $this->activeCampaigns(['sidebar'])->count(),
         ]);
+    }
+
+    public function updateSlotSettings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'top' => ['required', 'integer', 'min:1', 'max:20'],
+            'sidebar' => ['required', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        DB::transaction(function () use ($validated): void {
+            foreach ($validated as $placement => $maxActiveAds) {
+                AdPlacementSetting::query()->updateOrCreate(
+                    ['placement' => $placement],
+                    ['max_active_ads' => $maxActiveAds],
+                );
+            }
+        });
+
+        return back()->with('status', 'Kapasitas iklan banner atas dan samping berhasil diperbarui.');
     }
 
     public function reviewCampaign(
@@ -52,6 +77,19 @@ class AdvertisementController extends Controller
             $reviewedAt = now();
 
             if ($validated['decision'] === 'approve') {
+                $placementSetting = $lockedCampaign->placement === 'sidebar' ? 'sidebar' : 'top';
+                $setting = AdPlacementSetting::query()
+                    ->where('placement', $placementSetting)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $placements = $placementSetting === 'sidebar' ? ['sidebar'] : ['top', 'global'];
+
+                if ($this->activeCampaigns($placements)->count() >= $setting->max_active_ads) {
+                    throw ValidationException::withMessages([
+                        'capacity' => 'Kapasitas iklan untuk posisi ini sudah penuh. Naikkan batas slot atau tunggu slot tersedia sebelum menyetujui.',
+                    ]);
+                }
+
                 $lockedCampaign->forceFill([
                     'status' => AdCampaign::STATUS_ACTIVE,
                     'approved_by' => $request->user()->id,
@@ -139,5 +177,17 @@ class AdvertisementController extends Controller
                 ? 'Iklan ditolak dengan alasan dan pembayaran berhasil dibatalkan di Midtrans.'
                 : 'Iklan ditolak dengan alasan. Permintaan refund otomatis telah diterima Midtrans.',
         );
+    }
+
+    /**
+     * @param  list<string>  $placements
+     */
+    private function activeCampaigns(array $placements): Builder
+    {
+        return AdCampaign::query()
+            ->where('status', AdCampaign::STATUS_ACTIVE)
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>', now())
+            ->whereIn('placement', $placements);
     }
 }

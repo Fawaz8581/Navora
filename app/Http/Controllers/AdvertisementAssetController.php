@@ -34,7 +34,14 @@ class AdvertisementAssetController extends Controller
         abort_unless($disk->exists($adCampaign->asset_path), 404);
 
         $mimeType = $disk->mimeType($adCampaign->asset_path);
-        abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true), 404);
+        abort_unless(in_array($mimeType, [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'image/bmp',
+            'image/avif',
+        ], true), 404);
 
         return response()->file($disk->path($adCampaign->asset_path), [
             'Content-Type' => $mimeType,

@@ -2,6 +2,7 @@
 
 use App\Models\AdCampaign;
 use App\Models\AdPackage;
+use App\Models\AdPlacementSetting;
 use App\Models\BusinessProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +47,17 @@ function fakeAdImage(string $name = 'banner.png'): UploadedFile
 
     if ($content === false) {
         throw new RuntimeException('The advertisement test image could not be decoded.');
+    }
+
+    return UploadedFile::fake()->createWithContent($name, $content);
+}
+
+function fakeAdJpeg(string $name = 'banner.jpg'): UploadedFile
+{
+    $content = base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQEBUQEA8VFRUVFRUVFRUVFRUVFRUVFRUWFhUVFRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGxAQGy0lICUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAAEAAQMBIgACEQEDEQH/xAAXAAEBAQEAAAAAAAAAAAAAAAAAAQID/8QAFxEBAQEBAAAAAAAAAAAAAAAAAQACIf/aAAwDAQACEAMQAAAB6gD/xAAZEAEBAAMBAAAAAAAAAAAAAAABAhIhMUH/2gAIAQEAAT8ApVdRX//EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAgBAgEBPwB//8QAFhEBAQEAAAAAAAAAAAAAAAAAAQAR/9oACAEDAQE/AYf/2Q==', true);
+
+    if ($content === false) {
+        throw new RuntimeException('The advertisement test JPEG could not be decoded.');
     }
 
     return UploadedFile::fake()->createWithContent($name, $content);
@@ -108,18 +120,24 @@ test('verified vendors can start a Midtrans checkout for an admin-configured pac
 
     $this->actingAs($vendor)
         ->get(route('vendor.advertisements.index'))
+        ->assertRedirect(route('workspace', ['page' => 'advertisements']));
+    $this->actingAs($vendor)
+        ->get(route('workspace', ['page' => 'advertisements']))
         ->assertOk()
-        ->assertSee('Slot samping')
+        ->assertSee('data-page-panel="advertisements"', false)
+        ->assertSee('Banner samping')
+        ->assertSee('1200 × 300 px')
+        ->assertSee('300 × 900 px')
         ->assertSee('Rp200.000')
         ->assertSee('Judul iklan')
-        ->assertSee('Banner iklan (PNG atau GIF, maks. 5 MB)');
+        ->assertSee('PNG, JPG/JPEG, GIF, WebP, BMP, atau AVIF');
 
     $checkoutResponse = $this->actingAs($vendor)
         ->postJson(route('vendor.advertisements.store'), [
             'ad_package_id' => $package->id,
             'ad_title' => 'Promo Kemasan Kopi',
             'destination_url' => 'https://vendor.example/promo',
-            'asset' => fakeAdImage(),
+            'asset' => fakeAdJpeg(),
         ])
         ->assertOk()
         ->assertJsonPath('token', 'snap-token-123');
@@ -130,6 +148,8 @@ test('verified vendors can start a Midtrans checkout for an admin-configured pac
         ->assertJsonPath('status_url', route('vendor.advertisements.refresh', $campaign));
 
     expect($campaign->amount)->toBe(AdCampaign::SIDEBAR_PRICE)
+        ->and($campaign->width)->toBe(AdCampaign::SIDEBAR_BANNER_WIDTH)
+        ->and($campaign->height)->toBe(AdCampaign::SIDEBAR_BANNER_HEIGHT)
         ->and(substr($campaign->order_id, 0, 10))->toBe('NAVORA-AD-')
         ->and($campaign->snap_token)->toBe('snap-token-123')
         ->and($campaign->placement)->toBe('sidebar')
@@ -138,6 +158,7 @@ test('verified vendors can start a Midtrans checkout for an admin-configured pac
         ->and($campaign->asset_submitted_at)->not->toBeNull()
         ->and($campaign->status)->toBe(AdCampaign::STATUS_PENDING_PAYMENT);
     Storage::disk('local')->assertExists($campaign->asset_path);
+    expect(Storage::disk('local')->mimeType($campaign->asset_path))->toBe('image/jpeg');
 
     Http::assertSent(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions'
         && $request['transaction_details']['gross_amount'] === AdCampaign::SIDEBAR_PRICE
@@ -182,14 +203,22 @@ test('verified vendors can start a Midtrans checkout for an admin-configured pac
     expect($campaign->fresh()->status)->toBe(AdCampaign::STATUS_ACTIVE)
         ->and($campaign->fresh()->review_reason)->toBe('Banner sesuai panduan.');
 
+    $this->actingAs($vendor)
+        ->get(route('workspace'))
+        ->assertOk()
+        ->assertSee('bi-envelope', false)
+        ->assertSee('data-notifications-toggle', false);
+
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('https://vendor.example/promo', false)
+        ->assertDontSee('Jelajahi demo')
+        ->assertSee('href="'.route('workspace').'"', false)
+        ->assertSee(route('advertisements.click', $campaign), false)
         ->assertSee(route('advertisements.asset', $campaign), false)
         ->assertSee('navora-ad-sidebar');
 
     $this->actingAs($vendor)
-        ->get(route('vendor.advertisements.index'))
+        ->get(route('workspace', ['page' => 'advertisements']))
         ->assertOk()
         ->assertSee('snap.pay(token', false)
         ->assertSee('app.sandbox.midtrans.com/snap/snap.js', false);
@@ -211,20 +240,24 @@ test('vendors cannot start an advertising checkout when the Midtrans server key 
 
     $this->actingAs($vendor)
         ->get(route('vendor.advertisements.index'))
+        ->assertRedirect(route('workspace', ['page' => 'advertisements']));
+
+    $this->actingAs($vendor)
+        ->get(route('workspace', ['page' => 'advertisements']))
         ->assertOk()
         ->assertSee('Pembayaran iklan sementara belum tersedia.')
         ->assertSee('Pembayaran belum tersedia')
         ->assertSee('disabled', false);
 
     $this->actingAs($vendor)
-        ->from(route('vendor.advertisements.index'))
+        ->from(route('workspace', ['page' => 'advertisements']))
         ->post(route('vendor.advertisements.store'), [
             'ad_package_id' => $package->id,
             'ad_title' => 'Promo',
             'destination_url' => 'https://vendor.example/promo',
             'asset' => fakeAdImage(),
         ])
-        ->assertRedirect(route('vendor.advertisements.index'))
+        ->assertRedirect(route('workspace', ['page' => 'advertisements']))
         ->assertSessionHasErrors([
             'payment' => 'Pembayaran Midtrans belum dikonfigurasi admin. Silakan hubungi admin Navora.',
         ]);
@@ -232,21 +265,21 @@ test('vendors cannot start an advertising checkout when the Midtrans server key 
     expect(AdCampaign::query()->count())->toBe(0);
 });
 
-test('vendors cannot submit a JPG or an insecure advertisement destination URL', function () {
+test('vendors cannot submit SVG or an insecure advertisement destination URL', function () {
     config(['services.midtrans.server_key' => 'test-server-key']);
     Storage::fake('local');
     $vendor = createVerifiedAdVendor();
     $package = AdPackage::query()->where('is_active', true)->firstOrFail();
 
     $this->actingAs($vendor)
-        ->from(route('vendor.advertisements.index'))
+        ->from(route('workspace', ['page' => 'advertisements']))
         ->post(route('vendor.advertisements.store'), [
             'ad_package_id' => $package->id,
             'ad_title' => 'Promo',
             'destination_url' => 'http://vendor.example/promo',
-            'asset' => fakeAdGif('banner.jpg'),
+            'asset' => UploadedFile::fake()->createWithContent('banner.svg', '<svg><script>alert(1)</script></svg>'),
         ])
-        ->assertRedirect(route('vendor.advertisements.index'))
+        ->assertRedirect(route('workspace', ['page' => 'advertisements']))
         ->assertSessionHasErrors(['destination_url', 'asset']);
 
     expect(AdCampaign::query()->count())->toBe(0)
@@ -394,15 +427,21 @@ test('admin approval immediately publishes the paid asset to its placement', fun
         ->assertSee(route('advertisements.asset', $campaign), false);
     $this->actingAs($vendor)
         ->get(route('vendor.advertisements.index'))
+        ->assertRedirect(route('workspace', ['page' => 'advertisements']));
+    $this->actingAs($vendor)
+        ->get(route('workspace', ['page' => 'advertisements']))
         ->assertOk()
         ->assertSee(route('advertisements.asset', $campaign), false)
-        ->assertSee('Notifikasi: iklan diterima')
+        ->assertSee('Iklan diterima dan ditayangkan')
         ->assertSee('Bukti pembayaran Midtrans');
     $this->actingAs($vendor)
         ->get(route('workspace'))
         ->assertOk()
-        ->assertSee('Notifikasi iklan')
-        ->assertSee('Iklan diterima dan ditayangkan');
+        ->assertSee('bi-envelope', false)
+        ->assertSee('data-page="notifications"', false)
+        ->assertSee('data-ad-notifications-popup', false)
+        ->assertSee('data-notification-item', false)
+        ->assertSee('data-latest-ad-notice="'.$campaign->id.'"', false);
     $this->get(route('advertisements.asset', $campaign))
         ->assertOk()
         ->assertHeader('content-type', 'image/gif');
@@ -468,9 +507,9 @@ test('admin rejection records a reason, requests a Midtrans refund, and notifies
         && $request['reason'] === 'Iklan ditolak: Banner tidak sesuai panduan.');
 
     $this->actingAs($vendor)
-        ->get(route('vendor.advertisements.index'))
+        ->get(route('workspace', ['page' => 'advertisements']))
         ->assertOk()
-        ->assertSee('Notifikasi: iklan ditolak')
+        ->assertSee('Iklan ditolak admin')
         ->assertSee('Banner tidak sesuai panduan.')
         ->assertSee('Permintaan refund diterima Midtrans')
         ->assertSee('ID transaksi: midtrans-rejected-transaction');
@@ -619,13 +658,149 @@ test('active sidebar campaigns appear on the homepage and workspace', function (
         ->assertSee(route('advertisements.asset', $campaign), false);
 });
 
+test('UMKM receives a vendor-only message when clicking an advertisement', function () {
+    $vendor = createVerifiedAdVendor();
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $campaign = createAdCampaign($vendor, [
+        'destination_url' => 'https://vendor.example/promo',
+        'status' => AdCampaign::STATUS_ACTIVE,
+        'payment_status' => 'paid',
+        'starts_at' => now()->subMinute(),
+        'ends_at' => now()->addDay(),
+    ]);
+
+    $this->actingAs($buyer)
+        ->get(route('advertisements.click', $campaign))
+        ->assertOk()
+        ->assertSee('Iklan hanya khusus vendor untuk saat ini');
+
+    $this->actingAs($vendor)
+        ->get(route('advertisements.click', $campaign))
+        ->assertRedirect('https://vendor.example/promo');
+});
+
+test('admin can configure ad slot limits and cannot approve beyond capacity', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $vendor = createVerifiedAdVendor();
+    AdPlacementSetting::query()->where('placement', 'top')->update(['max_active_ads' => 1]);
+    $activeCampaign = createAdCampaign($vendor, [
+        'placement' => 'global',
+        'status' => AdCampaign::STATUS_ACTIVE,
+        'payment_status' => 'paid',
+        'asset_path' => 'advertisements/banner/top.png',
+        'starts_at' => now()->subMinute(),
+        'ends_at' => now()->addDay(),
+    ]);
+    $campaignToReview = createAdCampaign($vendor, [
+        'placement' => 'top',
+        'status' => AdCampaign::STATUS_ASSET_SUBMITTED,
+        'payment_status' => 'paid',
+        'asset_path' => 'advertisements/banner/pending.png',
+        'paid_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.customize.index'))
+        ->assertOk()
+        ->assertSee('Batas iklan aktif')
+        ->assertSee('Banner atas (aktif: 1)');
+
+    $this->actingAs($admin)
+        ->post(route('admin.customize.campaigns.review', $campaignToReview), [
+            'decision' => 'approve',
+        ])
+        ->assertSessionHasErrors('capacity');
+
+    expect($campaignToReview->fresh()->status)->toBe(AdCampaign::STATUS_ASSET_SUBMITTED)
+        ->and($activeCampaign->fresh()->status)->toBe(AdCampaign::STATUS_ACTIVE);
+
+    $this->actingAs($admin)
+        ->post(route('admin.customize.slot-settings.update'), [
+            'top' => 3,
+            'sidebar' => 4,
+        ])
+        ->assertSessionHas('status');
+
+    expect(AdPlacementSetting::query()->where('placement', 'top')->value('max_active_ads'))->toBe(3)
+        ->and(AdPlacementSetting::query()->where('placement', 'sidebar')->value('max_active_ads'))->toBe(4);
+});
+
 test('homepage and workspace show clickable ad-placement calls to action when no ads are active', function () {
     $this->get(route('home'))
         ->assertOk()
+        ->assertSee('action="'.route('login').'"', false)
+        ->assertSee('Masuk untuk mencari')
+        ->assertSee('href="'.route('login').'">Masuk untuk mencari vendor', false)
+        ->assertDontSee('action="'.route('workspace').'"', false)
         ->assertSee('Ingin pasang iklan?')
         ->assertSee('Klik di sini')
-        ->assertSee(route('vendor.advertisements.index'), false)
+        ->assertSee(route('workspace', ['page' => 'advertisements']), false)
         ->assertSee('navora-ad-sidebar-promo');
+});
+
+test('homepage search gives UMKM and vendors role-specific destinations', function () {
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    BusinessProfile::factory()->for($buyer)->create(['completed_at' => now()]);
+    $vendor = createVerifiedAdVendor();
+
+    $this->actingAs($buyer)
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('action="'.route('workspace').'"', false)
+        ->assertSee('Cari vendor');
+
+    $this->actingAs($vendor)
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('action="'.route('workspace', ['page' => 'listings']).'"', false)
+        ->assertSee('Kelola katalog saya');
+});
+
+test('vendors can edit paid advertisements and edited live campaigns return to admin review', function () {
+    Storage::fake('local');
+    $vendor = createVerifiedAdVendor();
+    $otherVendor = createVerifiedAdVendor();
+    $campaign = createAdCampaign($vendor, [
+        'ad_title' => 'Judul awal',
+        'destination_url' => 'https://vendor.example/awal',
+        'asset_path' => 'advertisements/'.$vendor->id.'/banner.png',
+        'status' => AdCampaign::STATUS_ACTIVE,
+        'payment_status' => 'paid',
+        'starts_at' => now()->subDay(),
+        'ends_at' => now()->addDays(6),
+        'reviewed_at' => now()->subDay(),
+        'published_at' => now()->subDay(),
+    ]);
+
+    $this->actingAs($vendor)
+        ->get(route('workspace', ['page' => 'advertisements']))
+        ->assertOk()
+        ->assertSee('Edit iklan')
+        ->assertSee('data-page-panel="advertisements"', false)
+        ->assertSee('Perubahan akan menghentikan tayang sementara');
+
+    $this->actingAs($vendor)
+        ->post(route('vendor.advertisements.update', $campaign), [
+            'ad_title' => 'Judul baru',
+            'destination_url' => 'https://vendor.example/baru',
+            'asset' => fakeAdImage('updated.png'),
+        ])
+        ->assertSessionHas('status', 'Iklan berhasil diperbarui dan dikirim kembali untuk ditinjau admin.');
+
+    expect($campaign->fresh()->ad_title)->toBe('Judul baru')
+        ->and($campaign->fresh()->destination_url)->toBe('https://vendor.example/baru')
+        ->and($campaign->fresh()->status)->toBe(AdCampaign::STATUS_ASSET_SUBMITTED)
+        ->and($campaign->fresh()->starts_at)->toBeNull()
+        ->and($campaign->fresh()->ends_at)->toBeNull()
+        ->and($campaign->fresh()->reviewed_at)->toBeNull();
+    Storage::disk('local')->assertExists($campaign->fresh()->asset_path);
+
+    $this->actingAs($otherVendor)
+        ->post(route('vendor.advertisements.update', $campaign), [
+            'ad_title' => 'Tidak berhak',
+            'destination_url' => 'https://vendor.example/tidak-berhak',
+        ])
+        ->assertNotFound();
 });
 
 test('advertising controls reject unapproved vendors, non-admins, invalid notifications, and cross-vendor assets', function () {
@@ -645,8 +820,8 @@ test('advertising controls reject unapproved vendors, non-admins, invalid notifi
     $umkm = User::factory()->create(['role' => 'umkm']);
 
     $this->actingAs($vendor)
-        ->get(route('vendor.advertisements.index'))
-        ->assertForbidden();
+        ->get(route('workspace', ['page' => 'advertisements']))
+        ->assertRedirect(route('vendor.verification.index'));
 
     $this->actingAs($umkm)
         ->get(route('admin.customize.index'))

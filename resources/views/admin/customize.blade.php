@@ -8,7 +8,7 @@
         <div>
             <span class="admin-eyebrow">IKLAN</span>
             <h1>Iklan dan pendapatan Navora</h1>
-            <p>Kelola paket iklan, tinjau pembayaran Midtrans, putuskan iklan dengan alasan, dan pantau pemasukan.</p>
+            <p>Tinjau pembayaran Midtrans, putuskan iklan dengan alasan, dan pantau pemasukan.</p>
         </div>
         <span class="admin-welcome-icon"><i class="bi bi-megaphone"></i></span>
     </section>
@@ -29,6 +29,25 @@
         </div>
         <p class="admin-ad-income">Rp{{ number_format($verifiedIncome, 0, ',', '.') }}</p>
         <p class="admin-customize-copy">Total pembayaran iklan yang terverifikasi dan belum tercatat sebagai refund selesai.</p>
+    </section>
+
+    <section class="admin-panel admin-customize-section">
+        <div class="admin-panel-heading">
+            <div><span class="admin-eyebrow">KAPASITAS</span><h2>Batas iklan aktif</h2></div>
+        </div>
+        <p class="admin-customize-copy">Iklan yang disetujui akan diputar acak setiap halaman dimuat ulang. Jika kapasitas penuh, iklan baru belum dapat disetujui sampai slot tersedia atau batas ditambah.</p>
+        <form class="admin-ad-slot-settings" action="{{ route('admin.customize.slot-settings.update') }}" method="post">
+            @csrf
+            <label>
+                <span>Banner atas (aktif: {{ $activeTopCount }})</span>
+                <input type="number" name="top" min="1" max="20" value="{{ old('top', $slotSettings->get('top')?->max_active_ads ?? 3) }}" required>
+            </label>
+            <label>
+                <span>Banner samping (aktif: {{ $activeSidebarCount }})</span>
+                <input type="number" name="sidebar" min="1" max="20" value="{{ old('sidebar', $slotSettings->get('sidebar')?->max_active_ads ?? 2) }}" required>
+            </label>
+            <button class="admin-table-action" type="submit">Simpan kapasitas</button>
+        </form>
     </section>
 
     <section class="admin-panel admin-customize-section">
@@ -79,7 +98,7 @@
                     <div><strong>{{ $campaign->ad_title ?: $campaign->package_name }}</strong><span>{{ $campaign->vendor->name }} · {{ $campaign->vendor->email }}</span></div>
                     <span class="admin-status-pill">{{ $statusLabels[$campaign->status] ?? $campaign->status }}</span>
                 </div>
-                <p>{{ $campaign->placement === 'sidebar' ? 'Slot samping' : 'Banner atas' }} · {{ $campaign->width }} × {{ $campaign->height }} px · {{ $campaign->duration_days }} hari · Rp{{ number_format($campaign->amount, 0, ',', '.') }} · Status pembayaran: {{ $paymentStatusLabels[$campaign->payment_status] ?? $campaign->payment_status }}</p>
+                <p>{{ $campaign->placement === 'sidebar' ? 'Banner samping · 300 × 900 px' : 'Banner atas · 1200 × 300 px' }} · {{ $campaign->duration_days }} hari · Rp{{ number_format($campaign->amount, 0, ',', '.') }} · Status pembayaran: {{ $paymentStatusLabels[$campaign->payment_status] ?? $campaign->payment_status }}</p>
                 @if ($campaign->paid_at)
                     <div class="admin-ad-payment-proof">
                         <strong>Bukti pembayaran Midtrans</strong>
@@ -99,7 +118,7 @@
                     <p>Status refund: {{ $refundLabels[$campaign->refund_status] ?? $campaign->refund_status }}</p>
                 @endif
                 @if ($campaign->status === 'asset_submitted' && $campaign->payment_status === 'paid')
-                    <div class="admin-ad-preview">
+                    <div class="admin-ad-preview {{ $campaign->placement === 'sidebar' ? 'is-sidebar' : 'is-top' }}">
                         <a href="{{ $campaign->destination_url }}" target="_blank" rel="noopener noreferrer" aria-label="Buka tautan tujuan iklan {{ $campaign->ad_title ?: $campaign->package_name }}">
                             <img src="{{ route('admin.customize.campaigns.asset', $campaign) }}" alt="Pratinjau banner {{ $campaign->ad_title ?: $campaign->package_name }}">
                         </a>

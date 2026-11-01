@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\VendorListingController as AdminVendorListingController;
 use App\Http\Controllers\Admin\VendorVerificationController as AdminVendorVerificationController;
 use App\Http\Controllers\AdvertisementAssetController;
+use App\Http\Controllers\AdvertisementClickController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BusinessProfileController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorListingController;
 use App\Http\Controllers\VendorVerificationController;
 use App\Models\AdCampaign;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/masukan', [FeedbackController::class, 'create'])->name('feedback.create');
@@ -31,8 +33,10 @@ Route::get('/', function () {
 })->name('home');
 Route::get('/iklan/{adCampaign}/aset', [AdvertisementAssetController::class, 'show'])
     ->name('advertisements.asset');
+Route::get('/iklan/{adCampaign}/klik', AdvertisementClickController::class)
+    ->name('advertisements.click');
 
-Route::get('/ruang-kerja', function () {
+Route::get('/ruang-kerja', function (Request $request, VendorAdvertisementController $vendorAdvertisements) {
     $user = auth()->user();
 
     if ($user?->role === 'admin') {
@@ -51,6 +55,10 @@ Route::get('/ruang-kerja', function () {
         }
     }
 
+    $workspaceData = $user?->role === 'vendor'
+        ? $vendorAdvertisements->workspaceData($request)
+        : [];
+
     return view('workspace', [
         'advertisementNotices' => $user?->role === 'vendor'
             ? $user->adCampaigns()
@@ -60,6 +68,7 @@ Route::get('/ruang-kerja', function () {
                 ->limit(5)
                 ->get()
             : collect(),
+        ...$workspaceData,
     ]);
 })->name('workspace');
 
@@ -135,6 +144,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/vendor/iklan/{adCampaign}/aset', [VendorAdvertisementController::class, 'uploadAsset'])
         ->middleware('throttle:10,1')
         ->name('vendor.advertisements.asset');
+    Route::post('/vendor/iklan/{adCampaign}/edit', [VendorAdvertisementController::class, 'updateCampaign'])
+        ->middleware('throttle:10,1')
+        ->name('vendor.advertisements.update');
     Route::post('/iklan/{adCampaign}/cek-pembayaran', [MidtransNotificationController::class, 'refreshAdvertisement'])
         ->middleware('throttle:20,1')
         ->name('vendor.advertisements.refresh');
@@ -173,6 +185,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('admin')
         ->group(function () {
             Route::get('/', [AdminAdvertisementController::class, 'index'])->name('index');
+            Route::post('/slot-settings', [AdminAdvertisementController::class, 'updateSlotSettings'])
+                ->name('slot-settings.update');
             Route::post('/campaigns/{adCampaign}/review', [AdminAdvertisementController::class, 'reviewCampaign'])
                 ->middleware('throttle:10,1')
                 ->name('campaigns.review');
