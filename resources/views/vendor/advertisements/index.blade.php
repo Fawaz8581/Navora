@@ -19,6 +19,12 @@
             <div><strong>Permintaan belum dapat diproses.</strong><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
         </div>
     @endif
+    @unless ($midtransConfigured)
+        <div class="auth-alert auth-alert-info" role="status">
+            <i class="bi bi-info-circle"></i>
+            <span>Pembayaran iklan sementara belum tersedia. Silakan hubungi admin Navora.</span>
+        </div>
+    @endunless
 
     <section class="onboarding-review-section">
         <h3>Paket iklan tersedia</h3>
@@ -32,7 +38,10 @@
                 <form action="{{ route('vendor.advertisements.store') }}" method="post">
                     @csrf
                     <input type="hidden" name="ad_package_id" value="{{ $package->id }}">
-                    <button class="auth-submit" type="submit">Pilih &amp; bayar <i class="bi bi-arrow-right"></i></button>
+                    <button class="auth-submit" type="submit" @disabled(! $midtransConfigured)>
+                        {{ $midtransConfigured ? 'Pilih & bayar' : 'Pembayaran belum tersedia' }}
+                        @if ($midtransConfigured)<i class="bi bi-arrow-right"></i>@endif
+                    </button>
                 </form>
             </article>
         @empty

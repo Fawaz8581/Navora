@@ -127,6 +127,38 @@ test('verified vendors can start a Midtrans checkout for an admin-configured pac
         && $request['transaction_details']['order_id'] === $campaign->order_id);
 });
 
+test('vendors cannot start an advertising checkout when the Midtrans server key is missing', function () {
+    config(['services.midtrans.server_key' => null]);
+    Http::preventStrayRequests();
+    $vendor = createVerifiedAdVendor();
+    $package = AdPackage::query()->create([
+        'name' => 'Banner 1200x300',
+        'placement' => 'sidebar',
+        'width' => 1200,
+        'height' => 300,
+        'price' => 50000,
+        'duration_days' => 7,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($vendor)
+        ->get(route('vendor.advertisements.index'))
+        ->assertOk()
+        ->assertSee('Pembayaran iklan sementara belum tersedia.')
+        ->assertSee('Pembayaran belum tersedia')
+        ->assertSee('disabled', false);
+
+    $this->actingAs($vendor)
+        ->from(route('vendor.advertisements.index'))
+        ->post(route('vendor.advertisements.store'), ['ad_package_id' => $package->id])
+        ->assertRedirect(route('vendor.advertisements.index'))
+        ->assertSessionHasErrors([
+            'payment' => 'Pembayaran Midtrans belum dikonfigurasi admin. Silakan hubungi admin Navora.',
+        ]);
+
+    expect(AdCampaign::query()->count())->toBe(0);
+});
+
 test('signed Midtrans notifications confirm payment and duplicate notices do not reset campaign review state', function () {
     config(['services.midtrans.server_key' => 'test-server-key']);
     $vendor = createVerifiedAdVendor();

@@ -30,6 +30,7 @@ class VendorAdvertisementController extends Controller
                 ->whereBelongsTo($request->user(), 'vendor')
                 ->latest()
                 ->get(),
+            'midtransConfigured' => $this->midtransIsConfigured(),
         ]);
     }
 
@@ -49,6 +50,13 @@ class VendorAdvertisementController extends Controller
             ->whereKey($validated['ad_package_id'])
             ->where('is_active', true)
             ->firstOrFail();
+
+        if (! $this->midtransIsConfigured()) {
+            return back()
+                ->withErrors(['payment' => 'Pembayaran Midtrans belum dikonfigurasi admin. Silakan hubungi admin Navora.'])
+                ->withInput();
+        }
+
         $vendor = $request->user();
         $campaign = AdCampaign::query()->create([
             'ad_package_id' => $package->id,
@@ -123,5 +131,12 @@ class VendorAdvertisementController extends Controller
         $profile = $request->user()->businessProfile;
 
         abort_unless($profile?->completed_at && $profile->verification_status === 'approved', 403);
+    }
+
+    private function midtransIsConfigured(): bool
+    {
+        $serverKey = config('services.midtrans.server_key');
+
+        return is_string($serverKey) && trim($serverKey) !== '';
     }
 }
