@@ -45,6 +45,125 @@ function orderPaymentNotification(string $orderId, int $amount): array
     ];
 }
 
+it('explains missing Midtrans configuration without creating a pending payment attempt', function () {
+    config(['services.midtrans.server_key' => null]);
+    Http::preventStrayRequests();
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createPaymentVendor();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'vendor_user_id' => $vendor->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi',
+        'quantity' => 10,
+        'packaging_details' => 'Kraft laminasi.',
+        'delivery_contact_name' => 'Pembeli Navora',
+        'delivery_contact_phone' => '+6281234567890',
+        'delivery_address' => 'Jalan Melati 10, Bandung',
+        'delivery_area_id' => '200',
+        'status' => Order::STATUS_WAITING,
+        'unit_price' => 1000,
+        'shipping_amount' => 15000,
+        'shipping_service' => 'REG',
+        'total_amount' => 25200,
+        'payment_status' => 'pending',
+        'quote_status' => 'accepted',
+    ]);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.checkout', $order))
+        ->assertServiceUnavailable()
+        ->assertJsonPath('message', 'Pembayaran Midtrans belum dikonfigurasi. Admin perlu mengatur MIDTRANS_SERVER_KEY di konfigurasi aplikasi.');
+
+    expect($order->fresh()->payment_order_id)->toBeNull()
+        ->and($order->fresh()->snap_token)->toBeNull();
+});
+
+it('completes simulated location selection, shipping calculation, and Midtrans checkout', function () {
+    config([
+        'services.midtrans.server_key' => 'checkout-flow-test-key',
+        'services.midtrans.base_url' => 'https://app.sandbox.midtrans.com',
+        'services.rajaongkir.api_key' => null,
+        'services.rajaongkir.simulated_rates' => true,
+        'services.rajaongkir.couriers' => ['jne'],
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://photon.komoot.io/api/*' => Http::response([
+            'features' => [[
+                'properties' => [
+                    'osm_type' => 'R',
+                    'osm_id' => 13290063,
+                    'name' => 'Coblong',
+                    'city' => 'Bandung',
+                    'state' => 'Jawa Barat',
+                    'countrycode' => 'ID',
+                ],
+            ]],
+        ]),
+        'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+            'token' => 'location-checkout-token',
+            'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/location-checkout-token',
+        ], 201),
+    ]);
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createPaymentVendor();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'vendor_user_id' => $vendor->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi',
+        'quantity' => 10,
+        'packaging_details' => 'Kraft laminasi.',
+        'status' => Order::STATUS_WAITING,
+        'unit_price' => 1000,
+        'subtotal_amount' => 10000,
+        'platform_fee_amount' => 200,
+        'total_amount' => 10200,
+        'shipping_weight_per_unit_grams' => 50000,
+        'payment_status' => 'pending',
+        'quote_status' => 'accepted',
+    ]);
+
+    $location = $this->actingAs($buyer)
+        ->getJson(route('rajaongkir.locations', ['search' => 'Coblong']))
+        ->assertOk()
+        ->json('destinations.0');
+
+    $this->actingAs($buyer)
+        ->putJson(route('orders.delivery-details', $order), [
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => $location['id'],
+            'delivery_area_name' => $location['label'],
+        ])
+        ->assertOk();
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.shipping-rates', $order).'?courier=jne')
+        ->assertOk()
+        ->assertJsonPath('simulated', true)
+        ->assertJsonPath('rates.0.cost', 15000);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.shipping-select', $order), [
+            'courier' => 'jne',
+            'service' => 'REG',
+        ])
+        ->assertOk()
+        ->assertJsonPath('shipping_amount', 15000);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.checkout', $order))
+        ->assertOk()
+        ->assertJsonPath('token', 'location-checkout-token');
+
+    expect($order->fresh()->delivery_area_id)->toBe($location['id'])
+        ->and($order->fresh()->shipping_amount)->toBe(15000)
+        ->and($order->fresh()->payment_order_id)->toStartWith('NAVORA-ORDER-');
+});
+
 it('requires a final vendor price and confirms a direct order only after a signed Midtrans payment', function () {
     config([
         'services.midtrans.server_key' => 'order-payment-test-key',

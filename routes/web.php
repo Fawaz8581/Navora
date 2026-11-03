@@ -121,6 +121,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/pesanan/{order}/ongkir', [RajaOngkirController::class, 'selectRate'])
         ->middleware('throttle:10,1')
         ->name('orders.shipping-select');
+    Route::get('/pesanan/{order}/checkout', [OrderController::class, 'checkoutPage'])
+        ->name('orders.checkout-page');
     Route::put('/pesanan/{order}/data-pengiriman', [OrderController::class, 'updateDeliveryDetails'])
         ->middleware('throttle:10,1')
         ->name('orders.delivery-details');

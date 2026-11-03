@@ -49,11 +49,62 @@ it('searches RajaOngkir locations using the server-side API key', function () {
         && str_contains($request->url(), 'search=Coblong'));
 });
 
+it('searches Indonesian locations without a RajaOngkir key when simulated rates are enabled', function () {
+    config([
+        'services.rajaongkir.api_key' => null,
+        'services.rajaongkir.simulated_rates' => true,
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://photon.komoot.io/api/*' => Http::response([
+            'type' => 'FeatureCollection',
+            'features' => [
+                [
+                    'properties' => [
+                        'osm_type' => 'R',
+                        'osm_id' => 13290063,
+                        'type' => 'district',
+                        'name' => 'Coblong',
+                        'city' => 'Bandung',
+                        'state' => 'Jawa Barat',
+                        'country' => 'Indonesia',
+                        'countrycode' => 'ID',
+                    ],
+                ],
+                [
+                    'properties' => [
+                        'osm_type' => 'R',
+                        'osm_id' => 12345,
+                        'type' => 'city',
+                        'name' => 'Coblong',
+                        'country' => 'France',
+                        'countrycode' => 'FR',
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+    $buyer = User::factory()->create(['role' => 'umkm']);
+
+    $this->actingAs($buyer)
+        ->getJson(route('rajaongkir.locations', ['search' => 'Coblong']))
+        ->assertOk()
+        ->assertJsonPath('simulated', true)
+        ->assertJsonPath('destinations.0.id', 'photon:R:13290063')
+        ->assertJsonPath('destinations.0.label', 'Coblong, Bandung, Jawa Barat')
+        ->assertJsonCount(1, 'destinations');
+
+    Http::assertSent(fn (Request $request): bool => str_starts_with($request->url(), 'https://photon.komoot.io/api/')
+        && $request['q'] === 'Coblong'
+        && $request->hasHeader('User-Agent'));
+});
+
 it('revalidates and stores shipping service, shipping fee, and the two-percent platform fee', function () {
     config([
         'services.rajaongkir.api_key' => 'rajaongkir-test-key',
         'services.rajaongkir.base_url' => 'https://rajaongkir.test/api/v1',
         'services.rajaongkir.couriers' => ['jne'],
+        'services.rajaongkir.simulated_rates' => false,
         'services.navora.platform_fee_percent' => 2,
     ]);
     Http::preventStrayRequests();
@@ -127,6 +178,7 @@ it('splits orders over 30 kilograms into courier-sized packages and sums each pa
         'services.rajaongkir.api_key' => 'rajaongkir-test-key',
         'services.rajaongkir.base_url' => 'https://rajaongkir.test/api/v1',
         'services.rajaongkir.couriers' => ['jne'],
+        'services.rajaongkir.simulated_rates' => false,
     ]);
     Http::preventStrayRequests();
     Http::fake([
@@ -189,6 +241,7 @@ it('does not accept a shipping service that is absent from the fresh RajaOngkir 
         'services.rajaongkir.api_key' => 'rajaongkir-test-key',
         'services.rajaongkir.base_url' => 'https://rajaongkir.test/api/v1',
         'services.rajaongkir.couriers' => ['jne'],
+        'services.rajaongkir.simulated_rates' => false,
     ]);
     Http::preventStrayRequests();
     Http::fake([
@@ -228,6 +281,68 @@ it('does not accept a shipping service that is absent from the fresh RajaOngkir 
         ->assertJsonValidationErrors(['service']);
 
     expect($order->fresh()->shipping_service)->toBeNull();
+});
+
+it('allows flexible product weight and uses size-independent simulated courier rates', function () {
+    config([
+        'services.rajaongkir.couriers' => ['jne'],
+        'services.rajaongkir.simulated_rates' => true,
+    ]);
+    Http::preventStrayRequests();
+    $buyer = User::factory()->create(['role' => 'umkm']);
+    $vendor = createRajaOngkirVendor();
+    $order = Order::query()->create([
+        'user_id' => $buyer->id,
+        'vendor_user_id' => $vendor->id,
+        'type' => Order::TYPE_DIRECT,
+        'product_name' => 'Pouch kopi',
+        'quantity' => 1,
+        'packaging_details' => 'Kraft laminasi.',
+        'status' => Order::STATUS_WAITING,
+        'payment_status' => 'awaiting_quote',
+        'quote_status' => 'awaiting_vendor',
+    ]);
+
+    $this->actingAs($vendor)
+        ->postJson(route('orders.price', $order), [
+            'unit_price' => 1000,
+            'shipping_weight_per_unit_grams' => 45000,
+        ])
+        ->assertOk();
+
+    expect($order->fresh()->shipping_weight_per_unit_grams)->toBe(45000);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.quote-decision', $order), ['decision' => 'accept'])
+        ->assertOk();
+
+    $this->actingAs($buyer)
+        ->putJson(route('orders.delivery-details', $order), [
+            'delivery_contact_name' => 'Pembeli Navora',
+            'delivery_contact_phone' => '+6281234567890',
+            'delivery_address' => 'Jalan Melati 10, Bandung',
+            'delivery_area_id' => '200',
+            'delivery_area_name' => 'Kecamatan Tujuan, Kota Tujuan',
+        ])
+        ->assertOk();
+
+    $this->actingAs($buyer)
+        ->getJson(route('orders.shipping-rates', $order).'?courier=jne')
+        ->assertOk()
+        ->assertJsonPath('simulated', true)
+        ->assertJsonPath('rates.0.cost', 15000)
+        ->assertJsonPath('rates.1.cost', 25000);
+
+    $this->actingAs($buyer)
+        ->postJson(route('orders.shipping-select', $order), [
+            'courier' => 'jne',
+            'service' => 'REG',
+        ])
+        ->assertOk()
+        ->assertJsonPath('shipping_amount', 15000);
+
+    expect($order->fresh()->shipping_amount)->toBe(15000)
+        ->and($order->fresh()->shipping_weight_per_unit_grams)->toBe(45000);
 });
 
 it('explains separately when vendor-origin and buyer-destination locations are missing', function () {

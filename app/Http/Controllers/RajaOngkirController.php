@@ -24,11 +24,46 @@ class RajaOngkirController extends Controller
             'search' => ['required', 'string', 'min:3', 'max:100'],
         ]);
 
+        if (config('services.rajaongkir.simulated_rates') && ! filled(config('services.rajaongkir.api_key'))) {
+            try {
+                return response()->json([
+                    'destinations' => $rajaOngkir->searchSimulatedDestinations($validated['search']),
+                    'simulated' => true,
+                ]);
+            } catch (ConnectionException|RequestException|RuntimeException $exception) {
+                Log::warning('Simulated location lookup failed.', [
+                    'exception' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Pencarian lokasi sedang tidak tersedia. Coba lagi sebentar.',
+                ], 502);
+            }
+        }
+
         try {
             return response()->json([
                 'destinations' => $rajaOngkir->searchDestinations($validated['search']),
+                'simulated' => false,
             ]);
         } catch (ConnectionException|RequestException|RuntimeException $exception) {
+            if (config('services.rajaongkir.simulated_rates')) {
+                try {
+                    Log::notice('RajaOngkir location search failed; using simulated location search.', [
+                        'exception' => $exception->getMessage(),
+                    ]);
+
+                    return response()->json([
+                        'destinations' => $rajaOngkir->searchSimulatedDestinations($validated['search']),
+                        'simulated' => true,
+                    ]);
+                } catch (ConnectionException|RequestException|RuntimeException $fallbackException) {
+                    Log::warning('Simulated location lookup failed.', [
+                        'exception' => $fallbackException->getMessage(),
+                    ]);
+                }
+            }
+
             Log::warning('RajaOngkir destination lookup failed.', [
                 'exception' => $exception->getMessage(),
             ]);
@@ -82,6 +117,13 @@ class RajaOngkirController extends Controller
             ]);
         }
 
+        if (config('services.rajaongkir.simulated_rates')) {
+            return response()->json([
+                'rates' => $this->simulatedRates($validated['courier']),
+                'simulated' => true,
+            ]);
+        }
+
         $weightDetails = $this->shippingWeightDetails($order, $quantity);
 
         try {
@@ -89,6 +131,7 @@ class RajaOngkirController extends Controller
                 'rates' => $rajaOngkir->shippingRates($origin, $destination, $weightDetails['packages'], $validated['courier']),
                 'weight_grams' => $weightDetails['total_weight_grams'],
                 'package_count' => $weightDetails['package_count'],
+                'simulated' => false,
             ]);
         } catch (ConnectionException|RequestException|RuntimeException $exception) {
             Log::warning('RajaOngkir shipping calculation failed.', [
@@ -146,19 +189,23 @@ class RajaOngkirController extends Controller
             ]);
         }
 
-        $weightDetails = $this->shippingWeightDetails($order, $quantity);
+        if (config('services.rajaongkir.simulated_rates')) {
+            $rates = $this->simulatedRates($validated['courier']);
+        } else {
+            $weightDetails = $this->shippingWeightDetails($order, $quantity);
 
-        try {
-            $rates = $rajaOngkir->shippingRates($origin, $destination, $weightDetails['packages'], $validated['courier']);
-        } catch (ConnectionException|RequestException|RuntimeException $exception) {
-            Log::warning('RajaOngkir shipping service validation failed.', [
-                'order_id' => $order->id,
-                'exception' => $exception->getMessage(),
-            ]);
+            try {
+                $rates = $rajaOngkir->shippingRates($origin, $destination, $weightDetails['packages'], $validated['courier']);
+            } catch (ConnectionException|RequestException|RuntimeException $exception) {
+                Log::warning('RajaOngkir shipping service validation failed.', [
+                    'order_id' => $order->id,
+                    'exception' => $exception->getMessage(),
+                ]);
 
-            return response()->json([
-                'message' => 'Tarif pengiriman belum berhasil diverifikasi. Coba lagi sebentar.',
-            ], 502);
+                return response()->json([
+                    'message' => 'Tarif pengiriman belum berhasil diverifikasi. Coba lagi sebentar.',
+                ], 502);
+            }
         }
 
         $selectedRate = collect($rates)->first(fn (array $rate): bool => $rate['service'] === $validated['service']);
@@ -221,6 +268,29 @@ class RajaOngkirController extends Controller
         }
 
         return $order->participants()->where('user_id', $user->id)->firstOrFail();
+    }
+
+    /**
+     * @return list<array{code: string, service: string, description: string, cost: int, etd: string}>
+     */
+    private function simulatedRates(string $courier): array
+    {
+        $rates = match ($courier) {
+            'jne' => [['REG', 'Reguler', 15000, '2-4 hari'], ['YES', 'Yes', 25000, '1-2 hari']],
+            'pos' => [['PKT', 'Paket Kilat', 14000, '2-5 hari'], ['EXP', 'Express', 24000, '1-2 hari']],
+            'tiki' => [['REG', 'Reguler', 16000, '2-4 hari'], ['ONS', 'Over Night Service', 27000, '1 hari']],
+            'jnt' => [['EZ', 'Reguler', 14000, '2-4 hari'], ['SUPER', 'J&T Super', 24000, '1-2 hari']],
+            'sicepat' => [['REG', 'Reguler', 15000, '2-4 hari'], ['BEST', 'Besok Sampai', 25000, '1 hari']],
+            default => [['REG', 'Reguler', 15000, '2-5 hari'], ['EXP', 'Express', 25000, '1-2 hari']],
+        };
+
+        return array_map(fn (array $rate): array => [
+            'code' => $courier,
+            'service' => $rate[0],
+            'description' => $rate[1].' (tarif simulasi)',
+            'cost' => $rate[2],
+            'etd' => $rate[3],
+        ], $rates);
     }
 
     /**

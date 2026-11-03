@@ -47,6 +47,68 @@ class RajaOngkirService
     }
 
     /**
+     * @return list<array{id: string, label: string}>
+     *
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function searchSimulatedDestinations(string $search): array
+    {
+        $response = Http::acceptJson()
+            ->withUserAgent('Navora location search ('.config('app.url').')')
+            ->timeout(10)
+            ->get('https://photon.komoot.io/api/', [
+                'q' => $search,
+                'countrycode' => 'ID',
+                'limit' => 30,
+            ])
+            ->throw();
+        $body = $response->json();
+        $features = is_array($body) ? ($body['features'] ?? null) : null;
+
+        if (! is_array($features)) {
+            throw new RuntimeException('Respons pencarian lokasi simulasi tidak valid.');
+        }
+
+        $destinations = [];
+        foreach ($features as $feature) {
+            $properties = is_array($feature) ? ($feature['properties'] ?? null) : null;
+            $osmType = is_array($properties) ? ($properties['osm_type'] ?? null) : null;
+            $osmId = is_array($properties) ? ($properties['osm_id'] ?? null) : null;
+            $countryCode = is_array($properties) ? ($properties['countrycode'] ?? null) : null;
+            $country = is_array($properties) ? ($properties['country'] ?? null) : null;
+            $name = is_array($properties) ? ($properties['name'] ?? null) : null;
+
+            if ((! is_string($countryCode) || strtoupper($countryCode) !== 'ID')
+                && (! is_string($country) || mb_strtolower($country) !== 'indonesia')) {
+                continue;
+            }
+
+            if (! is_string($osmType)
+                || ! is_numeric($osmId)
+                || ! is_string($name)
+                || $name === '') {
+                continue;
+            }
+
+            $label = implode(', ', array_unique(array_filter([
+                $name,
+                $properties['district'] ?? null,
+                $properties['city'] ?? null,
+                $properties['county'] ?? null,
+                $properties['state'] ?? null,
+            ], fn (mixed $part): bool => is_string($part) && $part !== '')));
+
+            $destinations[] = [
+                'id' => 'photon:'.$osmType.':'.$osmId,
+                'label' => $label,
+            ];
+        }
+
+        return array_slice($destinations, 0, 15);
+    }
+
+    /**
      * @param  array<int, int>  $packageWeightsAndCounts
      * @return list<array{code: string, service: string, description: string, cost: int, etd: string}>
      *

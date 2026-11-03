@@ -30,6 +30,7 @@
     data-orders-status-template="{{ route('orders.status', ['order' => '__ORDER__']) }}"
     data-orders-price-template="{{ route('orders.price', ['order' => '__ORDER__']) }}"
     data-orders-quote-decision-template="{{ route('orders.quote-decision', ['order' => '__ORDER__']) }}"
+    data-orders-checkout-page-template="{{ route('orders.checkout-page', ['order' => '__ORDER__']) }}"
     data-orders-checkout-template="{{ route('orders.checkout', ['order' => '__ORDER__']) }}"
     data-orders-payment-refresh-template="{{ route('orders.payment-refresh', ['order' => '__ORDER__']) }}"
     data-orders-shipping-rates-template="{{ route('orders.shipping-rates', ['order' => '__ORDER__']) }}"
@@ -39,6 +40,8 @@
     data-vendor-subscription-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}"
     data-rajaongkir-locations-url="{{ route('rajaongkir.locations') }}"
     data-rajaongkir-couriers="{{ implode(',', config('services.rajaongkir.couriers')) }}"
+    data-rajaongkir-simulated-rates="{{ config('services.rajaongkir.simulated_rates') ? 'true' : 'false' }}"
+    data-order-weight-max="{{ config('services.rajaongkir.simulated_rates') ? '4294967295' : '30000' }}"
     data-order-messages-template="{{ route('orders.messages.index', ['order' => '__ORDER__']) }}"
     data-order-message-store-template="{{ route('orders.messages.store', ['order' => '__ORDER__']) }}"
     data-vendor-income-url="{{ route('orders.vendor-income') }}">

@@ -3385,6 +3385,427 @@ body.navora-app-body {
     }
 }
 
+.navora-checkout-body {
+    background: #f3f6f8;
+}
+
+.navora-checkout-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px max(24px, calc((100% - 1180px) / 2));
+    border-bottom: 1px solid var(--navora-app-line);
+    background: #fff;
+}
+
+.navora-checkout-header .btn {
+    white-space: nowrap;
+}
+
+.navora-checkout-main {
+    width: min(1180px, calc(100% - 40px));
+    margin: 48px auto 72px;
+}
+
+.navora-checkout-heading {
+    margin-bottom: 26px;
+}
+
+.navora-checkout-heading h1 {
+    margin: 7px 0;
+    font: 800 30px/1.2 Manrope, sans-serif;
+}
+
+.navora-checkout-heading p,
+.navora-checkout-order p,
+.navora-checkout-addresses p,
+.navora-checkout-section-heading p {
+    margin: 0;
+    color: var(--navora-app-muted);
+}
+
+.navora-checkout-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(300px, .8fr);
+    align-items: start;
+    gap: 22px;
+}
+
+.navora-checkout-card,
+.navora-checkout-summary-card {
+    border: 1px solid var(--navora-app-line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--navora-app-shadow);
+}
+
+.navora-checkout-card {
+    padding: 26px;
+}
+
+.navora-checkout-order {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--navora-app-line);
+}
+
+.navora-checkout-icon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    place-items: center;
+    border-radius: 14px;
+    background: #eaf3f8;
+    color: var(--navora-app-blue);
+    font-size: 22px;
+}
+
+.navora-checkout-order h2,
+.navora-checkout-summary-card h2 {
+    margin: 4px 0;
+    font: 700 17px/1.4 Manrope, sans-serif;
+}
+
+.navora-checkout-order p {
+    font-size: 13px;
+}
+
+.navora-checkout-addresses {
+    display: grid;
+    grid-template-columns: 1fr 30px 1fr;
+    align-items: center;
+    gap: 14px;
+    padding: 22px 0;
+}
+
+.navora-checkout-addresses article {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--navora-app-line);
+    border-radius: 12px;
+}
+
+.navora-checkout-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+    color: var(--navora-app-blue);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.navora-checkout-addresses article strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+.navora-checkout-addresses article p {
+    overflow-wrap: anywhere;
+    font-size: 12px;
+}
+
+.navora-checkout-addresses article small {
+    display: block;
+    margin-top: 6px;
+    color: var(--navora-app-muted);
+}
+
+.navora-checkout-route {
+    color: var(--navora-app-teal);
+    text-align: center;
+}
+
+.navora-checkout-section-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    margin: 8px 0 16px;
+}
+
+.navora-checkout-section-heading > span {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    place-items: center;
+    border-radius: 50%;
+    background: #eaf3f8;
+    color: var(--navora-app-blue);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.navora-checkout-section-heading h2 {
+    margin: 0 0 3px;
+    font: 700 16px/1.4 Manrope, sans-serif;
+}
+
+.navora-checkout-section-heading p {
+    font-size: 12px;
+}
+
+.navora-checkout-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.navora-checkout-field {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    color: var(--navora-app-ink);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.navora-checkout-field-wide {
+    grid-column: 1 / -1;
+}
+
+.navora-checkout-field[data-location-picker] {
+    position: relative;
+}
+
+.navora-checkout-field input,
+.navora-checkout-field textarea,
+.navora-checkout-field select {
+    width: 100%;
+    min-height: 43px;
+    padding: 10px 12px;
+    border: 1px solid #dce4e9;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--navora-app-ink);
+    font: 500 13px 'DM Sans', sans-serif;
+}
+
+.navora-checkout-field textarea {
+    resize: vertical;
+}
+
+.navora-checkout-field input:focus,
+.navora-checkout-field textarea:focus,
+.navora-checkout-field select:focus {
+    border-color: var(--navora-app-blue);
+    outline: 3px solid rgba(30, 92, 146, .12);
+}
+
+.navora-checkout-field [data-location-validation] {
+    color: #a63d39;
+    font-weight: 500;
+}
+
+.navora-checkout-shipping-heading {
+    margin-top: 28px;
+}
+
+.navora-checkout-courier {
+    max-width: 420px;
+}
+
+.navora-checkout-rate-note {
+    margin: 12px 0;
+    color: var(--navora-app-muted);
+    font-size: 12px;
+}
+
+.navora-checkout-calculate {
+    width: 100%;
+    margin-top: 5px;
+}
+
+.navora-checkout-feedback {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: #eaf5f0;
+    color: #24644d;
+    font-size: 13px;
+}
+
+.navora-checkout-feedback.is-error {
+    background: #fff0ef;
+    color: #9a302c;
+}
+
+.navora-checkout-rates {
+    margin-top: 22px;
+}
+
+.navora-checkout-rates h3 {
+    margin-bottom: 12px;
+    font: 700 15px Manrope, sans-serif;
+}
+
+.navora-checkout-rate {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--navora-app-line);
+    border-radius: 10px;
+}
+
+.navora-checkout-rate + .navora-checkout-rate {
+    margin-top: 9px;
+}
+
+.navora-checkout-rate > div {
+    display: grid;
+    gap: 3px;
+}
+
+.navora-checkout-rate > div span {
+    color: var(--navora-app-muted);
+    font-size: 11px;
+}
+
+.navora-checkout-rate > strong {
+    font-size: 13px;
+}
+
+.navora-checkout-rate .btn {
+    padding: 7px 12px;
+}
+
+.navora-checkout-summary {
+    position: sticky;
+    top: 24px;
+}
+
+.navora-checkout-summary-card {
+    padding: 24px;
+}
+
+.navora-checkout-summary-card h2 {
+    margin: 8px 0 20px;
+}
+
+.navora-checkout-cost-row,
+.navora-checkout-total {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-top: 1px solid var(--navora-app-line);
+    font-size: 13px;
+}
+
+.navora-checkout-cost-row > span {
+    display: grid;
+    gap: 4px;
+    color: var(--navora-app-muted);
+}
+
+.navora-checkout-cost-row small {
+    color: var(--navora-app-blue);
+    font-size: 11px;
+}
+
+.navora-checkout-cost-row strong,
+.navora-checkout-total strong {
+    white-space: nowrap;
+}
+
+.navora-checkout-total {
+    margin-top: 3px;
+    border-top: 1px solid var(--navora-app-ink);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.navora-checkout-total strong {
+    color: var(--navora-app-blue);
+    font-size: 18px;
+}
+
+.navora-checkout-pay {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.navora-checkout-pay:disabled,
+.navora-checkout-calculate:disabled {
+    cursor: not-allowed;
+    opacity: .6;
+}
+
+.navora-checkout-secure {
+    margin: 12px 0 0;
+    color: var(--navora-app-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+@media (max-width: 800px) {
+    .navora-checkout-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .navora-checkout-summary {
+        position: static;
+    }
+}
+
+@media (max-width: 560px) {
+    .navora-checkout-header {
+        padding: 14px 18px;
+    }
+
+    .navora-checkout-header .btn {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .navora-checkout-main {
+        width: min(100% - 24px, 1180px);
+        margin-top: 28px;
+    }
+
+    .navora-checkout-heading h1 {
+        font-size: 24px;
+    }
+
+    .navora-checkout-card,
+    .navora-checkout-summary-card {
+        padding: 18px;
+    }
+
+    .navora-checkout-addresses {
+        grid-template-columns: 1fr;
+        gap: 9px;
+    }
+
+    .navora-checkout-route {
+        transform: rotate(0);
+    }
+
+    .navora-checkout-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .navora-checkout-field-wide {
+        grid-column: auto;
+    }
+
+    .navora-checkout-rate {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .navora-checkout-rate .btn {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+}
+
 .navora-order-create-actions,
 .navora-order-actions {
     display: flex;

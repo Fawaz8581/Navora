@@ -1742,7 +1742,7 @@
         const button = textElement(
             'button',
             'btn navora-app-primary',
-            authenticatedRole === 'vendor' ? 'Buka chat & tanggapi' : order.can_pay ? 'Buka chat & bayar' : 'Buka chat',
+            authenticatedRole === 'vendor' ? 'Buka chat & tanggapi' : order.can_checkout ? 'Buka chat & checkout' : 'Buka chat',
         );
         button.type = 'button';
         button.dataset.action = 'open-order-chat';
@@ -1783,11 +1783,11 @@
             items.push(quoteButton);
         }
 
-        if (order.can_pay) {
+        if (order.can_checkout) {
             const paymentButton = textElement(
                 'button',
                 'btn navora-app-primary',
-                `Bayar ${formatRupiah(order.payment_amount)} via Midtrans`,
+                `Lanjut ke checkout · ${formatRupiah(order.payment_amount)}`,
             );
             paymentButton.type = 'button';
             paymentButton.dataset.action = 'pay-order-from-chat';
@@ -2162,11 +2162,11 @@
             shippingButton.dataset.order = String(order.id);
             actions.append(shippingButton);
         }
-        if (order.can_pay) {
+        if (order.can_checkout) {
             const paymentButton = textElement(
                 'button',
                 'btn navora-app-primary',
-                `Bayar ${formatRupiah(order.payment_amount)} via Midtrans`,
+                `Lanjut ke checkout · ${formatRupiah(order.payment_amount)}`,
             );
             paymentButton.type = 'button';
             paymentButton.dataset.action = 'checkout-order';
@@ -2691,18 +2691,20 @@
     const setOrderPrice = (orderId) => {
         openModal({
             title: 'Tetapkan harga final',
-            description: 'Masukkan harga final dan berat per pcs. Berat maksimal satu paket kurir 30 kg; pesanan yang lebih berat otomatis dibagi ke beberapa paket.',
+            description: document.body.dataset.rajaongkirSimulatedRates === 'true'
+                ? 'Masukkan harga final dan berat per pcs. Ongkir simulasi tidak dibatasi ukuran paket.'
+                : 'Masukkan harga final dan berat per pcs. Berat maksimal satu paket kurir 30 kg; pesanan yang lebih berat otomatis dibagi ke beberapa paket.',
             icon: 'bi-tag',
             submit: 'Kirim harga ke pembeli',
             fields: [
                 { name: 'unit_price', label: 'Harga final per pcs (Rp)', placeholder: 'Contoh: 1250', type: 'number', min: 1, max: 1000000000, step: 1, required: true },
-                { name: 'shipping_weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 150', type: 'number', min: 1, max: 30000, step: 1, required: true },
+                { name: 'shipping_weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 150', type: 'number', min: 1, max: Number(document.body.dataset.orderWeightMax || 30000), step: 1, required: true },
             ],
             onSubmit: (values) => {
                 const unitPrice = Number(values.unit_price);
                 const weight = Number(values.shipping_weight_per_unit_grams);
                 if (!Number.isSafeInteger(unitPrice) || unitPrice < 1 || unitPrice > 1000000000
-                    || !Number.isSafeInteger(weight) || weight < 1 || weight > 30000) {
+                    || !Number.isSafeInteger(weight) || weight < 1 || weight > Number(document.body.dataset.orderWeightMax || 30000)) {
                     showToast('Masukkan harga dan berat per pcs sebagai bilangan bulat yang valid.');
                     return false;
                 }
@@ -2836,7 +2838,9 @@
 
         openModal({
             title: 'Pilih kurir pengiriman',
-            description: 'Tarif dihitung ulang dari lokasi vendor, area penerima, berat per pcs, dan jumlah pesanan.',
+            description: document.body.dataset.rajaongkirSimulatedRates === 'true'
+                ? 'Tarif simulasi tetap sama untuk ukuran paket apa pun.'
+                : 'Tarif dihitung ulang dari lokasi vendor, area penerima, berat per pcs, dan jumlah pesanan.',
             icon: 'bi-truck',
             submit: 'Lihat tarif',
             fields: [{
@@ -2938,65 +2942,8 @@
         }
     };
 
-    const checkoutOrder = async (orderId, button) => {
-        if (orderSubmissionInProgress) {
-            return;
-        }
-        orderSubmissionInProgress = true;
-        button.disabled = true;
-        let popupOpened = false;
-        let refreshStarted = false;
-
-        try {
-            const payload = await requestOrderData(orderUrl(document.body.dataset.ordersCheckoutTemplate, orderId), {
-                method: 'POST',
-            });
-            if (!payload.token) {
-                throw new Error('Midtrans tidak mengembalikan token pembayaran.');
-            }
-            if (!window.snap || typeof window.snap.pay !== 'function') {
-                throw new Error('Popup Midtrans belum tersedia. Muat ulang halaman atau hubungi admin.');
-            }
-
-            const refreshPayment = async (message) => {
-                if (refreshStarted) {
-                    return;
-                }
-                refreshStarted = true;
-                try {
-                    const result = await requestOrderData(
-                        orderUrl(document.body.dataset.ordersPaymentRefreshTemplate, orderId),
-                        { method: 'POST' },
-                    );
-                    await loadOrders();
-                    await loadGroupOrders();
-                    showToast(result.payment_status === 'paid'
-                        ? 'Pembayaran berhasil diverifikasi. Vendor dapat melihat bukti transaksi.'
-                        : message);
-                } catch (requestError) {
-                    console.error('Navora could not refresh the Midtrans order payment.', requestError);
-                    showToast(requestError.message || 'Status pembayaran belum dapat diperiksa. Coba periksa kembali.');
-                } finally {
-                    button.disabled = false;
-                }
-            };
-
-            window.snap.pay(payload.token, {
-                onSuccess: () => refreshPayment('Pembayaran berhasil; status sedang diverifikasi Midtrans.'),
-                onPending: () => refreshPayment('Pembayaran sedang diproses Midtrans.'),
-                onError: () => refreshPayment('Pembayaran belum berhasil. Periksa status atau coba kembali.'),
-                onClose: () => refreshPayment('Popup ditutup. Status pembayaran sudah diperiksa.'),
-            });
-            popupOpened = true;
-        } catch (requestError) {
-            console.error('Navora could not start the Midtrans order checkout.', requestError);
-            showToast(requestError.message || 'Checkout Midtrans gagal dibuat. Coba lagi.');
-        } finally {
-            orderSubmissionInProgress = false;
-            if (!popupOpened) {
-                button.disabled = false;
-            }
-        }
+    const checkoutOrder = (orderId) => {
+        window.location.assign(orderUrl(document.body.dataset.ordersCheckoutPageTemplate, orderId));
     };
 
     const decideOrderQuote = async (orderId, decision) => {

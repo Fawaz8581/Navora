@@ -9,6 +9,7 @@ use App\Models\OrderParticipant;
 use App\Models\User;
 use App\Models\VendorSubscription;
 use App\Services\MidtransSnapService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Client\ConnectionException;
@@ -180,6 +181,69 @@ class OrderController extends Controller
         ]);
 
         return response()->json(['order' => $this->presentOrder($order, $user)]);
+    }
+
+    public function checkoutPage(Request $request, Order $order): View
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'umkm', 403);
+
+        if ($order->type === Order::TYPE_DIRECT) {
+            abort_unless($order->user_id === $user->id, 404);
+            $participant = null;
+        } else {
+            $participant = $order->participants()->where('user_id', $user->id)->firstOrFail();
+        }
+
+        $paymentStatus = $participant?->payment_status ?? $order->payment_status;
+        abort_unless(
+            $order->status === Order::STATUS_WAITING
+                && $order->quote_status === 'accepted'
+                && in_array($paymentStatus, ['pending', 'failed'], true),
+            422,
+            'Pesanan ini belum tersedia untuk checkout.',
+        );
+
+        $order->load(['vendor.businessProfile']);
+        $quantity = $participant?->quantity ?? $order->quantity;
+        $subtotalAmount = (int) ($participant?->subtotal_amount ?? $order->unit_price * $quantity);
+        $platformFeeAmount = (int) ($participant?->platform_fee_amount ?? Order::platformFeeFor($subtotalAmount));
+        $shippingAmount = (int) ($participant?->shipping_amount ?? $order->shipping_amount ?? 0);
+        $shippingCourier = $participant?->shipping_courier ?? $order->shipping_courier;
+        $shippingService = $participant?->shipping_service ?? $order->shipping_service;
+        $missingMidtransSettings = array_values(array_filter([
+            filled(config('services.midtrans.server_key')) ? null : 'MIDTRANS_SERVER_KEY',
+            filled(config('services.midtrans.client_key')) ? null : 'MIDTRANS_CLIENT_KEY',
+        ]));
+
+        return view('orders.checkout', [
+            'order' => $order,
+            'buyer' => $user,
+            'participant' => $participant,
+            'vendorProfile' => $order->vendor?->businessProfile,
+            'delivery' => [
+                'contact_name' => $participant?->delivery_contact_name ?? $order->delivery_contact_name,
+                'contact_phone' => $participant?->delivery_contact_phone ?? $order->delivery_contact_phone,
+                'address' => $participant?->delivery_address ?? $order->delivery_address,
+                'area_id' => $participant?->delivery_area_id ?? $order->delivery_area_id,
+                'area_name' => $participant?->delivery_area_name ?? $order->delivery_area_name,
+            ],
+            'quantity' => $quantity,
+            'subtotalAmount' => $subtotalAmount,
+            'platformFeeAmount' => $platformFeeAmount,
+            'shippingAmount' => $shippingAmount,
+            'paymentAmount' => $subtotalAmount + $platformFeeAmount + $shippingAmount,
+            'shippingCourier' => $shippingCourier,
+            'shippingService' => $shippingService,
+            'hasShippingSelection' => filled($shippingService)
+                && ($participant?->shipping_amount ?? $order->shipping_amount) !== null,
+            'midtransConfigured' => $missingMidtransSettings === [],
+            'midtransSetupMessage' => $missingMidtransSettings === []
+                ? null
+                : 'Pembayaran belum tersedia. Admin perlu mengatur '.implode(' dan ', $missingMidtransSettings).' di konfigurasi aplikasi.',
+            'couriers' => config('services.rajaongkir.couriers'),
+            'simulatedRates' => (bool) config('services.rajaongkir.simulated_rates'),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -448,9 +512,15 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'unit_price' => ['required', 'integer', 'between:1,1000000000'],
-            'shipping_weight_per_unit_grams' => ['required', 'integer', 'between:1,30000'],
+            'shipping_weight_per_unit_grams' => [
+                'required',
+                'integer',
+                'between:1,'.(config('services.rajaongkir.simulated_rates') ? '4294967295' : '30000'),
+            ],
         ], [
-            'shipping_weight_per_unit_grams.between' => 'Berat per pcs harus antara 1 gram dan 30 kg agar dapat dihitung sebagai paket kurir.',
+            'shipping_weight_per_unit_grams.between' => config('services.rajaongkir.simulated_rates')
+                ? 'Berat per pcs harus berupa bilangan bulat positif.'
+                : 'Berat per pcs harus antara 1 gram dan 30 kg agar dapat dihitung sebagai paket kurir.',
         ]);
 
         $order = DB::transaction(function () use ($order, $user, $validated): Order {
@@ -711,6 +781,10 @@ class OrderController extends Controller
                     return ['token' => $lockedOrder->snap_token];
                 }
 
+                if (! filled(config('services.midtrans.server_key'))) {
+                    return ['configuration_error' => true];
+                }
+
                 $orderId = $lockedOrder->payment_status === 'failed' || ! $lockedOrder->payment_order_id
                     ? 'NAVORA-ORDER-'.Str::uuid()
                     : $lockedOrder->payment_order_id;
@@ -772,6 +846,10 @@ class OrderController extends Controller
                 return ['token' => $participant->snap_token];
             }
 
+            if (! filled(config('services.midtrans.server_key'))) {
+                return ['configuration_error' => true];
+            }
+
             $orderId = $participant->payment_status === 'failed' || ! $participant->payment_order_id
                 ? 'NAVORA-PART-'.Str::uuid()
                 : $participant->payment_order_id;
@@ -788,6 +866,12 @@ class OrderController extends Controller
                 'amount' => (int) $participant->payment_amount,
             ];
         });
+
+        if (isset($payment['configuration_error'])) {
+            return response()->json([
+                'message' => 'Pembayaran Midtrans belum dikonfigurasi. Admin perlu mengatur MIDTRANS_SERVER_KEY di konfigurasi aplikasi.',
+            ], 503);
+        }
 
         if (isset($payment['token'])) {
             return response()->json(['token' => $payment['token']]);
@@ -1419,6 +1503,13 @@ class OrderController extends Controller
                 && ($order->type === Order::TYPE_DIRECT
                     ? $isBuyer && $order->quote_status === 'pending_buyer'
                     : $currentParticipant?->quote_status === 'pending_buyer'),
+            'can_checkout' => $user->role === 'umkm'
+                && $order->status === Order::STATUS_WAITING
+                && $order->quote_status === 'accepted'
+                && ($order->type === Order::TYPE_DIRECT
+                    ? $isBuyer && in_array($order->payment_status, ['pending', 'failed'], true)
+                    : $currentParticipant !== null
+                        && in_array($currentParticipant->payment_status, ['pending', 'failed'], true)),
             'can_pay' => $user->role === 'umkm'
                 && $order->status === Order::STATUS_WAITING
                 && filled($shippingService)
