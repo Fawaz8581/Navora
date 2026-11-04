@@ -20,7 +20,12 @@
     data-shipping-rates-url="{{ route('orders.shipping-rates', $order) }}"
     data-shipping-select-url="{{ route('orders.shipping-select', $order) }}"
     data-payment-url="{{ route('orders.checkout', $order) }}"
-    data-payment-refresh-url="{{ route('orders.payment-refresh', $order) }}">
+    data-payment-refresh-url="{{ route('orders.payment-refresh', $order) }}"
+    data-profile-contact-name="{{ $buyerProfile?->business_name ?: $buyer->name }}"
+    data-profile-contact-phone="{{ $buyerProfile?->phone ?: '' }}"
+    data-profile-address="{{ $buyerProfile?->business_address ?: '' }}"
+    data-profile-area-id="{{ $buyerProfile?->rajaongkir_area_id ?: '' }}"
+    data-profile-area-name="{{ $buyerProfile?->rajaongkir_area_name ?: '' }}">
     <a class="navora-skip-link" href="#checkout-content">Lewati ke konten utama</a>
     <header class="navora-checkout-header">
         <a class="navora-app-brand" href="{{ route('workspace') }}">
@@ -67,8 +72,20 @@
                 <form class="navora-checkout-form" data-checkout-form>
                     <div class="navora-checkout-section-heading">
                         <span>01</span>
-                        <div><h2>Biodata penerima</h2><p>Masukkan kontak yang dapat menerima paket.</p></div>
+                        <div><h2>Biodata penerima</h2><p>Pilih gunakan alamat profil usaha atau masukkan manual.</p></div>
                     </div>
+                    @if ($buyerProfile?->business_address || $buyerProfile?->rajaongkir_area_id)
+                        <div class="navora-checkout-address-mode" style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                <input type="radio" name="address_source" value="profile" checked>
+                                <span><i class="bi bi-person-badge"></i> Gunakan alamat dari profil</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                <input type="radio" name="address_source" value="manual">
+                                <span><i class="bi bi-pencil-square"></i> Masukkan alamat manual</span>
+                            </label>
+                        </div>
+                    @endif
                     <div class="navora-checkout-fields">
                         <label class="navora-checkout-field">
                             <span>Nama penerima</span>
@@ -95,11 +112,12 @@
                         <div><h2>Pilih jasa ekspedisi</h2><p>Alamat pengirim mengikuti profil vendor; area tujuan mengikuti pilihan UMKM.</p></div>
                     </div>
                     <label class="navora-checkout-field navora-checkout-courier">
-                        <span>Jasa ekspedisi</span>
+                        <span>Jasa ekspedisi / pengiriman</span>
                         <select name="courier" data-checkout-courier required>
-                            <option value="">Pilih ekspedisi</option>
+                            <option value="">Pilih pengiriman</option>
+                            <option value="vendor" @selected(($shippingCourier ?? '') === 'vendor')>ONGKIR VIA VENDOR (GRATIS / RP 0)</option>
                             @foreach ($couriers as $courier)
-                                <option value="{{ $courier }}" @selected(($shippingCourier ?? '') === $courier)>{{ strtoupper($courier) }}</option>
+                                <option value="{{ $courier }}" @selected(($shippingCourier ?? '') === $courier)>EKSPEDISI {{ strtoupper($courier) }}</option>
                             @endforeach
                         </select>
                     </label>

@@ -79,8 +79,9 @@ class RajaOngkirController extends Controller
         $user = $request->user();
         $participant = $this->buyerContext($order, $user);
         abort_unless($order->quote_status === 'accepted', 422, 'Setujui penawaran harga sebelum menghitung ongkir.');
+        $allowedCouriers = array_merge(config('services.rajaongkir.couriers'), ['vendor']);
         $validated = $request->validate([
-            'courier' => ['required', 'string', Rule::in(config('services.rajaongkir.couriers'))],
+            'courier' => ['required', 'string', Rule::in($allowedCouriers)],
         ]);
         $vendorProfile = $order->vendor?->businessProfile;
         $origin = $vendorProfile?->rajaongkir_area_id;
@@ -117,6 +118,21 @@ class RajaOngkirController extends Controller
             ]);
         }
 
+        if ($validated['courier'] === 'vendor') {
+            return response()->json([
+                'rates' => [
+                    [
+                        'code' => 'vendor',
+                        'service' => 'Vendor Delivery',
+                        'description' => 'Pengiriman oleh vendor (gratis / ditanggung vendor)',
+                        'cost' => 0,
+                        'etd' => 'Sesuai kesepakatan',
+                    ],
+                ],
+                'simulated' => true,
+            ]);
+        }
+
         if (config('services.rajaongkir.simulated_rates')) {
             return response()->json([
                 'rates' => $this->simulatedRates($validated['courier']),
@@ -150,8 +166,9 @@ class RajaOngkirController extends Controller
         $user = $request->user();
         $participant = $this->buyerContext($order, $user);
         abort_unless($order->quote_status === 'accepted', 422, 'Setujui penawaran harga sebelum memilih ongkir.');
+        $allowedCouriers = array_merge(config('services.rajaongkir.couriers'), ['vendor']);
         $validated = $request->validate([
-            'courier' => ['required', 'string', Rule::in(config('services.rajaongkir.couriers'))],
+            'courier' => ['required', 'string', Rule::in($allowedCouriers)],
             'service' => ['required', 'string', 'max:100'],
         ]);
         $vendorProfile = $order->vendor?->businessProfile;
@@ -189,7 +206,17 @@ class RajaOngkirController extends Controller
             ]);
         }
 
-        if (config('services.rajaongkir.simulated_rates')) {
+        if ($validated['courier'] === 'vendor') {
+            $rates = [
+                [
+                    'code' => 'vendor',
+                    'service' => 'Vendor Delivery',
+                    'description' => 'Pengiriman oleh vendor (gratis / ditanggung vendor)',
+                    'cost' => 0,
+                    'etd' => 'Sesuai kesepakatan',
+                ],
+            ];
+        } elseif (config('services.rajaongkir.simulated_rates')) {
             $rates = $this->simulatedRates($validated['courier']);
         } else {
             $weightDetails = $this->shippingWeightDetails($order, $quantity);

@@ -36,6 +36,7 @@
     let incomeLoadPromise = null;
     let orderSubmissionInProgress = false;
     let vendorListings = [];
+    let catalogVendorsCache = [];
     let vendorListingsVerified = false;
     let vendorListingsLoadPromise = null;
     let listingSubmissionInProgress = false;
@@ -362,6 +363,18 @@
         if (field.type === 'location') {
             wrapper.dataset.locationPicker = '';
         }
+        if (field.type === 'hidden') {
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = field.name;
+            if (field.value !== undefined) {
+                hiddenInput.value = field.value;
+            }
+            wrapper.style.display = 'none';
+            wrapper.append(hiddenInput);
+            return wrapper;
+        }
+
         const label = textElement('label', 'navora-form-label', field.label);
         const input = document.createElement(field.type === 'textarea' ? 'textarea' : field.type === 'select' ? 'select' : 'input');
         input.name = field.name;
@@ -447,6 +460,7 @@
             return;
         }
 
+        modalForm.reset();
         lastFocusedElement = document.activeElement;
         setText('[data-modal-title]', title);
         setText('[data-modal-description]', description);
@@ -791,6 +805,7 @@
                 signal: requestController.signal,
             });
             const vendors = Array.isArray(response.vendors) ? response.vendors : [];
+            catalogVendorsCache = vendors;
             grid.replaceChildren(...vendors.map(renderCatalogVendor));
             setText('[data-vendor-result-count]', String(vendors.length));
             if (empty) {
@@ -1420,6 +1435,17 @@
             }
         }
 
+        let vendorProductOptions = [];
+        if (!product && isCatalogVendor) {
+            const targetVendor = catalogVendorsCache.find((v) => String(v.id) === String(vendorUserId));
+            if (targetVendor && Array.isArray(targetVendor.listings) && targetVendor.listings.length > 0) {
+                vendorProductOptions = targetVendor.listings.map((l) => ({
+                    value: l.name,
+                    label: `${l.name} (MOQ: ${Number(l.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs)`,
+                }));
+            }
+        }
+
         const fields = isRealQuote
             ? [
                 ...(!isCatalogVendor
@@ -1437,9 +1463,31 @@
                         ],
                     }]
                     : []),
-                { ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: product?.name || '' },
-                { name: 'quantity', label: 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: product ? product.minimum_order_quantity : 1, step: 1, required: true, value: product ? String(product.minimum_order_quantity) : '' },
-                { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true, value: product ? `${product.material}. ${product.description}` : '' },
+                ...(product
+                    ? [{ name: 'product_name', type: 'hidden', value: product.name }]
+                    : vendorProductOptions.length > 0
+                        ? [{
+                            name: 'product_name',
+                            label: 'Pilih produk dari katalog vendor',
+                            type: 'select',
+                            required: true,
+                            options: [
+                                { value: '', label: 'Pilih produk dari toko' },
+                                ...vendorProductOptions,
+                            ],
+                        }]
+                        : [{ ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: '' }]),
+                {
+                    name: 'quantity',
+                    label: 'Jumlah pesanan (pcs)',
+                    placeholder: 'Minimal 100',
+                    type: 'number',
+                    min: 100,
+                    step: 1,
+                    required: true,
+                    value: '',
+                },
+                { name: 'packaging_details', label: 'Spesifikasi dan kebutuhan khusus', placeholder: 'Ukuran, material, warna, atau kebutuhan sampel', type: 'textarea', rows: 3, required: true, value: '' },
                 { name: 'target_unit_price', label: 'Tawaran harga per pcs (Rp, opsional)', placeholder: 'Contoh: 1.200', type: 'number', min: 1, max: 1000000000, step: 1, required: false },
                 { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan', type: 'textarea', rows: 2, required: false },
             ]
@@ -1465,8 +1513,8 @@
             onSubmit: (values) => {
                 if (isRealQuote) {
                     const quantity = Number(values.quantity);
-                    if (!Number.isSafeInteger(quantity) || quantity < 1) {
-                        showToast('Masukkan jumlah pesanan sebagai bilangan bulat positif.');
+                    if (!Number.isSafeInteger(quantity) || quantity < 100) {
+                        showToast('Masukkan jumlah pesanan minimal 100 pcs.');
                         return false;
                     }
                     const targetPrice = values.target_unit_price ? Number(values.target_unit_price) : null;
@@ -1768,11 +1816,41 @@
             ));
         }
         if (order.unit_price) {
+            let statusText = 'Menunggu persetujuan';
+            if (order.quote_status === 'accepted') {
+                statusText = order.payment_status === 'paid' ? 'Lunas' : 'Menunggu pembayaran';
+            } else if (order.quote_status === 'rejected') {
+                statusText = 'Penawaran ditolak';
+            } else if (order.payment_status === 'paid') {
+                statusText = 'Lunas';
+            }
+
             items.push(textElement(
                 'p',
                 'navora-order-chat-offer',
-                `Penawaran: ${formatRupiah(order.unit_price)} / pcs · Total ${formatRupiah(order.total_amount)} · ${order.payment_status === 'paid' ? 'Lunas' : order.payment_status === 'pending' ? 'Menunggu pembayaran' : 'Pembayaran gagal'}`,
+                `Penawaran: ${formatRupiah(order.unit_price)} / pcs · Total ${formatRupiah(order.total_amount)} · ${statusText}`,
             ));
+        }
+
+        if (order.can_decide_quote) {
+            const acceptBtn = textElement('button', 'btn navora-app-primary me-2', 'Setujui harga');
+            acceptBtn.type = 'button';
+            acceptBtn.dataset.action = 'decide-order-quote';
+            acceptBtn.dataset.order = String(order.id);
+            acceptBtn.dataset.decision = 'accept';
+
+            const rejectBtn = textElement('button', 'btn navora-order-cancel', 'Tolak harga');
+            rejectBtn.type = 'button';
+            rejectBtn.dataset.action = 'decide-order-quote';
+            rejectBtn.dataset.order = String(order.id);
+            rejectBtn.dataset.decision = 'reject';
+
+            const decisionWrapper = document.createElement('div');
+            decisionWrapper.style.display = 'flex';
+            decisionWrapper.style.gap = '8px';
+            decisionWrapper.style.margin = '6px 0';
+            decisionWrapper.append(acceptBtn, rejectBtn);
+            items.push(decisionWrapper);
         }
 
         if (order.can_set_price) {
@@ -1843,9 +1921,12 @@
             title.textContent = `${order.product_name} · ${Number(order.quantity).toLocaleString('id-ID')} pcs`;
         }
         panel.hidden = false;
+        const chatBox = document.querySelector('[data-floating-chat-box]');
+        if (chatBox) {
+            chatBox.classList.remove('is-collapsed');
+        }
         renderOrderChatActions(order);
         loadOrderMessages(orderId);
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         messageInput?.focus({ preventScroll: true });
     };
 
@@ -2210,6 +2291,25 @@
             card.append(actions);
         }
 
+        // Tombol Chat Langsung di Kartu Pesanan
+        if (order.id) {
+            const chatActionButton = textElement(
+                'button',
+                'btn navora-app-outline navora-order-chat-btn',
+                'Chat pesanan',
+            );
+            chatActionButton.type = 'button';
+            chatActionButton.dataset.action = 'open-order-chat';
+            chatActionButton.dataset.order = String(order.id);
+            const chatIcon = document.createElement('i');
+            chatIcon.className = 'bi bi-chat-dots me-1';
+            chatActionButton.prepend(chatIcon);
+            actions.append(chatActionButton);
+            if (!actions.parentElement) {
+                card.append(actions);
+            }
+        }
+
         return card;
     };
 
@@ -2504,18 +2604,18 @@
         ];
         const isGroup = type === 'patungan';
         const fields = [
-            modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'),
-            { name: 'quantity', label: isGroup ? 'Target jumlah (pcs)' : 'Jumlah pesanan (pcs)', placeholder: 'Contoh: 1.000', type: 'number', min: 1, step: 1, required: true },
+            { ...modalTextField('product_name', 'Nama produk atau kemasan', 'Contoh: pouch kopi 200 g'), value: '' },
+            { name: 'quantity', label: isGroup ? 'Target jumlah (pcs)' : 'Jumlah pesanan (pcs)', placeholder: 'Minimal 100 pcs', type: 'number', min: 100, step: 1, required: true, value: '' },
             ...(isGroup
-                ? [{ name: 'initial_quantity', label: 'Jumlah awal yang kamu ambil (pcs)', placeholder: 'Contoh: 100', type: 'number', min: 1, step: 1, required: true }]
+                ? [{ name: 'initial_quantity', label: 'Jumlah awal yang kamu ambil (pcs)', placeholder: 'Minimal 100 pcs', type: 'number', min: 100, step: 1, required: true, value: '' }]
                 : []),
-            { name: 'packaging_details', label: 'Spesifikasi kemasan', placeholder: 'Ukuran, material, bentuk, atau kebutuhan khusus', type: 'textarea', rows: 3, required: true },
-            { name: 'vendor_user_id', label: 'Vendor terverifikasi', type: 'select', required: true, options: vendorOptions },
-            { name: 'delivery_contact_name', label: 'Nama penerima', placeholder: 'Nama lengkap penerima', type: 'text', required: true },
-            { name: 'delivery_contact_phone', label: 'Nomor telepon penerima', placeholder: 'Contoh: 081234567890', type: 'tel', required: true },
-            { name: 'delivery_address', label: 'Alamat lengkap tujuan pengiriman', placeholder: 'Nama jalan, nomor, kelurahan, kecamatan, kota, dan kode pos', type: 'textarea', rows: 2, required: true },
-            { name: 'delivery_area_name', hiddenName: 'delivery_area_id', label: 'Area tujuan untuk hitung ongkir', placeholder: 'Cari kecamatan atau kota, lalu pilih hasilnya', type: 'location', required: true },
-            { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan untuk pesanan', type: 'textarea', rows: 2, required: false },
+            { name: 'packaging_details', label: 'Spesifikasi kemasan', placeholder: 'Ukuran, material, bentuk, atau kebutuhan khusus', type: 'textarea', rows: 3, required: true, value: '' },
+            { name: 'vendor_user_id', label: 'Vendor terverifikasi', type: 'select', required: true, options: vendorOptions, value: '' },
+            { name: 'delivery_contact_name', label: 'Nama penerima', placeholder: 'Nama lengkap penerima', type: 'text', required: true, value: '' },
+            { name: 'delivery_contact_phone', label: 'Nomor telepon penerima', placeholder: 'Contoh: 081234567890', type: 'tel', required: true, value: '' },
+            { name: 'delivery_address', label: 'Alamat lengkap tujuan pengiriman', placeholder: 'Nama jalan, nomor, kelurahan, kecamatan, kota, dan kode pos', type: 'textarea', rows: 2, required: true, value: '' },
+            { name: 'delivery_area_name', hiddenName: 'delivery_area_id', label: 'Area tujuan untuk hitung ongkir', placeholder: 'Cari kecamatan atau kota, lalu pilih hasilnya', type: 'location', required: true, value: '', hiddenValue: '' },
+            { name: 'notes', label: 'Catatan (opsional)', placeholder: 'Informasi tambahan untuk pesanan', type: 'textarea', rows: 2, required: false, value: '' },
         ];
 
         openModal({
@@ -2689,16 +2789,28 @@
     };
 
     const setOrderPrice = (orderId) => {
+        const order = [...orderListData, ...groupOrderListData].find((item) => String(item.id) === String(orderId));
+        let defaultWeight = '';
+        if (vendorListings && vendorListings.length > 0) {
+            const matchingListing = vendorListings.find((l) => order && l.name && order.product_name && (
+                order.product_name.toLowerCase().includes(l.name.toLowerCase()) ||
+                l.name.toLowerCase().includes(order.product_name.toLowerCase())
+            ) && l.weight_per_unit_grams) || vendorListings.find((l) => l.weight_per_unit_grams);
+            if (matchingListing && matchingListing.weight_per_unit_grams) {
+                defaultWeight = String(matchingListing.weight_per_unit_grams);
+            }
+        }
+
         openModal({
             title: 'Tetapkan harga final',
             description: document.body.dataset.rajaongkirSimulatedRates === 'true'
-                ? 'Masukkan harga final dan berat per pcs. Ongkir simulasi tidak dibatasi ukuran paket.'
-                : 'Masukkan harga final dan berat per pcs. Berat maksimal satu paket kurir 30 kg; pesanan yang lebih berat otomatis dibagi ke beberapa paket.',
+                ? 'Masukkan harga final dan berat per pcs. Berat otomatis diambil dari data katalog jika cocok.'
+                : 'Masukkan harga final dan berat per pcs. Berat otomatis diambil dari data katalog jika cocok.',
             icon: 'bi-tag',
             submit: 'Kirim harga ke pembeli',
             fields: [
                 { name: 'unit_price', label: 'Harga final per pcs (Rp)', placeholder: 'Contoh: 1250', type: 'number', min: 1, max: 1000000000, step: 1, required: true },
-                { name: 'shipping_weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 150', type: 'number', min: 1, max: Number(document.body.dataset.orderWeightMax || 30000), step: 1, required: true },
+                { name: 'shipping_weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 150', type: 'number', min: 1, max: Number(document.body.dataset.orderWeightMax || 30000), step: 1, required: true, value: defaultWeight, help: defaultWeight ? 'Otomatis terisi dari berat katalog yang kamu daftarkan.' : 'Berat produk per pcs (gram).' },
             ],
             onSubmit: (values) => {
                 const unitPrice = Number(values.unit_price);
@@ -3080,6 +3192,7 @@
             fields.push(
                 { name: 'pricing_type', label: 'Jenis penawaran harga', type: 'select', required: true, value: listingToEdit?.pricing_type || 'final', options: [{ value: 'final', label: 'Harga final (tetap)' }, { value: 'negotiable', label: 'Bisa nego' }] },
                 { name: 'price_per_unit', label: 'Harga per pcs (Rp)', placeholder: 'Contoh: 1.500', type: 'number', min: 1, max: 1000000000, step: 1, required: false, value: listingToEdit?.price_per_unit ? String(listingToEdit.price_per_unit) : '', help: 'Untuk harga final wajib diisi. Pada pilihan bisa nego, harga boleh dikosongkan atau diisi sebagai harga awal.' },
+                { name: 'weight_per_unit_grams', label: 'Berat produk per pcs (gram)', placeholder: 'Contoh: 50', type: 'number', min: 1, max: 100000, step: 1, required: false, value: listingToEdit?.weight_per_unit_grams ? String(listingToEdit.weight_per_unit_grams) : '', help: 'Berat produk per pcs agar saat pemesanan ongkir langsung otomatis terhitung tanpa diinput ulang.' },
             );
             fields.push({
                 name: 'media',
@@ -3114,6 +3227,7 @@
                         minimum_order_quantity: Number(values.moq),
                         pricing_type: values.pricing_type,
                         price_per_unit: values.price_per_unit ? Number(values.price_per_unit) : null,
+                        weight_per_unit_grams: values.weight_per_unit_grams ? Number(values.weight_per_unit_grams) : null,
                         description: values.description.trim(),
                     };
                     if (listing.pricing_type === 'final'
@@ -3671,6 +3785,29 @@
 
         if (pageLink instanceof HTMLElement) {
             showPage(pageLink.dataset.openPage || 'overview');
+            return;
+        }
+
+        if (target.closest('[data-close-floating-chat]')) {
+            const chatBox = document.querySelector('[data-floating-chat-box]');
+            if (chatBox) {
+                chatBox.classList.add('is-collapsed');
+            }
+            return;
+        }
+
+        if (target.closest('[data-toggle-floating-chat]')) {
+            const chatBox = document.querySelector('[data-floating-chat-box]');
+            if (chatBox) {
+                if (chatBox.classList.contains('is-collapsed') && !activeChatOrderId) {
+                    const firstOrderWithChat = [...orderListData, ...groupOrderListData][0];
+                    if (firstOrderWithChat) {
+                        openOrderChat(firstOrderWithChat.id);
+                        return;
+                    }
+                }
+                chatBox.classList.toggle('is-collapsed');
+            }
             return;
         }
 

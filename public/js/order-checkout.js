@@ -79,6 +79,64 @@
         payButton.disabled = true;
     };
 
+    // Alamat profil otomatis atau manual
+    const applyProfileAddress = () => {
+        const contactNameInput = form.elements.namedItem('delivery_contact_name');
+        const phoneInput = form.elements.namedItem('delivery_contact_phone');
+        const addressInput = form.elements.namedItem('delivery_address');
+        const areaNameInput = form.elements.namedItem('delivery_area_name');
+        const areaIdInput = form.elements.namedItem('delivery_area_id');
+
+        if (document.body.dataset.profileContactName && contactNameInput) {
+            contactNameInput.value = document.body.dataset.profileContactName;
+        }
+        if (document.body.dataset.profileContactPhone && phoneInput) {
+            phoneInput.value = document.body.dataset.profileContactPhone;
+        }
+        if (document.body.dataset.profileAddress && addressInput) {
+            addressInput.value = document.body.dataset.profileAddress;
+        }
+        if (document.body.dataset.profileAreaId && areaIdInput) {
+            areaIdInput.value = document.body.dataset.profileAreaId;
+        }
+        if (document.body.dataset.profileAreaName && areaNameInput) {
+            areaNameInput.value = document.body.dataset.profileAreaName;
+        }
+        markDeliveryChanged();
+        triggerAutoCalculate();
+    };
+
+    document.querySelectorAll('input[name="address_source"]').forEach((radio) => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'profile') {
+                applyProfileAddress();
+            } else {
+                markDeliveryChanged();
+            }
+        });
+    });
+
+    let autoCalculateTimer = null;
+    const triggerAutoCalculate = () => {
+        window.clearTimeout(autoCalculateTimer);
+        autoCalculateTimer = window.setTimeout(() => {
+            const courier = form.elements.namedItem('courier')?.value;
+            const areaId = form.querySelector('[data-rajaongkir-area-id]')?.value;
+            const address = form.elements.namedItem('delivery_address')?.value?.trim();
+            const contactName = form.elements.namedItem('delivery_contact_name')?.value?.trim();
+            const phone = form.elements.namedItem('delivery_contact_phone')?.value?.trim();
+
+            if (courier && areaId && address && contactName && phone && !requestInProgress) {
+                form.requestSubmit();
+            }
+        }, 300);
+    };
+
+    // Auto-calculate saat ganti kurir jika alamat sudah terisi
+    form.elements.namedItem('courier')?.addEventListener('change', () => {
+        triggerAutoCalculate();
+    });
+
     form.addEventListener('input', markDeliveryChanged);
     form.addEventListener('change', markDeliveryChanged);
     document.addEventListener('click', (event) => {

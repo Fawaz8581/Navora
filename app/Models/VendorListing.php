@@ -29,6 +29,7 @@ class VendorListing extends Model
         'material',
         'minimum_order_quantity',
         'price_per_unit',
+        'weight_per_unit_grams',
         'pricing_type',
         'description',
         'status',
@@ -59,6 +60,7 @@ class VendorListing extends Model
         return [
             'minimum_order_quantity' => 'integer',
             'price_per_unit' => 'integer',
+            'weight_per_unit_grams' => 'integer',
             'approved_at' => 'datetime',
         ];
     }

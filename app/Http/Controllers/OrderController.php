@@ -219,6 +219,7 @@ class OrderController extends Controller
         return view('orders.checkout', [
             'order' => $order,
             'buyer' => $user,
+            'buyerProfile' => $user->businessProfile,
             'participant' => $participant,
             'vendorProfile' => $order->vendor?->businessProfile,
             'delivery' => [

@@ -305,21 +305,6 @@
                     <article class="navora-incoming-rfq"><div class="navora-rfq-icon icon-lilac"><i class="bi bi-tags"></i></div><div class="navora-incoming-copy"><h3>Label botol minuman</h3><p>Brand minuman lokal · target 2.500 pcs · Label tahan air · Jakarta</p><span>Contoh RFQ · profil pembeli disamarkan</span></div><button class="btn navora-app-primary" type="button" data-action="respond-rfq" data-rfq="rfq-demo-2">Buat penawaran</button></article>
                 </div>
                 <div class="navora-empty-state" data-rfq-empty hidden><i class="bi bi-chat-square-text"></i><strong>Belum ada permintaan penawaran</strong><span>Permintaan yang dikirim ke vendor akan muncul di sini.</span></div>
-                <section class="navora-panel navora-chat-panel" data-order-chat hidden aria-labelledby="order-chat-title">
-                    <div class="navora-panel-heading">
-                        <div><span class="navora-panel-kicker">RUANG DISKUSI</span><h2 id="order-chat-title" data-order-chat-title>Chat penawaran</h2></div>
-                        <button class="navora-text-action" type="button" data-action="refresh-order-chat"><i class="bi bi-arrow-repeat"></i> Segarkan</button>
-                    </div>
-                    <div class="navora-order-chat-messages" data-order-chat-messages role="log" aria-live="polite" aria-relevant="additions text"></div>
-                    <div class="navora-order-chat-loading" data-order-chat-loading hidden>Memuat percakapan…</div>
-                    <div class="navora-order-error" data-order-chat-error role="alert" hidden></div>
-                    <div class="navora-order-chat-actions" data-order-chat-actions></div>
-                    <form class="navora-order-chat-form" data-order-chat-form>
-                        <label class="visually-hidden" for="order-chat-message">Tulis pesan</label>
-                        <textarea id="order-chat-message" name="message" rows="2" maxlength="2000" required placeholder="Tulis pesan untuk vendor atau UMKM…"></textarea>
-                        <button class="btn navora-app-primary" type="submit" data-order-chat-send><i class="bi bi-send"></i> Kirim</button>
-                    </form>
-                </section>
                 <div class="navora-note" data-rfq-demo-footer><i class="bi bi-info-circle"></i><span>Permintaan dan penawaran di halaman ini hanya simulasi lokal. Harga belum dikonfirmasi vendor dan bukan penawaran mengikat.</span></div>
             </section>
 
@@ -568,6 +553,44 @@
         </section>
     </div>
     <div class="navora-toast" role="status" aria-live="polite" data-toast></div>
+
+    <!-- Floating Chat Popup & FAB -->
+    <div class="navora-floating-chat-container" data-order-chat>
+        <div class="navora-floating-chat-card is-collapsed" data-floating-chat-box>
+            <div class="navora-floating-chat-header">
+                <div>
+                    <span class="navora-panel-kicker" style="color: rgba(255,255,255,0.8); font-size: 0.7rem;">DISKUSI PESANAN</span>
+                    <h3 id="order-chat-title" data-order-chat-title style="font-size: 0.95rem; font-weight: 700; margin: 0; color: #fff;">Chat</h3>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button class="navora-text-action" type="button" data-action="refresh-order-chat" title="Segarkan pesan" style="color: #fff; padding: 2px 6px;">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    <button type="button" class="navora-floating-chat-close" data-close-floating-chat aria-label="Tutup chat">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="navora-floating-chat-body">
+                <div class="navora-order-chat-messages" data-order-chat-messages role="log" aria-live="polite" aria-relevant="additions text"></div>
+                <div class="navora-order-chat-loading" data-order-chat-loading hidden>Memuat percakapan…</div>
+                <div class="navora-order-error" data-order-chat-error role="alert" hidden></div>
+            </div>
+            <div class="navora-order-chat-actions" data-order-chat-actions style="padding: 0 12px;"></div>
+            <form class="navora-floating-chat-footer navora-order-chat-form" data-order-chat-form>
+                <label class="visually-hidden" for="order-chat-message">Tulis pesan</label>
+                <textarea id="order-chat-message" name="message" rows="1" maxlength="2000" required placeholder="Tulis pesan ke vendor / UMKM…"></textarea>
+                <button class="btn navora-app-primary" type="submit" data-order-chat-send title="Kirim">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </form>
+        </div>
+        <button class="navora-floating-chat-fab" type="button" data-toggle-floating-chat aria-label="Buka Chat">
+            <i class="bi bi-chat-dots-fill"></i>
+            <span>Chat</span>
+        </button>
+    </div>
+
     @if (filled(config('services.midtrans.client_key')))
         <script src="{{ rtrim(config('services.midtrans.base_url'), '/').'/snap/snap.js' }}" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
     @endif

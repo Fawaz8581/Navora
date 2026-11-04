@@ -53,6 +53,7 @@ class VendorListingController extends Controller
                 'integer',
                 'between:1,1000000000',
             ],
+            'weight_per_unit_grams' => ['nullable', 'integer', 'between:1,100000'],
             'description' => ['required', 'string', 'max:2000'],
             'remove_media_ids' => ['sometimes', 'array', 'max:4'],
             'remove_media_ids.*' => ['integer', 'distinct'],
@@ -133,8 +134,9 @@ class VendorListingController extends Controller
                         'minimum_order_quantity',
                         'pricing_type',
                         'price_per_unit',
+                        'weight_per_unit_grams',
                         'description',
-                    ])->contains(fn (string $attribute): bool => $listing->{$attribute} !== $validated[$attribute])
+                    ])->contains(fn (string $attribute): bool => $listing->{$attribute} !== ($validated[$attribute] ?? null))
                     || $mediaFiles !== []
                     || $mediaToRemove->isNotEmpty();
                 $isPublished = $listing->exists && $listing->status === VendorListing::STATUS_ACTIVE;
@@ -222,6 +224,7 @@ class VendorListingController extends Controller
             'material' => $listing->material,
             'minimum_order_quantity' => $listing->minimum_order_quantity,
             'price_per_unit' => $listing->price_per_unit,
+            'weight_per_unit_grams' => $listing->weight_per_unit_grams,
             'pricing_type' => $listing->pricing_type,
             'description' => $listing->description,
             'status' => $listing->status,

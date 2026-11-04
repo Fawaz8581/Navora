@@ -144,6 +144,7 @@ class VendorCatalogController extends Controller
                         'material' => $listing->material,
                         'minimum_order_quantity' => $listing->minimum_order_quantity,
                         'price_per_unit' => $listing->price_per_unit,
+                        'weight_per_unit_grams' => $listing->weight_per_unit_grams,
                         'pricing_type' => $listing->pricing_type,
                         'description' => $listing->description,
                         'media' => $listing->media
