@@ -56,6 +56,7 @@ class VendorCatalogController extends Controller
                     ->latest('id')
                     ->limit(10)
                     ->with('media'),
+                'user.vendorReviews',
             ])
             ->when($validated['search'] ?? null, function (Builder $query, string $search): void {
                 $query->where(function (Builder $matches) use ($search): void {
@@ -133,6 +134,8 @@ class VendorCatalogController extends Controller
                 'materials' => $profile->materials,
                 'lead_time_days' => $profile->production_lead_time_days,
                 'price_per_unit' => $profile->indicative_price_per_unit,
+                'rating' => round((float) ($profile->user?->vendorReviews->avg('rating') ?: 0), 1),
+                'reviews_count' => $profile->user?->vendorReviews->count() ?? 0,
                 'has_sample' => count($profile->work_sample_paths ?? []) > 0,
                 'certificate_count' => count($profile->certificate_paths ?? []),
                 'distance_km' => $distance,

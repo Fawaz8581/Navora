@@ -57,6 +57,11 @@ class User extends Authenticatable
         return $this->hasMany(VendorSubscription::class, 'vendor_user_id');
     }
 
+    public function vendorReviews(): HasMany
+    {
+        return $this->hasMany(VendorReview::class, 'vendor_user_id');
+    }
+
     public function sentOrderMessages(): HasMany
     {
         return $this->hasMany(OrderMessage::class);

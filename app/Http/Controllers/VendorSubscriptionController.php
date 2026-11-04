@@ -36,6 +36,8 @@ class VendorSubscriptionController extends Controller
             $pending = VendorSubscription::query()
                 ->where('vendor_user_id', $vendor->id)
                 ->where('payment_status', 'pending')
+                ->whereNotNull('snap_token')
+                ->where('created_at', '>=', now()->subHours(8))
                 ->latest('id')
                 ->first();
 

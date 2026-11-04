@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -107,6 +108,11 @@ class Order extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(OrderMessage::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(VendorReview::class);
     }
 
     public function nextSimulatedStatus(): ?string

@@ -1869,18 +1869,35 @@ body.navora-app-body {
 
 .navora-order-chat-message {
     width: fit-content;
-    max-width: min(82%, 620px);
-    padding: 9px 11px;
-    border: 1px solid #e6edf1;
-    border-radius: 10px 10px 10px 3px;
-    background: #fff;
+    max-width: min(85%, 620px);
+    padding: 9px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px 12px 12px 2px;
+    background: #ffffff;
+    align-self: flex-start;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .navora-order-chat-message.is-mine {
-    justify-self: end;
-    border-color: #d7e9e3;
-    border-radius: 10px 10px 3px 10px;
-    background: #edf7f3;
+    align-self: flex-end;
+    margin-left: auto;
+    border-color: #bae6fd;
+    border-radius: 12px 12px 2px 12px;
+    background: #f0f9ff;
+}
+
+.navora-order-chat-image-wrap {
+    margin-top: 6px;
+    margin-bottom: 4px;
+}
+
+.navora-order-chat-image-wrap img {
+    max-width: 100%;
+    max-height: 220px;
+    border-radius: 8px;
+    display: block;
+    cursor: pointer;
+    object-fit: cover;
 }
 
 .navora-order-chat-message strong,
@@ -4281,6 +4298,65 @@ body.navora-app-body {
     align-items: center;
 }
 
+.navora-chat-attach-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: background 0.15s, color 0.15s;
+    margin: 0;
+}
+
+.navora-chat-attach-btn:hover {
+    background: #f1f5f9;
+    color: #1e5c92;
+}
+
+.navora-chat-input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.navora-chat-attachment-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e2e8f0;
+    color: #1e293b;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+    max-width: 100%;
+}
+
+.navora-chat-attachment-preview span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navora-chat-preview-remove {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    color: #64748b;
+}
+
+.navora-chat-preview-remove:hover {
+    color: #dc2626;
+}
+
 .navora-floating-chat-footer textarea {
     flex: 1;
     border: 1px solid #cbd5e1;
@@ -4297,7 +4373,7 @@ body.navora-app-body {
     border-color: #2b6cb0;
 }
 
-.navora-floating-chat-footer button {
+.navora-floating-chat-footer button[type="submit"] {
     border-radius: 50%;
     width: 38px;
     height: 38px;
@@ -4331,4 +4407,322 @@ body.navora-app-body {
 
 .navora-floating-chat-fab i {
     font-size: 1.15rem;
+}
+
+/* Floating Vendor Subscription Pop-up & Wobble/Shake Animation */
+@keyframes navoraShake {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    15% { transform: rotate(-5deg) scale(1.04); }
+    30% { transform: rotate(5deg) scale(1.04); }
+    45% { transform: rotate(-4deg); }
+    60% { transform: rotate(4deg); }
+    75% { transform: rotate(-2deg); }
+}
+
+.navora-vendor-sub-fab-wrapper {
+    position: fixed;
+    bottom: 84px;
+    right: 24px;
+    z-index: 1055;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.navora-vendor-sub-fab {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff;
+    border: 2px solid #fef3c7;
+    border-radius: 30px;
+    padding: 9px 16px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(217, 119, 6, 0.45);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navora-vendor-sub-fab:hover {
+    box-shadow: 0 6px 22px rgba(217, 119, 6, 0.6);
+}
+
+.navora-shake-badge {
+    animation: navoraShake 3s ease-in-out infinite;
+}
+
+.navora-sub-sparkle {
+    color: #fef08a;
+    font-size: 1.1rem;
+    animation: spin 4s linear infinite;
+}
+
+.navora-vendor-sub-popup {
+    width: 320px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 12px 36px rgba(217, 119, 6, 0.25), 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #fed7aa;
+    overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, visibility 0.2s;
+    transform-origin: bottom right;
+}
+
+.navora-vendor-sub-popup.is-collapsed {
+    transform: scale(0.85) translateY(20px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    height: 0;
+    margin: 0;
+    border: none;
+}
+
+.navora-vendor-sub-popup-header {
+    background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+    color: #fff;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.navora-vendor-sub-popup-header h4 {
+    margin: 2px 0 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.navora-vendor-sub-popup-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1rem;
+    padding: 4px;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.navora-vendor-sub-popup-close:hover {
+    opacity: 1;
+}
+
+.navora-vendor-sub-popup-body {
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    color: #334155;
+    background: #fffbeb;
+}
+
+.navora-sub-badge {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+}
+
+.navora-sub-price {
+    margin: 0 0 10px;
+}
+
+.navora-sub-price strong {
+    font-size: 1.25rem;
+    color: #b45309;
+}
+
+.navora-sub-price span {
+    font-size: 0.8rem;
+    color: #78716c;
+}
+
+.navora-sub-benefits {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+
+.navora-sub-benefits li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.35;
+}
+
+/* Verified Badge in Profile */
+.navora-vendor-verified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.35);
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.navora-order-reviewed-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #d97706;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+
+.navora-vendor-clickable-name {
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.navora-vendor-clickable-name:hover {
+    color: #1e5c92;
+    text-decoration: underline;
+}
+
+.navora-vendor-clickable-avatar {
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.navora-vendor-clickable-avatar:hover {
+    transform: scale(1.08);
+    box-shadow: 0 2px 8px rgba(30, 92, 146, 0.25);
+}
+
+.navora-vendor-rating-line {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.8rem;
+    margin-top: 3px;
+    padding: 2px 6px;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-radius: 6px;
+    width: fit-content;
+    transition: background 0.15s;
+}
+
+.navora-vendor-rating-line:hover {
+    background: #fef3c7;
+}
+
+/* Modal Detail Profil Vendor */
+.navora-vendor-profile-dialog {
+    width: min(640px, calc(100vw - 32px));
+    max-height: min(780px, calc(100vh - 40px));
+    margin: auto;
+    padding: 0;
+    overflow-y: auto;
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(18, 43, 64, 0.35);
+    background: #ffffff;
+}
+
+.navora-vendor-profile-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.navora-vendor-profile-header {
+    position: relative;
+    height: 140px;
+    background: linear-gradient(135deg, #1b3d54 0%, #295573 100%);
+}
+
+.navora-vendor-profile-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-size: cover;
+    background-position: center;
+}
+
+.navora-vendor-profile-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+    z-index: 2;
+}
+
+.navora-vendor-profile-close:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.navora-vendor-profile-avatar-wrap {
+    position: absolute;
+    bottom: -32px;
+    left: 24px;
+}
+
+.navora-vendor-profile-main-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 4px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1e3a52;
+    overflow: hidden;
+    object-fit: cover;
+}
+
+.navora-vendor-profile-main-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.navora-vendor-profile-body {
+    padding: 44px 24px 24px;
+}
+
+.navora-vendor-review-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.navora-vendor-review-card img {
+    max-width: 100px;
+    max-height: 80px;
+    border-radius: 6px;
+    margin-top: 6px;
+    cursor: pointer;
 }

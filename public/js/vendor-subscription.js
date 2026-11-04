@@ -4,6 +4,24 @@
         return;
     }
 
+    const popup = section.querySelector('[data-vendor-sub-popup]');
+    const fabToggle = section.querySelector('[data-vendor-sub-fab-toggle]');
+    const closeBtn = section.querySelector('[data-vendor-sub-close]');
+
+    if (fabToggle instanceof HTMLButtonElement && popup instanceof HTMLElement) {
+        fabToggle.addEventListener('click', () => {
+            const isCollapsed = popup.classList.toggle('is-collapsed');
+            fabToggle.setAttribute('aria-expanded', String(!isCollapsed));
+        });
+    }
+
+    if (closeBtn instanceof HTMLButtonElement && popup instanceof HTMLElement) {
+        closeBtn.addEventListener('click', () => {
+            popup.classList.add('is-collapsed');
+            fabToggle?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
     const dismissButton = section.querySelector('[data-vendor-subscription-dismiss]');
     dismissButton?.addEventListener('click', () => {
         section.dataset.vendorSubscriptionDismissed = 'true';
@@ -32,10 +50,10 @@
         }
 
         if (result.is_active) {
-            section.querySelector('p')?.replaceChildren(
-                document.createTextNode(`Paket aktif sampai ${new Date(result.ends_at).toLocaleDateString('id-ID')}. Profil tetap harus disetujui admin untuk tampil sebagai vendor terverifikasi.`),
-            );
-            button.remove();
+            popup?.classList.add('is-collapsed');
+            section.remove();
+            window.alert('Selamat! Langganan Vendor Premium Anda telah aktif.');
+            window.location.reload();
         } else {
             window.alert(result.payment_status === 'pending'
                 ? 'Pembayaran masih menunggu konfirmasi Midtrans.'

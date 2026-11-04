@@ -616,35 +616,77 @@
         verified.append(textElement('i', 'bi bi-patch-check-fill', ''), document.createTextNode(' Terverifikasi'));
         art.append(verified);
 
-        const content = textElement('div', 'navora-vendor-content', '');
-        const heading = textElement('div', 'navora-vendor-name-row', '');
-        const nameAndLocation = textElement('div', '', '');
-        nameAndLocation.append(
-            textElement('h2', '', vendor.name || 'Vendor'),
-            textElement('span', 'navora-vendor-location', vendor.location || 'Lokasi belum diisi'),
-        );
-        if (vendor.is_premium) {
-            nameAndLocation.append(textElement('span', 'navora-premium-tag', 'VENDOR PREMIUM'));
-        }
         const details = [
             `MOQ mulai ${Number(vendor.minimum_order_quantity || 0).toLocaleString('id-ID')} pcs`,
             vendor.price_per_unit === null
                 ? 'Harga belum dicantumkan'
                 : `${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(vendor.price_per_unit))} / pcs (indikatif)`,
+            vendor.rating ? `★ ${vendor.rating} (${vendor.reviews_count || 0} ulasan)` : '★ Belum ada ulasan',
             vendor.distance_km === null ? 'Jarak belum tersedia' : `± ${vendor.distance_km} km (garis lurus)`,
         ];
+
+        const content = textElement('div', 'navora-vendor-content', '');
+        const heading = textElement('div', 'navora-vendor-name-row', '');
+        const nameAndLocation = textElement('div', '', '');
+        const vendorHeading = textElement('h2', 'navora-vendor-clickable-name', vendor.name || 'Vendor');
+        vendorHeading.dataset.action = 'vendor-detail';
+        vendorHeading.dataset.vendor = vendor.name || 'Vendor';
+        vendorHeading.dataset.vendorUserId = String(vendor.id);
+        vendorHeading.dataset.vendorDescription = vendor.description || '';
+        vendorHeading.dataset.vendorSpecifications = details.join(' · ');
+        vendorHeading.title = 'Lihat profil dan ulasan vendor';
+
+        nameAndLocation.append(
+            vendorHeading,
+            textElement('span', 'navora-vendor-location', vendor.location || 'Lokasi belum diisi'),
+        );
+        if (vendor.is_premium) {
+            nameAndLocation.append(textElement('span', 'navora-premium-tag', 'VENDOR PREMIUM'));
+        }
+
+        // Tampilkan Star Rating langsung di samping nama toko
+        if (vendor.rating) {
+            const ratingWrap = textElement('div', 'navora-vendor-rating-line', '');
+            const starIcon = document.createElement('i');
+            starIcon.className = 'bi bi-star-fill text-warning me-1';
+            ratingWrap.append(
+                starIcon,
+                textElement('strong', '', `${vendor.rating}`),
+                textElement('small', 'text-muted ms-1', `(${vendor.reviews_count || 0} ulasan)`),
+            );
+            ratingWrap.dataset.action = 'vendor-detail';
+            ratingWrap.dataset.vendor = vendor.name || 'Vendor';
+            ratingWrap.dataset.vendorUserId = String(vendor.id);
+            ratingWrap.dataset.vendorDescription = vendor.description || '';
+            ratingWrap.dataset.vendorSpecifications = details.join(' · ');
+            ratingWrap.style.cursor = 'pointer';
+            nameAndLocation.append(ratingWrap);
+        }
         if (vendor.profile_image_url) {
-            const profileImage = textElement('img', 'navora-vendor-profile-avatar', '');
+            const profileImage = textElement('img', 'navora-vendor-profile-avatar navora-vendor-clickable-avatar', '');
             profileImage.src = vendor.profile_image_url;
             profileImage.alt = `Foto profil ${vendor.name || 'vendor'}`;
             profileImage.loading = 'lazy';
+            profileImage.dataset.action = 'vendor-detail';
+            profileImage.dataset.vendor = vendor.name || 'Vendor';
+            profileImage.dataset.vendorUserId = String(vendor.id);
+            profileImage.dataset.vendorDescription = vendor.description || '';
+            profileImage.dataset.vendorSpecifications = details.join(' · ');
+            profileImage.title = 'Lihat profil dan ulasan vendor';
             heading.append(profileImage);
         } else {
-            heading.append(textElement(
+            const fallbackAvatar = textElement(
                 'span',
-                'navora-vendor-profile-avatar navora-vendor-profile-fallback',
+                'navora-vendor-profile-avatar navora-vendor-profile-fallback navora-vendor-clickable-avatar',
                 (vendor.name || 'V').charAt(0).toLocaleUpperCase('id'),
-            ));
+            );
+            fallbackAvatar.dataset.action = 'vendor-detail';
+            fallbackAvatar.dataset.vendor = vendor.name || 'Vendor';
+            fallbackAvatar.dataset.vendorUserId = String(vendor.id);
+            fallbackAvatar.dataset.vendorDescription = vendor.description || '';
+            fallbackAvatar.dataset.vendorSpecifications = details.join(' · ');
+            fallbackAvatar.title = 'Lihat profil dan ulasan vendor';
+            heading.append(fallbackAvatar);
         }
         heading.append(nameAndLocation);
         const tags = textElement('div', 'navora-vendor-tags', '');
@@ -717,6 +759,7 @@
         detailButton.type = 'button';
         detailButton.dataset.action = 'vendor-detail';
         detailButton.dataset.vendor = vendor.name || 'Vendor';
+        detailButton.dataset.vendorUserId = String(vendor.id);
         detailButton.dataset.vendorDescription = vendor.description || '';
         detailButton.dataset.vendorSpecifications = details.join(' · ');
         const quoteButton = textElement('button', 'btn navora-app-primary', 'Minta penawaran');
@@ -1891,9 +1934,23 @@
             const item = textElement('article', `navora-order-chat-message${message.is_mine ? ' is-mine' : ''}`, '');
             item.append(
                 textElement('strong', '', message.is_mine ? 'Kamu' : message.sender_name || 'Pengguna'),
-                textElement('p', '', message.message),
-                textElement('time', '', displayOrderDate(message.created_at)),
             );
+            if (message.message) {
+                item.append(textElement('p', '', message.message));
+            }
+            if (message.image_url) {
+                const imgWrap = textElement('div', 'navora-order-chat-image-wrap', '');
+                const img = document.createElement('img');
+                img.src = message.image_url;
+                img.alt = 'Foto lampiran chat';
+                img.loading = 'lazy';
+                img.addEventListener('click', () => {
+                    window.open(message.image_url, '_blank', 'noopener,noreferrer');
+                });
+                imgWrap.appendChild(img);
+                item.append(imgWrap);
+            }
+            item.append(textElement('time', '', displayOrderDate(message.created_at)));
             return item;
         }));
         list.scrollTop = list.scrollHeight;
@@ -1982,9 +2039,14 @@
         }
 
         const input = form.querySelector('textarea[name="message"]');
+        const fileInput = form.querySelector('[data-chat-image-input]');
+        const previewWrap = form.querySelector('[data-chat-image-preview]');
+        const previewName = form.querySelector('[data-chat-image-name]');
         const sendButton = form.querySelector('[data-order-chat-send]');
-        const message = input?.value.trim();
-        if (!message) {
+        const message = input?.value.trim() || '';
+        const hasFile = fileInput instanceof HTMLInputElement && fileInput.files && fileInput.files.length > 0;
+
+        if (!message && !hasFile) {
             input?.focus();
             return;
         }
@@ -1995,15 +2057,32 @@
         }
 
         try {
+            const formData = new FormData();
+            if (message) {
+                formData.append('message', message);
+            }
+            if (hasFile && fileInput.files[0]) {
+                formData.append('image', fileInput.files[0]);
+            }
+
             await requestOrderData(
                 orderUrl(document.body.dataset.orderMessageStoreTemplate, activeChatOrderId),
                 {
                     method: 'POST',
-                    body: JSON.stringify({ message }),
+                    body: formData,
                 },
             );
             if (input) {
                 input.value = '';
+            }
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            if (previewWrap) {
+                previewWrap.hidden = true;
+            }
+            if (previewName) {
+                previewName.textContent = '';
             }
             chatRequestController?.abort();
             chatRequestController = null;
@@ -2289,6 +2368,21 @@
         });
         if (actions.childElementCount) {
             card.append(actions);
+        }
+
+        if (order.can_review) {
+            const reviewButton = textElement('button', 'btn navora-app-primary', 'Beri Ulasan Vendor');
+            reviewButton.type = 'button';
+            reviewButton.dataset.action = 'review-vendor-order';
+            reviewButton.dataset.order = String(order.id);
+            const starIcon = document.createElement('i');
+            starIcon.className = 'bi bi-star-fill me-1 text-warning';
+            reviewButton.prepend(starIcon);
+            actions.append(reviewButton);
+        } else if (order.has_reviewed && order.review) {
+            const reviewedBadge = textElement('span', 'navora-order-reviewed-badge', `Ulasan: ★ ${order.review.rating}/5`);
+            reviewedBadge.title = order.review.comment;
+            actions.append(reviewedBadge);
         }
 
         // Tombol Chat Langsung di Kartu Pesanan
@@ -3054,6 +3148,96 @@
         }
     };
 
+    const createVendorOrderReview = (orderId) => {
+        const order = [...orderListData, ...groupOrderListData].find((item) => String(item.id) === String(orderId));
+        if (!order) {
+            showToast('Pesanan tidak ditemukan.');
+            return;
+        }
+
+        openModal({
+            title: `Beri ulasan untuk ${order.vendor_name || 'Vendor'}`,
+            description: `Pesanan: ${order.product_name} (${Number(order.quantity).toLocaleString('id-ID')} pcs). Bagikan pengalamanmu untuk membantu pemilik usaha lainnya.`,
+            icon: 'bi-star-fill',
+            submit: 'Kirim Ulasan',
+            fields: [
+                {
+                    name: 'rating',
+                    label: 'Rating Bintang',
+                    type: 'select',
+                    required: true,
+                    value: '5',
+                    options: [
+                        { value: '5', label: '★★★★★ (5 Bintang - Sangat Puas)' },
+                        { value: '4', label: '★★★★☆ (4 Bintang - Puas)' },
+                        { value: '3', label: '★★★☆☆ (3 Bintang - Cukup)' },
+                        { value: '2', label: '★★☆☆☆ (2 Bintang - Kurang)' },
+                        { value: '1', label: '★☆☆☆☆ (1 Bintang - Kecewa)' },
+                    ],
+                },
+                {
+                    name: 'comment',
+                    label: 'Penjelasan Ulasan',
+                    type: 'textarea',
+                    required: true,
+                    rows: 3,
+                    placeholder: 'Ceritakan kualitas kemasan, ketepatan waktu, dan pelayanan vendor…',
+                },
+                {
+                    name: 'image',
+                    label: 'Foto Produk yang Diterima (Opsional)',
+                    type: 'file',
+                    accept: 'image/jpeg,image/png,image/webp',
+                    required: false,
+                    help: 'Unggah foto hasil kemasan pesananmu (maksimal 5MB)',
+                },
+            ],
+            onSubmit: (values, formData) => {
+                if (!values.comment || values.comment.trim().length < 3) {
+                    showToast('Penjelasan ulasan minimal 3 karakter.');
+                    return false;
+                }
+
+                orderSubmissionInProgress = true;
+                const submitBtn = modal?.querySelector('[data-modal-submit]');
+                if (submitBtn instanceof HTMLButtonElement) {
+                    submitBtn.disabled = true;
+                }
+
+                const postData = new FormData();
+                postData.append('rating', values.rating);
+                postData.append('comment', values.comment.trim());
+                if (formData instanceof FormData) {
+                    const file = formData.get('image');
+                    if (file instanceof File && file.size > 0) {
+                        postData.append('image', file);
+                    }
+                }
+
+                const url = orderUrl(document.body.dataset.orderReviewStoreTemplate, orderId);
+                requestOrderData(url, {
+                    method: 'POST',
+                    body: postData,
+                }).then(() => {
+                    closeModal();
+                    showToast('Ulasan vendor berhasil dikirim! Terima kasih.');
+                    loadOrders();
+                    loadGroupOrders();
+                }).catch((error) => {
+                    console.error('Navora could not submit vendor review.', error);
+                    showToast(error.message || 'Gagal mengirim ulasan vendor.');
+                }).finally(() => {
+                    orderSubmissionInProgress = false;
+                    if (submitBtn instanceof HTMLButtonElement) {
+                        submitBtn.disabled = false;
+                    }
+                });
+
+                return false; // don't close immediately, wait for promise
+            },
+        });
+    };
+
     const checkoutOrder = (orderId) => {
         window.location.assign(orderUrl(document.body.dataset.ordersCheckoutPageTemplate, orderId));
     };
@@ -3595,6 +3779,142 @@
         });
     };
 
+    const openVendorProfileModal = (vendorUserId, fallbackName = 'Vendor') => {
+        const dialog = document.querySelector('[data-vendor-profile-dialog]');
+        if (!(dialog instanceof HTMLDialogElement)) {
+            return;
+        }
+
+        const vendor = catalogVendorsCache.find((v) => String(v.id) === String(vendorUserId));
+        const nameEl = dialog.querySelector('[data-vendor-profile-name]');
+        const subEl = dialog.querySelector('[data-vendor-profile-sub]');
+        const descEl = dialog.querySelector('[data-vendor-profile-description]');
+        const ratingNumEl = dialog.querySelector('[data-vendor-profile-rating-num]');
+        const reviewCountEl = dialog.querySelector('[data-vendor-profile-review-count]');
+        const totalReviewsBadge = dialog.querySelector('[data-vendor-profile-total-reviews-badge]');
+        const tagsContainer = dialog.querySelector('[data-vendor-profile-tags]');
+        const listingsContainer = dialog.querySelector('[data-vendor-profile-listings]');
+        const reviewsContainer = dialog.querySelector('[data-vendor-profile-reviews-list]');
+        const proBadge = dialog.querySelector('[data-vendor-profile-pro]');
+        const avatarEl = dialog.querySelector('[data-vendor-profile-avatar]');
+        const coverEl = dialog.querySelector('[data-vendor-profile-cover]');
+        const rfqBtn = dialog.querySelector('[data-vendor-profile-rfq-btn]');
+
+        const vendorName = vendor?.name || fallbackName;
+        if (nameEl) nameEl.textContent = vendorName;
+        if (subEl) subEl.textContent = `${vendor?.category || 'Kategori kemasan'} · ${vendor?.location || 'Lokasi belum diisi'}`;
+        if (descEl) descEl.textContent = vendor?.description || 'Vendor terverifikasi di platform Navora.';
+        if (proBadge instanceof HTMLElement) proBadge.hidden = !vendor?.is_premium;
+
+        if (avatarEl) {
+            avatarEl.innerHTML = '';
+            if (vendor?.profile_image_url) {
+                const img = document.createElement('img');
+                img.src = vendor.profile_image_url;
+                img.alt = `Foto profil ${vendorName}`;
+                avatarEl.appendChild(img);
+            } else {
+                avatarEl.textContent = vendorName.charAt(0).toUpperCase();
+            }
+        }
+
+        if (coverEl instanceof HTMLElement) {
+            if (vendor?.cover_image_url) {
+                coverEl.style.backgroundImage = `url('${vendor.cover_image_url}')`;
+            } else {
+                coverEl.style.backgroundImage = 'none';
+            }
+        }
+
+        if (tagsContainer) {
+            tagsContainer.innerHTML = '';
+            [
+                vendor?.materials,
+                vendor?.minimum_order_quantity ? `MOQ ${Number(vendor.minimum_order_quantity).toLocaleString('id-ID')} pcs` : null,
+                vendor?.has_sample ? 'Sampel Tersedia' : null,
+                vendor?.certificate_count ? `${vendor.certificate_count} Sertifikat` : null,
+            ].filter(Boolean).forEach((tag) => {
+                const badge = textElement('span', 'badge bg-light text-secondary border', tag);
+                tagsContainer.appendChild(badge);
+            });
+        }
+
+        if (listingsContainer) {
+            listingsContainer.innerHTML = '';
+            if (Array.isArray(vendor?.listings) && vendor.listings.length > 0) {
+                vendor.listings.forEach((item) => {
+                    const card = textElement('div', 'p-2 border rounded bg-light', '');
+                    card.style.fontSize = '0.8rem';
+                    const title = textElement('strong', 'd-block text-truncate', item.name);
+                    const moq = textElement('small', 'text-muted d-block', `MOQ: ${Number(item.minimum_order_quantity).toLocaleString('id-ID')} pcs`);
+                    const price = textElement('span', 'text-success fw-bold d-block mt-1', item.price_per_unit ? formatRupiah(item.price_per_unit) : 'Nego');
+                    card.append(title, moq, price);
+                    listingsContainer.appendChild(card);
+                });
+            } else {
+                listingsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada katalog publik.</p>';
+            }
+        }
+
+        if (rfqBtn instanceof HTMLButtonElement) {
+            rfqBtn.onclick = () => {
+                dialog.close();
+                createRfq(vendorName, vendorUserId);
+            };
+        }
+
+        // Muat reviews dinamis
+        if (reviewsContainer) {
+            reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Memuat ulasan vendor…</p>';
+        }
+
+        if (document.body.dataset.vendorReviewsListTemplate) {
+            const listUrl = document.body.dataset.vendorReviewsListTemplate.replace('__VENDOR__', encodeURIComponent(vendorUserId));
+            fetch(listUrl, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            }).then((res) => res.json()).then((data) => {
+                if (ratingNumEl) ratingNumEl.textContent = Number(data.average_rating || 0).toFixed(1);
+                if (reviewCountEl) reviewCountEl.textContent = `(${data.total_reviews || 0} ulasan)`;
+                if (totalReviewsBadge) totalReviewsBadge.textContent = `${data.total_reviews || 0} Ulasan`;
+
+                if (reviewsContainer) {
+                    reviewsContainer.innerHTML = '';
+                    if (Array.isArray(data.reviews) && data.reviews.length > 0) {
+                        data.reviews.forEach((rev) => {
+                            const revCard = textElement('div', 'navora-vendor-review-card', '');
+                            const head = textElement('div', 'd-flex justify-content-between align-items-center mb-1', '');
+                            head.append(
+                                textElement('strong', '', rev.reviewer_name),
+                                textElement('small', 'text-warning fw-bold', `★ ${rev.rating}/5 · ${rev.created_at}`),
+                            );
+                            const comment = textElement('p', 'mb-1 text-secondary', rev.comment);
+                            comment.style.fontSize = '0.82rem';
+                            revCard.append(head, comment);
+
+                            if (rev.image_url) {
+                                const img = document.createElement('img');
+                                img.src = rev.image_url;
+                                img.alt = 'Foto ulasan pembeli';
+                                img.onclick = () => window.open(rev.image_url, '_blank', 'noopener,noreferrer');
+                                revCard.appendChild(img);
+                            }
+                            reviewsContainer.appendChild(revCard);
+                        });
+                    } else {
+                        reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan dari pembeli.</p>';
+                    }
+                }
+            }).catch(() => {
+                if (reviewsContainer) {
+                    reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan.</p>';
+                }
+            });
+        }
+
+        dialog.showModal();
+    };
+
     const handleAction = (button) => {
         const action = button.dataset.action;
 
@@ -3614,6 +3934,8 @@
             selectOrderShipping(button.dataset.order || '');
         } else if (action === 'checkout-order') {
             checkoutOrder(button.dataset.order || '', button);
+        } else if (action === 'review-vendor-order') {
+            createVendorOrderReview(button.dataset.order || '');
         } else if (action === 'decide-order-quote') {
             decideOrderQuote(button.dataset.order || '', button.dataset.decision || '');
         } else if (action === 'refresh-order-payment') {
@@ -3673,13 +3995,17 @@
                 'bi-chat-square-text',
             );
         } else if (action === 'vendor-detail') {
-            openInfo(
-                button.dataset.vendor || 'Vendor',
-                button.dataset.vendorDescription
-                    ? `${button.dataset.vendorDescription} ${button.dataset.vendorSpecifications || ''}`
-                    : 'Halaman ini hanya menampilkan ringkasan katalog contoh. Detail usaha, kapasitas, sertifikat, sampel, jadwal, harga final, dan identitas vendor belum diverifikasi.',
-                'bi-box-seam',
-            );
+            const vendorUserId = button.dataset.vendorUserId;
+            const vendorName = button.dataset.vendor || 'Vendor';
+            if (vendorUserId) {
+                openVendorProfileModal(vendorUserId, vendorName);
+            } else {
+                openInfo(
+                    vendorName,
+                    button.dataset.vendorDescription || 'Informasi vendor terverifikasi.',
+                    'bi-box-seam',
+                );
+            }
         } else if (action === 'retry-vendor-catalog') {
             loadVendorCatalog();
         } else if (action === 'use-current-location') {
@@ -3756,6 +4082,12 @@
             return;
         }
 
+        const vendorProfileDialog = document.querySelector('[data-vendor-profile-dialog]');
+        if (target.closest('[data-close-vendor-profile-dialog]') && vendorProfileDialog instanceof HTMLDialogElement) {
+            vendorProfileDialog.close();
+            return;
+        }
+
         if (target.closest('[data-notifications-toggle]') && notificationPopup instanceof HTMLDialogElement) {
             notificationPopup.showModal();
             return;
@@ -3766,11 +4098,86 @@
             return;
         }
 
-        if (target.closest('[data-notification-item], [data-open-notifications]')) {
+        const dismissBtn = target.closest('[data-dismiss-notification]');
+        if (dismissBtn instanceof HTMLButtonElement) {
+            const noticeId = dismissBtn.dataset.dismissNotification;
+            const template = document.body.dataset.vendorDismissAdNoticeTemplate;
+            if (noticeId && template) {
+                dismissBtn.disabled = true;
+                const url = template.replace('__NOTICE__', encodeURIComponent(noticeId));
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    credentials: 'same-origin',
+                }).then(async (res) => {
+                    if (res.ok) {
+                        const row = document.querySelector(`[data-notification-row="${noticeId}"]`);
+                        row?.remove();
+                        const remaining = document.querySelectorAll('[data-notification-row]').length;
+                        const badge = document.querySelector('.navora-notification-count');
+                        if (badge) {
+                            if (remaining > 0) {
+                                badge.textContent = String(remaining);
+                            } else {
+                                badge.remove();
+                            }
+                        }
+                        if (remaining === 0) {
+                            const list = document.querySelector('.ad-notifications-popup-list');
+                            if (list) {
+                                list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                            }
+                            document.querySelector('[data-dismiss-all-notifications]')?.remove();
+                        }
+                    } else {
+                        dismissBtn.disabled = false;
+                    }
+                }).catch(() => {
+                    dismissBtn.disabled = false;
+                });
+            }
+            return;
+        }
+
+        const dismissAllBtn = target.closest('[data-dismiss-all-notifications]');
+        if (dismissAllBtn instanceof HTMLButtonElement) {
+            const url = document.body.dataset.vendorDismissAllAdNoticesUrl;
+            if (url) {
+                dismissAllBtn.disabled = true;
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    credentials: 'same-origin',
+                }).then(async (res) => {
+                    if (res.ok) {
+                        document.querySelectorAll('[data-notification-row]').forEach((el) => el.remove());
+                        document.querySelector('.navora-notification-count')?.remove();
+                        dismissAllBtn.remove();
+                        const list = document.querySelector('.ad-notifications-popup-list');
+                        if (list) {
+                            list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                        }
+                    } else {
+                        dismissAllBtn.disabled = false;
+                    }
+                }).catch(() => {
+                    dismissAllBtn.disabled = false;
+                });
+            }
+            return;
+        }
+
+        if (target.closest('[data-notification-item]')) {
             if (notificationPopup instanceof HTMLDialogElement && notificationPopup.open) {
                 notificationPopup.close();
             }
-            showPage('notifications');
+            showPage('advertisements');
             return;
         }
 
@@ -3813,7 +4220,7 @@
 
         const actionButton = target.closest('[data-action]');
 
-        if (actionButton instanceof HTMLButtonElement) {
+        if (actionButton instanceof HTMLElement) {
             handleAction(actionButton);
             return;
         }
@@ -3839,6 +4246,63 @@
         }
     });
 
+    document.addEventListener('keydown', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLTextAreaElement && target.id === 'order-chat-message') {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                const form = target.closest('form');
+                if (form instanceof HTMLFormElement) {
+                    submitOrderMessage(form);
+                }
+            }
+        }
+    });
+
+    document.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement && target.matches('[data-chat-image-input]')) {
+            const form = target.closest('form');
+            const previewWrap = form?.querySelector('[data-chat-image-preview]');
+            const previewName = form?.querySelector('[data-chat-image-name]');
+            if (target.files && target.files.length > 0 && target.files[0]) {
+                const file = target.files[0];
+                if (previewWrap instanceof HTMLElement) {
+                    previewWrap.hidden = false;
+                }
+                if (previewName instanceof HTMLElement) {
+                    previewName.textContent = file.name;
+                }
+            } else {
+                if (previewWrap instanceof HTMLElement) {
+                    previewWrap.hidden = true;
+                }
+            }
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        if (target.closest('[data-chat-image-remove]')) {
+            const form = target.closest('form');
+            const input = form?.querySelector('[data-chat-image-input]');
+            const previewWrap = form?.querySelector('[data-chat-image-preview]');
+            const previewName = form?.querySelector('[data-chat-image-name]');
+            if (input instanceof HTMLInputElement) {
+                input.value = '';
+            }
+            if (previewWrap instanceof HTMLElement) {
+                previewWrap.hidden = true;
+            }
+            if (previewName instanceof HTMLElement) {
+                previewName.textContent = '';
+            }
+        }
+    });
+
     modalForm?.addEventListener('submit', (event) => {
         event.preventDefault();
 
@@ -3846,7 +4310,8 @@
             return;
         }
 
-        const shouldClose = activeModalHandler(readFormValues(new FormData(modalForm)));
+        const formData = new FormData(modalForm);
+        const shouldClose = activeModalHandler(readFormValues(formData), formData);
 
         if (shouldClose !== false) {
             closeModal();

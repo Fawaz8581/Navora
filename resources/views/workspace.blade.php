@@ -44,6 +44,10 @@
     data-order-weight-max="{{ config('services.rajaongkir.simulated_rates') ? '4294967295' : '30000' }}"
     data-order-messages-template="{{ route('orders.messages.index', ['order' => '__ORDER__']) }}"
     data-order-message-store-template="{{ route('orders.messages.store', ['order' => '__ORDER__']) }}"
+    data-order-review-store-template="{{ route('orders.review.store', ['order' => '__ORDER__']) }}"
+    data-vendor-reviews-list-template="{{ route('vendor.reviews.list', ['vendor' => '__VENDOR__']) }}"
+    data-vendor-dismiss-ad-notice-template="{{ route('vendor.advertisements.dismiss-notification', ['adCampaign' => '__NOTICE__']) }}"
+    data-vendor-dismiss-all-ad-notices-url="{{ route('vendor.advertisements.dismiss-all-notifications') }}"
     data-vendor-income-url="{{ route('orders.vendor-income') }}">
     <a class="navora-skip-link" href="#app-content">Lewati ke konten utama</a>
     <div class="navora-app-shell">
@@ -58,30 +62,6 @@
                     <input type="search" data-global-search placeholder="Cari kemasan, vendor, bahan..." aria-label="Cari di Navora">
                     <kbd>/</kbd>
                 </div>
-                @if (auth()->user()?->role === 'vendor')
-                    <section class="navora-panel navora-discover-panel" data-role-content="vendor" hidden
-                        data-vendor-subscription
-                        data-checkout-url="{{ route('vendor.subscription.checkout') }}"
-                        data-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}">
-                        <div class="navora-panel-heading">
-                            <div><span class="navora-panel-kicker">PAKET VENDOR</span><h2>Vendor Premium</h2></div>
-                            <div class="navora-subscription-header-actions">
-                                <span class="navora-status-pill {{ $vendorSubscription?->isActive() ? 'status-open' : 'status-waiting' }}">
-                                    {{ $vendorSubscription?->isActive() ? 'Aktif' : 'Gratis' }}
-                                </span>
-                                <button class="navora-subscription-dismiss" type="button" data-vendor-subscription-dismiss aria-label="Tutup informasi Vendor Premium" title="Tutup">
-                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                        </div>
-                        @if ($vendorSubscription?->isActive())
-                            <p>Paket aktif sampai {{ $vendorSubscription->ends_at?->format('d M Y') }}. Vendor Premium mendapat badge, prioritas pencarian, dan kuota RFQ tanpa batas.</p>
-                        @else
-                            <p>Rp{{ number_format(config('services.navora.vendor_subscription_amount'), 0, ',', '.') }} / {{ config('services.navora.vendor_subscription_days') }} hari. Dapatkan badge, prioritas pencarian, dan kuota RFQ tanpa batas; akun gratis mendapat {{ config('services.navora.free_vendor_monthly_rfq_limit') }} RFQ per bulan. Verifikasi tetap diperiksa admin.</p>
-                            <button class="btn navora-app-primary" type="button" data-vendor-subscription-checkout>Aktifkan via Midtrans</button>
-                        @endif
-                    </section>
-                @endif
                 <div class="navora-header-actions">
                     @auth
                         <span class="navora-demo-label"><i class="bi bi-circle-fill"></i> AKUN TERHUBUNG</span>
@@ -127,7 +107,6 @@
             </div>
             <nav class="navora-app-nav" aria-label="Navigasi ruang Navora">
                 <div class="container-fluid navora-app-nav-inner">
-                    <div class="navora-nav-context"><span class="navora-context-dot"></span><span data-role-caption>Ruang UMKM</span></div>
                     <div class="navora-page-links" role="tablist" aria-label="Halaman demo">
                         <button class="navora-page-link is-active" type="button" data-page="overview" data-roles="umkm,vendor,partner" role="tab" aria-selected="true"><i class="bi bi-grid-1x2"></i> Ringkasan</button>
                         <button class="navora-page-link" type="button" data-page="vendors" data-roles="umkm" role="tab" aria-selected="false"><i class="bi bi-search"></i> Cari vendor</button>
@@ -135,7 +114,7 @@
                         @auth
                             @if (Auth::user()->role === 'vendor')
                                 <button class="navora-page-link" type="button" data-page="advertisements" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-megaphone"></i> Iklan</button>
-                                <button class="navora-page-link" type="button" data-page="notifications" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-envelope"></i> Notifikasi @if ($advertisementNotices->isNotEmpty())<span class="navora-tab-count">{{ $advertisementNotices->count() }}</span>@endif</button>
+                                <button class="navora-page-link" type="button" data-page="notifications" data-roles="vendor" role="tab" aria-selected="false" hidden><i class="bi bi-envelope"></i> Notifikasi</button>
                                 <button class="navora-page-link" type="button" data-page="income" data-roles="vendor" role="tab" aria-selected="false"><i class="bi bi-cash-stack"></i> Pendapatan & produk</button>
                             @endif
                         @endauth
@@ -425,9 +404,19 @@
                             @endif
                             <div>
                                 <span class="navora-panel-kicker">PROFIL TERSIMPAN</span>
-                                <h2>{{ $businessProfile?->business_name ?? Auth::user()->name }}</h2>
+                                <h2>
+                                    {{ $businessProfile?->business_name ?? Auth::user()->name }}
+                                    @if (Auth::user()->role === 'vendor' && $vendorSubscription?->isActive())
+                                        <span class="navora-vendor-verified-badge" title="Vendor Premium Terverifikasi">
+                                            <i class="bi bi-patch-check-fill"></i> PRO Vendor
+                                        </span>
+                                    @endif
+                                </h2>
                                 <p>{{ $businessProfile?->category ?? 'Bidang usaha belum diisi' }} · {{ $businessProfile?->location ?? 'Lokasi belum diisi' }}</p>
                                 <span class="navora-status-pill status-waiting">Profil usaha · {{ Auth::user()->role === 'vendor' ? 'Vendor' : 'UMKM' }}</span>
+                                @if (Auth::user()->role === 'vendor' && $vendorSubscription?->isActive())
+                                    <span class="navora-status-pill status-approved ms-1"><i class="bi bi-star-fill text-warning"></i> Langganan Aktif</span>
+                                @endif
                             </div>
                             <a class="btn navora-app-outline" href="{{ route('business-profile.show') }}">Ubah profil</a>
                         </section>
@@ -438,6 +427,7 @@
                             <div class="navora-account-row"><span>Nomor kontak</span><strong>{{ $businessProfile?->phone ?: 'Belum diisi' }}</strong></div>
                             <div class="navora-account-row"><span>Tentang usaha</span><strong>{{ $businessProfile?->description ?: 'Belum diisi' }}</strong></div>
                             @if (Auth::user()->role === 'vendor')
+                                <div class="navora-account-row"><span>Status paket vendor</span><strong>{!! $vendorSubscription?->isActive() ? '<span class="text-success"><i class="bi bi-patch-check-fill text-primary"></i> Premium (Aktif s.d. ' . $vendorSubscription->ends_at->format('d M Y') . ')</span>' : '<span class="text-muted">Standar / Belum berlangganan</span>' !!}</strong></div>
                                 <div class="navora-account-row"><span>Jenis kemasan atau layanan</span><strong>{{ $businessProfile?->product_categories ?: 'Belum diisi' }}</strong></div>
                                 <div class="navora-account-row"><span>MOQ</span><strong>{{ $businessProfile?->minimum_order_quantity ? number_format($businessProfile->minimum_order_quantity, 0, ',', '.') . ' pcs' : 'Belum diisi' }}</strong></div>
                                 <div class="navora-account-row"><span>Verifikasi vendor</span><strong>{{ ['not_submitted' => 'Belum diajukan', 'pending' => 'Menunggu pemeriksaan', 'approved' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'][$businessProfile?->verification_status ?? 'not_submitted'] }}</strong></div>
@@ -505,18 +495,37 @@
         @if (Auth::user()->role === 'vendor')
             <dialog class="ad-notifications-popup" data-ad-notifications-popup aria-labelledby="ad-notifications-title">
                 <div class="ad-notifications-popup-header">
-                    <div><span class="navora-panel-kicker">RUANG VENDOR</span><h2 id="ad-notifications-title">Notifikasi iklan</h2></div>
-                    <button class="navora-modal-close" type="button" data-close-ad-notifications aria-label="Tutup notifikasi"><i class="bi bi-x-lg"></i></button>
+                    <div>
+                        <span class="navora-panel-kicker">RUANG VENDOR</span>
+                        <h2 id="ad-notifications-title">Notifikasi iklan</h2>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        @if ($advertisementNotices->isNotEmpty())
+                            <button class="navora-text-action text-danger" type="button" data-dismiss-all-notifications style="font-size: 0.75rem;">
+                                Hapus semua
+                            </button>
+                        @endif
+                        <button class="navora-modal-close" type="button" data-close-ad-notifications aria-label="Tutup notifikasi"><i class="bi bi-x-lg"></i></button>
+                    </div>
                 </div>
-                @forelse ($advertisementNotices as $notice)
-                    <button class="ad-notification-popup-item" type="button" data-notification-item>
-                        <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}</strong>
-                        <span>{{ $notice->ad_title ?: $notice->package_name }}</span>
-                    </button>
-                @empty
-                    <p class="ad-notification-popup-empty">Notifikasi keputusan iklan akan muncul di sini.</p>
-                @endforelse
-                <button class="btn navora-app-outline ad-notifications-open-all" type="button" data-open-notifications>Semua notifikasi</button>
+                <div class="ad-notifications-popup-list">
+                    @forelse ($advertisementNotices as $notice)
+                        <div class="ad-notification-popup-item" data-notification-row="{{ $notice->id }}">
+                            <div class="ad-notification-item-content" data-notification-item>
+                                <strong>{{ $notice->status === 'active' ? 'Iklan diterima dan ditayangkan' : 'Iklan ditolak admin' }}</strong>
+                                <span>{{ $notice->ad_title ?: $notice->package_name }} · {{ $notice->reviewed_at?->format('d M Y H:i') }}</span>
+                                @if ($notice->review_reason)
+                                    <small class="text-danger" style="display: block; margin-top: 2px;">Catatan: {{ $notice->review_reason }}</small>
+                                @endif
+                            </div>
+                            <button class="ad-notification-item-delete" type="button" data-dismiss-notification="{{ $notice->id }}" title="Hapus notifikasi ini" aria-label="Hapus notifikasi">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    @empty
+                        <p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>
+                    @endforelse
+                </div>
             </dialog>
         @endif
     @endauth
@@ -537,6 +546,59 @@
                     Minta penawaran harga <i class="bi bi-arrow-right"></i>
                 </button>
             </section>
+        </div>
+    </dialog>
+
+    <!-- Dialog Modal Detail Profil Vendor -->
+    <dialog class="navora-vendor-profile-dialog" data-vendor-profile-dialog aria-labelledby="vendor-profile-dialog-name">
+        <div class="navora-vendor-profile-header">
+            <div class="navora-vendor-profile-cover" data-vendor-profile-cover></div>
+            <button class="navora-modal-close navora-vendor-profile-close" type="button" data-close-vendor-profile-dialog aria-label="Tutup profil vendor">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <div class="navora-vendor-profile-avatar-wrap">
+                <div class="navora-vendor-profile-main-avatar" data-vendor-profile-avatar>V</div>
+            </div>
+        </div>
+        <div class="navora-vendor-profile-body">
+            <div class="navora-vendor-profile-meta">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h2 id="vendor-profile-dialog-name" data-vendor-profile-name style="font-size: 1.35rem; font-weight: 800; margin: 0; color: #1e3a52;">Nama Vendor</h2>
+                    <span class="navora-verified-tag"><i class="bi bi-patch-check-fill"></i> Terverifikasi</span>
+                    <span class="navora-vendor-verified-badge" data-vendor-profile-pro hidden><i class="bi bi-patch-check-fill"></i> PRO Vendor</span>
+                </div>
+                <p class="navora-vendor-profile-sub" data-vendor-profile-sub style="color: #64748b; margin: 4px 0 8px; font-size: 0.85rem;"></p>
+                <div class="navora-vendor-profile-rating-box" data-vendor-profile-rating-box style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; margin-bottom: 12px;">
+                    <span class="text-warning"><i class="bi bi-star-fill"></i> <strong data-vendor-profile-rating-num>0.0</strong></span>
+                    <span class="text-muted" data-vendor-profile-review-count>(0 ulasan)</span>
+                </div>
+            </div>
+
+            <div class="navora-vendor-profile-section">
+                <h4 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-bottom: 6px;">Tentang Usaha & Layanan</h4>
+                <p data-vendor-profile-description style="font-size: 0.85rem; color: #334155; line-height: 1.6; margin-bottom: 10px;"></p>
+                <div class="navora-vendor-profile-tags" data-vendor-profile-tags style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+            </div>
+
+            <div class="navora-vendor-profile-section mt-3">
+                <h4 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-bottom: 8px;">Katalog Produk Unggulan</h4>
+                <div class="navora-vendor-profile-listings" data-vendor-profile-listings style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;"></div>
+            </div>
+
+            <div class="navora-vendor-profile-section mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin: 0;">Ulasan & Pengalaman UMKM</h4>
+                    <span class="badge bg-light text-dark" data-vendor-profile-total-reviews-badge>0 Ulasan</span>
+                </div>
+                <div class="navora-vendor-profile-reviews-list" data-vendor-profile-reviews-list style="display: flex; flex-direction: column; gap: 8px;">
+                    <p class="text-muted" style="font-size: 0.85rem;">Memuat ulasan vendor…</p>
+                </div>
+            </div>
+
+            <div class="navora-vendor-profile-actions mt-4 pt-2 border-top d-flex gap-2 justify-content-end">
+                <button class="btn navora-app-outline" type="button" data-close-vendor-profile-dialog>Tutup</button>
+                <button class="btn navora-app-primary" type="button" data-vendor-profile-rfq-btn><i class="bi bi-chat-square-text me-1"></i> Minta Penawaran Harga</button>
+            </div>
         </div>
     </dialog>
 
@@ -577,9 +639,19 @@
                 <div class="navora-order-error" data-order-chat-error role="alert" hidden></div>
             </div>
             <div class="navora-order-chat-actions" data-order-chat-actions style="padding: 0 12px;"></div>
-            <form class="navora-floating-chat-footer navora-order-chat-form" data-order-chat-form>
-                <label class="visually-hidden" for="order-chat-message">Tulis pesan</label>
-                <textarea id="order-chat-message" name="message" rows="1" maxlength="2000" required placeholder="Tulis pesan ke vendor / UMKM…"></textarea>
+            <form class="navora-floating-chat-footer navora-order-chat-form" data-order-chat-form enctype="multipart/form-data">
+                <label class="navora-chat-attach-btn" title="Kirim gambar" for="order-chat-image-input">
+                    <i class="bi bi-image"></i>
+                    <input type="file" id="order-chat-image-input" name="image" accept="image/jpeg,image/png,image/webp" style="display: none;" data-chat-image-input>
+                </label>
+                <div class="navora-chat-input-wrapper">
+                    <div class="navora-chat-attachment-preview" data-chat-image-preview hidden>
+                        <span data-chat-image-name></span>
+                        <button type="button" class="navora-chat-preview-remove" data-chat-image-remove aria-label="Hapus gambar">&times;</button>
+                    </div>
+                    <label class="visually-hidden" for="order-chat-message">Tulis pesan</label>
+                    <textarea id="order-chat-message" name="message" rows="1" maxlength="2000" placeholder="Tulis pesan (Enter untuk kirim)…"></textarea>
+                </div>
                 <button class="btn navora-app-primary" type="submit" data-order-chat-send title="Kirim">
                     <i class="bi bi-send-fill"></i>
                 </button>
@@ -590,6 +662,47 @@
             <span>Chat</span>
         </button>
     </div>
+
+    @if (auth()->user()?->role === 'vendor' && !($vendorSubscription?->isActive()))
+        <!-- Floating Vendor Premium Subscription Promotion (Goyang-goyang / Shake style) -->
+        <div class="navora-vendor-sub-fab-wrapper" data-vendor-subscription
+            data-checkout-url="{{ route('vendor.subscription.checkout') }}"
+            data-refresh-template="{{ route('vendor.subscription.refresh', ['vendorSubscription' => '__SUBSCRIPTION__']) }}">
+            
+            <div class="navora-vendor-sub-popup is-collapsed" data-vendor-sub-popup>
+                <div class="navora-vendor-sub-popup-header">
+                    <div>
+                        <span class="navora-sub-badge"><i class="bi bi-patch-check-fill"></i> VENDOR PREMIUM</span>
+                        <h4>Upgrade Akun Toko</h4>
+                    </div>
+                    <button type="button" class="navora-vendor-sub-popup-close" data-vendor-sub-close data-vendor-subscription-dismiss aria-label="Tutup">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="navora-vendor-sub-popup-body">
+                    <p class="navora-sub-price">
+                        <strong>Rp{{ number_format(config('services.navora.vendor_subscription_amount'), 0, ',', '.') }}</strong>
+                        <span>/ {{ config('services.navora.vendor_subscription_days') }} hari</span>
+                    </p>
+                    <ul class="navora-sub-benefits">
+                        <li><i class="bi bi-check-circle-fill text-success"></i> <strong>Badge Verified & Premium</strong> di foto profil & toko</li>
+                        <li><i class="bi bi-check-circle-fill text-success"></i> <strong>Prioritas teratas</strong> di hasil pencarian UMKM</li>
+                        <li><i class="bi bi-check-circle-fill text-success"></i> <strong>Kuota RFQ & pesanan tanpa batas</strong></li>
+                        <li><i class="bi bi-check-circle-fill text-success"></i> Tanda khusus centang biru & badge emas di etalase</li>
+                    </ul>
+                    <button class="btn navora-app-primary w-100 py-2 mt-2" type="button" data-vendor-subscription-checkout>
+                        <i class="bi bi-shield-check me-1"></i> Berlangganan via Midtrans
+                    </button>
+                </div>
+            </div>
+
+            <button class="navora-vendor-sub-fab navora-shake-badge" type="button" data-vendor-sub-fab-toggle aria-label="Paket Vendor Premium">
+                <i class="bi bi-award-fill"></i>
+                <span>Langganan Premium</span>
+                <span class="navora-sub-sparkle">★</span>
+            </button>
+        </div>
+    @endif
 
     @if (filled(config('services.midtrans.client_key')))
         <script src="{{ rtrim(config('services.midtrans.base_url'), '/').'/snap/snap.js' }}" data-client-key="{{ config('services.midtrans.client_key') }}"></script>

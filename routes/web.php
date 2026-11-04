@@ -20,6 +20,7 @@ use App\Http\Controllers\RajaOngkirController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorListingController;
+use App\Http\Controllers\VendorReviewController;
 use App\Http\Controllers\VendorSubscriptionController;
 use App\Http\Controllers\VendorVerificationController;
 use App\Models\AdCampaign;
@@ -76,8 +77,9 @@ Route::get('/ruang-kerja', function (Request $request, VendorAdvertisementContro
             ? $user->adCampaigns()
                 ->whereIn('status', [AdCampaign::STATUS_ACTIVE, AdCampaign::STATUS_REJECTED])
                 ->whereNotNull('reviewed_at')
+                ->whereNull('notification_dismissed_at')
                 ->latest('reviewed_at')
-                ->limit(5)
+                ->limit(10)
                 ->get()
             : collect(),
         ...$workspaceData,
@@ -142,6 +144,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/pesanan/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::get('/pesanan/{order}/pesan', [OrderMessageController::class, 'index'])
         ->name('orders.messages.index');
+    Route::get('/pesanan/{order}/pesan/{message}/gambar', [OrderMessageController::class, 'image'])
+        ->name('orders.messages.image');
     Route::post('/pesanan/{order}/pesan', [OrderMessageController::class, 'store'])
         ->middleware('throttle:30,1')
         ->name('orders.messages.store');
@@ -163,6 +167,13 @@ Route::middleware('auth')->group(function () {
     Route::patch('/pesanan/{order}/status', [OrderController::class, 'updateStatus'])
         ->middleware('throttle:30,1')
         ->name('orders.status');
+    Route::post('/pesanan/{order}/ulasan', [VendorReviewController::class, 'store'])
+        ->middleware('throttle:15,1')
+        ->name('orders.review.store');
+    Route::get('/vendor/{vendor}/ulasan', [VendorReviewController::class, 'listByVendor'])
+        ->name('vendor.reviews.list');
+    Route::get('/ulasan/{review}/gambar', [VendorReviewController::class, 'image'])
+        ->name('vendor.reviews.image');
 
     Route::delete('/akun', AccountController::class)
         ->middleware('throttle:6,1')
@@ -196,6 +207,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/vendor/iklan/{adCampaign}/edit', [VendorAdvertisementController::class, 'updateCampaign'])
         ->middleware('throttle:10,1')
         ->name('vendor.advertisements.update');
+    Route::post('/vendor/iklan/{adCampaign}/hapus-notifikasi', [VendorAdvertisementController::class, 'dismissNotification'])
+        ->middleware('throttle:30,1')
+        ->name('vendor.advertisements.dismiss-notification');
+    Route::post('/vendor/iklan/hapus-semua-notifikasi', [VendorAdvertisementController::class, 'dismissAllNotifications'])
+        ->middleware('throttle:20,1')
+        ->name('vendor.advertisements.dismiss-all-notifications');
     Route::post('/iklan/{adCampaign}/cek-pembayaran', [MidtransNotificationController::class, 'refreshAdvertisement'])
         ->middleware('throttle:20,1')
         ->name('vendor.advertisements.refresh');

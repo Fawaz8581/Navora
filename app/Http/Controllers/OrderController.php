@@ -53,6 +53,7 @@ class OrderController extends Controller
                 'vendor.businessProfile:id,user_id,business_name,business_address,rajaongkir_area_id,rajaongkir_area_name',
                 'participants.user:id,name',
                 'statusHistory.actor:id,name',
+                'review',
             ])
             ->latest('id')
             ->paginate(50);
@@ -1419,10 +1420,26 @@ class OrderController extends Controller
                 : ! ($currentParticipant?->payment_status === 'pending'
                     && filled($currentParticipant?->payment_order_id)));
 
+        $canReview = $user->role === 'umkm'
+            && $isBuyer
+            && $order->vendor_user_id !== null
+            && $order->status === Order::STATUS_RECEIVED;
+
+        $review = $order->review;
+
         return [
             'id' => $order->id,
             'type' => $order->type,
             'vendor_user_id' => $order->vendor_user_id,
+            'can_review' => $canReview && $review === null,
+            'has_reviewed' => $review !== null,
+            'review' => $review ? [
+                'id' => $review->id,
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'image_url' => $review->image_path ? route('vendor.reviews.image', $review) : null,
+                'created_at' => $review->created_at?->format('d M Y'),
+            ] : null,
             'is_quote_request' => $order->type === Order::TYPE_DIRECT
                 && $order->vendor_user_id !== null
                 && $order->payment_status !== 'not_required',

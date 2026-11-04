@@ -229,6 +229,39 @@ class VendorAdvertisementController extends Controller
             );
     }
 
+    public function dismissNotification(Request $request, AdCampaign $adCampaign): JsonResponse
+    {
+        $this->ensureVerifiedVendor($request);
+        abort_unless($adCampaign->vendor_user_id === $request->user()->id, 403);
+
+        $adCampaign->forceFill([
+            'notification_dismissed_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notifikasi berhasil dihapus.',
+        ]);
+    }
+
+    public function dismissAllNotifications(Request $request): JsonResponse
+    {
+        $this->ensureVerifiedVendor($request);
+
+        $request->user()->adCampaigns()
+            ->whereIn('status', [AdCampaign::STATUS_ACTIVE, AdCampaign::STATUS_REJECTED])
+            ->whereNotNull('reviewed_at')
+            ->whereNull('notification_dismissed_at')
+            ->update([
+                'notification_dismissed_at' => now(),
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Semua notifikasi berhasil dihapus.',
+        ]);
+    }
+
     private function ensureVerifiedVendor(Request $request): void
     {
         abort_unless($request->user()->role === 'vendor', 403);

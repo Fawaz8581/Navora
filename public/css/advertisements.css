@@ -442,15 +442,47 @@
 }
 
 .ad-notification-popup-item {
-    display: grid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     width: 100%;
-    gap: 5px;
-    padding: 13px 10px;
+    gap: 10px;
+    padding: 12px 10px;
     border: 1px solid transparent;
-    border-bottom-color: #edf1f3;
+    border-bottom: 1px solid #edf1f3;
     background: #fff;
     color: #38536a;
     text-align: left;
+    transition: background 0.15s;
+}
+
+.ad-notification-popup-item:hover {
+    background: #f8fafc;
+}
+
+.ad-notification-item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+}
+
+.ad-notification-item-delete {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 1rem;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+
+.ad-notification-item-delete:hover {
+    color: #dc2626;
+    background: #fee2e2;
 }
 
 .ad-notification-popup-item span,
