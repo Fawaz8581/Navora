@@ -1584,7 +1584,7 @@
                 state.rfqs.unshift(rfq);
                 saveState();
                 renderStoredRfqs();
-                    showToast('Permintaan tersimpan di browser demo. Belum dikirim kepada vendor.');
+                showToast('Permintaan tersimpan di browser demo. Belum dikirim kepada vendor.');
                 return true;
             },
         });
@@ -2358,7 +2358,7 @@
                         ? 'Konfirmasi pesanan'
                         : transition.status === 'diterima'
                             ? 'Konfirmasi pesanan diterima'
-                        : `Tandai ${transition.label.toLowerCase()}`,
+                            : `Tandai ${transition.label.toLowerCase()}`,
             );
             button.type = 'button';
             button.dataset.action = 'update-order-status';
@@ -3397,7 +3397,7 @@
                 ? 'Perubahan pada katalog yang sudah aktif langsung tampil di pencarian UMKM tanpa perlu ACC ulang.'
                 : authenticatedRole === 'vendor'
                     ? 'Tambahkan foto atau video agar UMKM bisa melihat produkmu. Katalog akan aktif setelah disetujui admin.'
-                : 'Informasi akan disimpan lokal sebagai draft demo dan tidak dipublikasikan ke marketplace.',
+                    : 'Informasi akan disimpan lokal sebagai draft demo dan tidak dipublikasikan ke marketplace.',
             icon: 'bi-box-seam',
             submit: listingToEdit ? 'Simpan perubahan' : authenticatedRole === 'vendor' ? 'Kirim untuk ditinjau' : 'Simpan draft demo',
             fields,
@@ -3680,776 +3680,938 @@
         });
     };
 
-    const showAssistantResult = (values) => {
-        const product = values.product.trim();
-        const lowerProduct = product.toLocaleLowerCase('id');
-        const liquid = /minuman|sambal|saus|sabun cair|minyak|sirup|jus/.test(lowerProduct);
-        const food = /kopi|teh|snack|makanan|camilan|rempah|bumbu/.test(lowerProduct);
-        const packaging = liquid
-            ? ['Botol PET atau kaca dapat dieksplorasi; konfirmasi kompatibilitas produk dengan vendor.']
-            : food
-                ? ['Pouch dengan zipper dapat dipertimbangkan; tanyakan opsi lapisan dan sampel.']
-                : ['Bandingkan pouch, box, atau botol berdasarkan bentuk produk dan cara distribusinya.'];
-        const material = liquid
-            ? ['Tanyakan material yang sesuai kontak produk dan uji kompatibilitas sebelum produksi.']
-            : food
-                ? ['Tanyakan spesifikasi food-contact, lapisan pelindung, dan bukti yang relevan kepada vendor.']
-                : ['Minta informasi komposisi material, ketahanan, dan opsi sampel dari vendor.'];
-        const volumeNote = values.volume === 'small'
-            ? 'Mulai dengan meminta sampel dan menanyakan opsi batch kecil atau patungan.'
-            : values.volume === 'medium'
-                ? 'Bandingkan MOQ, harga bertingkat, waktu produksi, dan ongkos pengiriman.'
-                : 'Tanyakan kapasitas produksi, konsistensi kualitas, serta jadwal pengiriman bertahap.';
-        const vendors = liquid
-            ? ['Kemas Prima', 'Rasa Racik Maklon']
-            : food
-                ? ['PouchKita Studio', 'Cetak Bumi']
-                : ['PouchKita Studio', 'Kemas Prima', 'Cetak Bumi'];
-        const result = document.querySelector('[data-assistant-result]');
+        const showAssistantResult = async (values) => {
+            const result = document.querySelector('[data-assistant-result]');
+            const submitBtn = document.querySelector('[data-assistant-submit-btn]');
+            if (!result) return;
 
-        if (!result) {
-            return;
-        }
-
-        const content = document.createElement('div');
-        content.className = 'navora-result-content';
-        content.append(
-            textElement('span', 'navora-panel-kicker', 'IDE AWAL UNTUK DISKUSI'),
-            textElement('h2', '', `Pilihan awal untuk ${product}`),
-            textElement('p', '', `${values.size ? `Kebutuhan ${values.size}. ` : ''}${volumeNote}`),
-        );
-
-        const packageBlock = document.createElement('div');
-        packageBlock.className = 'navora-result-block';
-        packageBlock.append(textElement('strong', '', 'Format yang bisa ditanyakan'));
-        const packageList = document.createElement('ul');
-        packaging.forEach((recommendation) => packageList.append(textElement('li', '', recommendation)));
-        packageBlock.append(packageList);
-
-        const materialBlock = document.createElement('div');
-        materialBlock.className = 'navora-result-block';
-        materialBlock.append(textElement('strong', '', 'Hal yang perlu dikonfirmasi'));
-        const materialList = document.createElement('ul');
-        [...material, ...(values.preference ? [`Sampaikan preferensi: ${values.preference.trim()}.`] : [])]
-            .forEach((recommendation) => materialList.append(textElement('li', '', recommendation)));
-        materialBlock.append(materialList);
-
-        const vendorList = document.createElement('div');
-        vendorList.className = 'navora-result-vendors';
-        vendors.forEach((name) => vendorList.append(textElement('span', '', name)));
-        content.append(packageBlock, materialBlock, textElement('strong', 'navora-panel-kicker', 'VENDOR DEMO UNTUK DITELUSURI'), vendorList);
-        content.append(textElement('p', 'navora-result-warning', 'Simulasi berbasis kata kunci, bukan AI atau saran ahli. Material, keamanan pangan, klaim sertifikasi, biaya, dan kecocokan wajib dikonfirmasi dengan pihak yang kompeten.'));
-        result.replaceChildren(content);
-    };
-
-    const createProfileEdit = () => {
-        const role = state.role;
-        const defaultName = state.profile.name || (role === 'vendor' ? 'PouchKita Studio' : role === 'partner' ? 'Mitra UMKM Nusantara' : 'Usaha Kopi Nusantara');
-
-        openModal({
-            title: 'Perbarui profil demo',
-            description: 'Nama dan lokasi ini hanya disimpan di browser pada perangkat ini.',
-            icon: 'bi-person',
-            submit: 'Simpan profil lokal',
-            fields: [
-                { name: 'name', label: role === 'umkm' ? 'Nama usaha' : role === 'vendor' ? 'Nama vendor' : 'Nama mitra', placeholder: 'Nama tampilan', required: true, value: defaultName },
-                { name: 'location', label: 'Lokasi', placeholder: 'Kota, provinsi', required: true, value: state.profile.location || (role === 'partner' ? 'Indonesia' : 'Bandung, Jawa Barat') },
-            ],
-            onSubmit: (values) => {
-                state.profile = { name: values.name.trim(), location: values.location.trim() };
-                saveState();
-                updateRoleContent();
-                if (authenticatedRole === 'umkm') {
-                    loadVendorCatalog();
-                } else {
-                    updateVendorFilters();
+                const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Menganalisis...';
                 }
-                showToast('Profil demo diperbarui di browser ini.');
-                return true;
-            },
-        });
-    };
 
-    const openInfo = (title, description, icon = 'bi-info-circle') => {
-        openModal({
-            title,
-            description,
-            icon,
-            submit: 'Mengerti',
-        });
-    };
+                result.innerHTML = `
+            <div class="navora-assistant-placeholder py-4">
+                <div class="spinner-border text-success mb-3" style="width: 2.5rem; height: 2.5rem;" role="status"></div>
+                <h2 style="font-size: 15px; color: #2e5a44;">AI Navora sedang memproses data...</h2>
+                <p>Menganalisis karakteristik formula produk, ketahanan barier, estimasi harga pabrik, dan regulasi label BPOM.</p>
+            </div>
+        `;
 
-    const openVendorProfileModal = (vendorUserId, fallbackName = 'Vendor') => {
-        const dialog = document.querySelector('[data-vendor-profile-dialog]');
-        if (!(dialog instanceof HTMLDialogElement)) {
-            return;
-        }
+                try {
+                    const form = document.querySelector('[data-assistant-form]');
+                    const targetUrl = form?.dataset.recommendUrl || '/asisten-kemasan/analisis';
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || form?.querySelector('input[name="_token"]')?.value || '';
 
-        const vendor = catalogVendorsCache.find((v) => String(v.id) === String(vendorUserId));
-        const nameEl = dialog.querySelector('[data-vendor-profile-name]');
-        const subEl = dialog.querySelector('[data-vendor-profile-sub]');
-        const descEl = dialog.querySelector('[data-vendor-profile-description]');
-        const ratingNumEl = dialog.querySelector('[data-vendor-profile-rating-num]');
-        const reviewCountEl = dialog.querySelector('[data-vendor-profile-review-count]');
-        const totalReviewsBadge = dialog.querySelector('[data-vendor-profile-total-reviews-badge]');
-        const tagsContainer = dialog.querySelector('[data-vendor-profile-tags]');
-        const listingsContainer = dialog.querySelector('[data-vendor-profile-listings]');
-        const reviewsContainer = dialog.querySelector('[data-vendor-profile-reviews-list]');
-        const proBadge = dialog.querySelector('[data-vendor-profile-pro]');
-        const avatarEl = dialog.querySelector('[data-vendor-profile-avatar]');
-        const coverEl = dialog.querySelector('[data-vendor-profile-cover]');
-        const rfqBtn = dialog.querySelector('[data-vendor-profile-rfq-btn]');
+                    const response = await fetch(targetUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(values),
+                    });
 
-        const vendorName = vendor?.name || fallbackName;
-        if (nameEl) nameEl.textContent = vendorName;
-        if (subEl) subEl.textContent = `${vendor?.category || 'Kategori kemasan'} · ${vendor?.location || 'Lokasi belum diisi'}`;
-        if (descEl) descEl.textContent = vendor?.description || 'Vendor terverifikasi di platform Navora.';
-        if (proBadge instanceof HTMLElement) proBadge.hidden = !vendor?.is_premium;
+                    if (!response.ok) {
+                        throw new Error('Gagal mendapatkan rekomendasi');
+                    }
 
-        if (avatarEl) {
-            avatarEl.innerHTML = '';
-            if (vendor?.profile_image_url) {
-                const img = document.createElement('img');
-                img.src = vendor.profile_image_url;
-                img.alt = `Foto profil ${vendorName}`;
-                avatarEl.appendChild(img);
-            } else {
-                avatarEl.textContent = vendorName.charAt(0).toUpperCase();
-            }
-        }
-
-        if (coverEl instanceof HTMLElement) {
-            if (vendor?.cover_image_url) {
-                coverEl.style.backgroundImage = `url('${vendor.cover_image_url}')`;
-            } else {
-                coverEl.style.backgroundImage = 'none';
-            }
-        }
-
-        if (tagsContainer) {
-            tagsContainer.innerHTML = '';
-            [
-                vendor?.materials,
-                vendor?.minimum_order_quantity ? `MOQ ${Number(vendor.minimum_order_quantity).toLocaleString('id-ID')} pcs` : null,
-                vendor?.has_sample ? 'Sampel Tersedia' : null,
-                vendor?.certificate_count ? `${vendor.certificate_count} Sertifikat` : null,
-            ].filter(Boolean).forEach((tag) => {
-                const badge = textElement('span', 'badge bg-light text-secondary border', tag);
-                tagsContainer.appendChild(badge);
-            });
-        }
-
-        if (listingsContainer) {
-            listingsContainer.innerHTML = '';
-            if (Array.isArray(vendor?.listings) && vendor.listings.length > 0) {
-                vendor.listings.forEach((item) => {
-                    const card = textElement('div', 'p-2 border rounded bg-light', '');
-                    card.style.fontSize = '0.8rem';
-                    const title = textElement('strong', 'd-block text-truncate', item.name);
-                    const moq = textElement('small', 'text-muted d-block', `MOQ: ${Number(item.minimum_order_quantity).toLocaleString('id-ID')} pcs`);
-                    const price = textElement('span', 'text-success fw-bold d-block mt-1', item.price_per_unit ? formatRupiah(item.price_per_unit) : 'Nego');
-                    card.append(title, moq, price);
-                    listingsContainer.appendChild(card);
-                });
-            } else {
-                listingsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada katalog publik.</p>';
-            }
-        }
-
-        if (rfqBtn instanceof HTMLButtonElement) {
-            rfqBtn.onclick = () => {
-                dialog.close();
-                createRfq(vendorName, vendorUserId);
+                    const data = await response.json();
+                    renderAdvancedAssistantResult(data, values);
+                } catch (err) {
+                    console.error('Assistant error:', err);
+                    // Fallback rendering
+                    renderLocalAssistantResult(values);
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHtml;
+                    }
+                }
             };
-        }
 
-        // Muat reviews dinamis
-        if (reviewsContainer) {
-            reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Memuat ulasan vendor…</p>';
-        }
+            const renderAdvancedAssistantResult = (data, values) => {
+                const result = document.querySelector('[data-assistant-result]');
+                if (!result) return;
 
-        if (document.body.dataset.vendorReviewsListTemplate) {
-            const listUrl = document.body.dataset.vendorReviewsListTemplate.replace('__VENDOR__', encodeURIComponent(vendorUserId));
-            fetch(listUrl, {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            }).then((res) => res.json()).then((data) => {
-                if (ratingNumEl) ratingNumEl.textContent = Number(data.average_rating || 0).toFixed(1);
-                if (reviewCountEl) reviewCountEl.textContent = `(${data.total_reviews || 0} ulasan)`;
-                if (totalReviewsBadge) totalReviewsBadge.textContent = `${data.total_reviews || 0} Ulasan`;
+                const packagingCards = (data.packaging_types || []).map((t) => `
+            <div class="p-3 mb-2 rounded-3 border" style="background: #ffffff;">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <strong style="font-size: 13px; color: #1e3a2f;"><i class="bi bi-box-seam me-1 text-success"></i> ${t.name}</strong>
+                    <span class="badge bg-light text-dark border" style="font-size: 10px;">${t.thickness}</span>
+                </div>
+                <div class="small text-muted mb-1" style="font-size: 11px;"><strong>Target:</strong> ${t.suitable_for}</div>
+                <div class="small" style="font-size: 11px; color: #49635b; line-height: 1.5;">${t.reason}</div>
+            </div>
+        `).join('');
 
-                if (reviewsContainer) {
-                    reviewsContainer.innerHTML = '';
-                    if (Array.isArray(data.reviews) && data.reviews.length > 0) {
-                        data.reviews.forEach((rev) => {
-                            const revCard = textElement('div', 'navora-vendor-review-card', '');
-                            const head = textElement('div', 'd-flex justify-content-between align-items-center mb-1', '');
-                            head.append(
-                                textElement('strong', '', rev.reviewer_name),
-                                textElement('small', 'text-warning fw-bold', `★ ${rev.rating}/5 · ${rev.created_at}`),
-                            );
-                            const comment = textElement('p', 'mb-1 text-secondary', rev.comment);
-                            comment.style.fontSize = '0.82rem';
-                            revCard.append(head, comment);
+                const vendorItems = (data.vendor_recommendations || []).map((v) => `
+            <div class="d-flex align-items-center justify-content-between p-2 mb-1 rounded border bg-white" style="font-size: 11px;">
+                <div>
+                    <strong class="d-block text-dark">${v.vendor_name}</strong>
+                    <span class="text-muted"><i class="bi bi-geo-alt"></i> ${v.city} · MOQ ${Number(v.moq || 0).toLocaleString('id-ID')} pcs · ${v.material}</span>
+                </div>
+                <div>
+                    ${v.is_pro ? '<span class="badge bg-warning text-dark me-1" style="font-size: 9px;"><i class="bi bi-star-fill"></i> PRO</span>' : ''}
+                    <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 10px;" type="button" data-action="assistant-open-rfq" data-vendor-id="${v.vendor_user_id || ''}" data-vendor-name="${v.vendor_name}">
+                        Minta RFQ
+                    </button>
+                </div>
+            </div>
+        `).join('');
 
-                            if (rev.image_url) {
-                                const img = document.createElement('img');
-                                img.src = rev.image_url;
-                                img.alt = 'Foto ulasan pembeli';
-                                img.onclick = () => window.open(rev.image_url, '_blank', 'noopener,noreferrer');
-                                revCard.appendChild(img);
-                            }
-                            reviewsContainer.appendChild(revCard);
+                const labelItems = (data.regulatory_compliance?.label_checklist || []).map((l) => `
+            <li class="mb-1 small" style="font-size: 11px;"><i class="bi bi-check2-circle text-success me-1"></i> ${l}</li>
+        `).join('');
+
+                result.innerHTML = `
+            <div class="navora-result-content p-1" style="animation: fadeIn 0.3s ease;">
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                    <div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle mb-1" style="font-size: 10px; font-weight: 700;">
+                            <i class="bi bi-stars"></i> REKOMENDASI TERVERIFIKASI
+                        </span>
+                        <h2 class="mb-0" style="font-size: 18px; color: #1c3d2e; font-weight: 800;">Solusi Kemasan untuk ${data.product}</h2>
+                        <span class="text-muted small" style="font-size: 11px;">Kategori: <strong>${data.category_detected}</strong></span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()" title="Cetak Rekomendasi" style="font-size: 11px;">
+                        <i class="bi bi-printer"></i> Cetak
+                    </button>
+                </div>
+
+                <!-- Karakteristik & Perlindungan Barrier -->
+                <div class="p-3 mb-3 rounded-3" style="background: #eef7f2; border-left: 4px solid #2d7a5b;">
+                    <strong class="d-block mb-1" style="font-size: 12px; color: #1c4b37;"><i class="bi bi-shield-lock me-1"></i> Karakteristik Formula & Syarat Perlindungan:</strong>
+                    <p class="mb-0 small" style="font-size: 11.5px; color: #2e5443; line-height: 1.6;">${data.characteristics}</p>
+                </div>
+
+                <!-- Tipe Kemasan yang Disarankan -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold mb-2" style="font-size: 12px; color: #244b3c;">
+                        <i class="bi bi-collection me-1"></i> Format & Tipe Kemasan Terbaik:
+                    </label>
+                    ${packagingCards}
+                </div>
+
+                <!-- Spesifikasi Material & Lapisan -->
+                <div class="p-3 mb-3 rounded-3 border" style="background: #fbfdfc;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-layers text-primary me-2" style="font-size: 16px;"></i>
+                        <div>
+                            <strong style="font-size: 12.5px; color: #1c3d2e;">Material Pilihan: ${data.material_specification?.name || '-'}</strong>
+                        </div>
+                    </div>
+                    <div class="small text-muted mb-1" style="font-size: 11px;"><strong>Keunggulan:</strong> ${data.material_specification?.advantages || '-'}</div>
+                    <div class="small text-muted" style="font-size: 11px;"><strong>Ideal untuk:</strong> ${data.material_specification?.ideal_for || '-'}</div>
+                </div>
+
+                <!-- Kalkulasi Biaya & Strategi Volume Cetak -->
+                <div class="p-3 mb-3 rounded-3 border bg-light">
+                    <strong class="d-block mb-2" style="font-size: 12px; color: #1f3b2d;">
+                        <i class="bi bi-calculator me-1"></i> Estimasi Biaya & Pilihan Metode Cetak:
+                    </strong>
+                    <div class="d-flex align-items-center justify-content-between p-2 rounded mb-2 bg-white border">
+                        <span class="small text-muted" style="font-size: 11px;">Perkiraan Biaya Satuan:</span>
+                        <span class="fw-bold text-success" style="font-size: 14px;">${data.cost_estimation?.estimated_price_range || '-'} / pcs</span>
+                    </div>
+                    <div class="small text-muted mb-2" style="font-size: 11px;">
+                        <strong>Metode Cetak Optimal:</strong> <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">${data.cost_estimation?.recommended_printing || '-'}</span>
+                    </div>
+                    <div class="small p-2 rounded" style="background: #f3f6f5; font-size: 11px; line-height: 1.5; color: #355346;">
+                        <i class="bi bi-lightbulb-fill text-warning me-1"></i> <strong>Saran Strategi:</strong> ${data.volume_strategy || '-'}
+                    </div>
+                </div>
+
+                <!-- Rekomendasi Vendor Nyata -->
+                ${vendorItems ? `
+                <div class="mb-3">
+                    <label class="form-label fw-bold mb-2" style="font-size: 12px; color: #244b3c;">
+                        <i class="bi bi-shop me-1"></i> Rekomendasi Mitra Vendor di Navora:
+                    </label>
+                    ${vendorItems}
+                </div>
+                ` : ''}
+
+                <!-- Panduan Label BPOM & Halal -->
+                <div class="p-3 mb-3 rounded-3 border bg-white">
+                    <strong class="d-block mb-2" style="font-size: 12px; color: #1c3d2e;">
+                        <i class="bi bi-patch-check me-1 text-primary"></i> Checklist Kelengkapan Desain Label (Standar BPOM & Halal):
+                    </strong>
+                    <ul class="list-unstyled mb-2">
+                        ${labelItems}
+                    </ul>
+                    <div class="small text-muted" style="font-size: 10.5px; line-height: 1.5;">
+                        <i class="bi bi-info-circle me-1"></i> ${data.regulatory_compliance?.storage_tips || ''}
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3 pt-2 border-top">
+                    <button class="btn btn-sm navora-app-primary flex-fill" type="button" data-action="go-to-vendors-tab">
+                        <i class="bi bi-search me-1"></i> Cari Vendor Kemasan Serupa
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-action="assistant-reset">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        `;
+
+                // Bind interactive events
+                result.querySelector('[data-action="go-to-vendors-tab"]')?.addEventListener('click', () => {
+                    showPage('vendors');
+                });
+
+                result.querySelector('[data-action="assistant-reset"]')?.addEventListener('click', () => {
+                    document.querySelector('[data-assistant-form]')?.reset();
+                    result.innerHTML = `
+                <div class="navora-assistant-placeholder">
+                    <span><i class="bi bi-stars"></i></span>
+                    <h2>Hasil Konsultasi Kemasan Cerdas</h2>
+                    <p>Masukkan nama produk dan kebutuhanmu di formulir sebelah kiri untuk melihat rekomendasi format, bahan food-grade, perkiraan harga cetak, dan vendor yang relevan.</p>
+                </div>
+            `;
+                });
+
+                result.querySelectorAll('[data-action="assistant-open-rfq"]').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const vendorName = btn.dataset.vendorName || '';
+                        showPage('rfq');
+                        toastMessage(`Beralih ke tab Permintaan Penawaran untuk vendor ${vendorName}`);
+                    });
+                });
+            };
+
+            const renderLocalAssistantResult = (values) => {
+                const product = values.product.trim();
+                const result = document.querySelector('[data-assistant-result]');
+                if (!result) return;
+
+                result.innerHTML = `
+            <div class="navora-result-content p-2">
+                <span class="badge bg-success text-white mb-2">Rekomendasi Cerdas</span>
+                <h2>Kemasan untuk ${product}</h2>
+                <div class="p-3 mb-2 rounded bg-light border">
+                    <p class="small mb-1"><strong>Ukuran:</strong> ${values.size || 'Standar retail'}</p>
+                    <p class="small mb-1"><strong>Format disarankan:</strong> Standing Pouch Zipper dengan lapisan barrier aluminium foil food grade.</p>
+                    <p class="small mb-0"><strong>Estimasi Biaya:</strong> Rp 1.200 - Rp 2.500 / pcs tergantung volume pemesanan.</p>
+                </div>
+                <button class="btn btn-sm navora-app-primary mt-2" type="button" onclick="showPage('vendors')">
+                    Lihat Daftar Vendor Terkait
+                </button>
+            </div>
+        `;
+            };
+
+            const createProfileEdit = () => {
+                const role = state.role;
+                const defaultName = state.profile.name || (role === 'vendor' ? 'PouchKita Studio' : role === 'partner' ? 'Mitra UMKM Nusantara' : 'Usaha Kopi Nusantara');
+
+                openModal({
+                    title: 'Perbarui profil demo',
+                    description: 'Nama dan lokasi ini hanya disimpan di browser pada perangkat ini.',
+                    icon: 'bi-person',
+                    submit: 'Simpan profil lokal',
+                    fields: [
+                        { name: 'name', label: role === 'umkm' ? 'Nama usaha' : role === 'vendor' ? 'Nama vendor' : 'Nama mitra', placeholder: 'Nama tampilan', required: true, value: defaultName },
+                        { name: 'location', label: 'Lokasi', placeholder: 'Kota, provinsi', required: true, value: state.profile.location || (role === 'partner' ? 'Indonesia' : 'Bandung, Jawa Barat') },
+                    ],
+                    onSubmit: (values) => {
+                        state.profile = { name: values.name.trim(), location: values.location.trim() };
+                        saveState();
+                        updateRoleContent();
+                        if (authenticatedRole === 'umkm') {
+                            loadVendorCatalog();
+                        } else {
+                            updateVendorFilters();
+                        }
+                        showToast('Profil demo diperbarui di browser ini.');
+                        return true;
+                    },
+                });
+            };
+
+            const openInfo = (title, description, icon = 'bi-info-circle') => {
+                openModal({
+                    title,
+                    description,
+                    icon,
+                    submit: 'Mengerti',
+                });
+            };
+
+            const openVendorProfileModal = (vendorUserId, fallbackName = 'Vendor') => {
+                const dialog = document.querySelector('[data-vendor-profile-dialog]');
+                if (!(dialog instanceof HTMLDialogElement)) {
+                    return;
+                }
+
+                const vendor = catalogVendorsCache.find((v) => String(v.id) === String(vendorUserId));
+                const nameEl = dialog.querySelector('[data-vendor-profile-name]');
+                const subEl = dialog.querySelector('[data-vendor-profile-sub]');
+                const descEl = dialog.querySelector('[data-vendor-profile-description]');
+                const ratingNumEl = dialog.querySelector('[data-vendor-profile-rating-num]');
+                const reviewCountEl = dialog.querySelector('[data-vendor-profile-review-count]');
+                const totalReviewsBadge = dialog.querySelector('[data-vendor-profile-total-reviews-badge]');
+                const tagsContainer = dialog.querySelector('[data-vendor-profile-tags]');
+                const listingsContainer = dialog.querySelector('[data-vendor-profile-listings]');
+                const reviewsContainer = dialog.querySelector('[data-vendor-profile-reviews-list]');
+                const proBadge = dialog.querySelector('[data-vendor-profile-pro]');
+                const avatarEl = dialog.querySelector('[data-vendor-profile-avatar]');
+                const coverEl = dialog.querySelector('[data-vendor-profile-cover]');
+                const rfqBtn = dialog.querySelector('[data-vendor-profile-rfq-btn]');
+
+                const vendorName = vendor?.name || fallbackName;
+                if (nameEl) nameEl.textContent = vendorName;
+                if (subEl) subEl.textContent = `${vendor?.category || 'Kategori kemasan'} · ${vendor?.location || 'Lokasi belum diisi'}`;
+                if (descEl) descEl.textContent = vendor?.description || 'Vendor terverifikasi di platform Navora.';
+                if (proBadge instanceof HTMLElement) proBadge.hidden = !vendor?.is_premium;
+
+                if (avatarEl) {
+                    avatarEl.innerHTML = '';
+                    if (vendor?.profile_image_url) {
+                        const img = document.createElement('img');
+                        img.src = vendor.profile_image_url;
+                        img.alt = `Foto profil ${vendorName}`;
+                        avatarEl.appendChild(img);
+                    } else {
+                        avatarEl.textContent = vendorName.charAt(0).toUpperCase();
+                    }
+                }
+
+                if (coverEl instanceof HTMLElement) {
+                    if (vendor?.cover_image_url) {
+                        coverEl.style.backgroundImage = `url('${vendor.cover_image_url}')`;
+                    } else {
+                        coverEl.style.backgroundImage = 'none';
+                    }
+                }
+
+                if (tagsContainer) {
+                    tagsContainer.innerHTML = '';
+                    [
+                        vendor?.materials,
+                        vendor?.minimum_order_quantity ? `MOQ ${Number(vendor.minimum_order_quantity).toLocaleString('id-ID')} pcs` : null,
+                        vendor?.has_sample ? 'Sampel Tersedia' : null,
+                        vendor?.certificate_count ? `${vendor.certificate_count} Sertifikat` : null,
+                    ].filter(Boolean).forEach((tag) => {
+                        const badge = textElement('span', 'badge bg-light text-secondary border', tag);
+                        tagsContainer.appendChild(badge);
+                    });
+                }
+
+                if (listingsContainer) {
+                    listingsContainer.innerHTML = '';
+                    if (Array.isArray(vendor?.listings) && vendor.listings.length > 0) {
+                        vendor.listings.forEach((item) => {
+                            const card = textElement('div', 'p-2 border rounded bg-light', '');
+                            card.style.fontSize = '0.8rem';
+                            const title = textElement('strong', 'd-block text-truncate', item.name);
+                            const moq = textElement('small', 'text-muted d-block', `MOQ: ${Number(item.minimum_order_quantity).toLocaleString('id-ID')} pcs`);
+                            const price = textElement('span', 'text-success fw-bold d-block mt-1', item.price_per_unit ? formatRupiah(item.price_per_unit) : 'Nego');
+                            card.append(title, moq, price);
+                            listingsContainer.appendChild(card);
                         });
                     } else {
-                        reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan dari pembeli.</p>';
+                        listingsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada katalog publik.</p>';
                     }
                 }
-            }).catch(() => {
+
+                if (rfqBtn instanceof HTMLButtonElement) {
+                    rfqBtn.onclick = () => {
+                        dialog.close();
+                        createRfq(vendorName, vendorUserId);
+                    };
+                }
+
+                // Muat reviews dinamis
                 if (reviewsContainer) {
-                    reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan.</p>';
+                    reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Memuat ulasan vendor…</p>';
                 }
-            });
-        }
 
-        dialog.showModal();
-    };
+                if (document.body.dataset.vendorReviewsListTemplate) {
+                    const listUrl = document.body.dataset.vendorReviewsListTemplate.replace('__VENDOR__', encodeURIComponent(vendorUserId));
+                    fetch(listUrl, {
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    }).then((res) => res.json()).then((data) => {
+                        if (ratingNumEl) ratingNumEl.textContent = Number(data.average_rating || 0).toFixed(1);
+                        if (reviewCountEl) reviewCountEl.textContent = `(${data.total_reviews || 0} ulasan)`;
+                        if (totalReviewsBadge) totalReviewsBadge.textContent = `${data.total_reviews || 0} Ulasan`;
 
-    const handleAction = (button) => {
-        const action = button.dataset.action;
+                        if (reviewsContainer) {
+                            reviewsContainer.innerHTML = '';
+                            if (Array.isArray(data.reviews) && data.reviews.length > 0) {
+                                data.reviews.forEach((rev) => {
+                                    const revCard = textElement('div', 'navora-vendor-review-card', '');
+                                    const head = textElement('div', 'd-flex justify-content-between align-items-center mb-1', '');
+                                    head.append(
+                                        textElement('strong', '', rev.reviewer_name),
+                                        textElement('small', 'text-warning fw-bold', `★ ${rev.rating}/5 · ${rev.created_at}`),
+                                    );
+                                    const comment = textElement('p', 'mb-1 text-secondary', rev.comment);
+                                    comment.style.fontSize = '0.82rem';
+                                    revCard.append(head, comment);
 
-        if (action === 'load-more-orders') {
-            loadOrders(true);
-        } else if (action === 'create-order') {
-            createOrder(button.dataset.orderType || 'langsung');
-        } else if (action === 'join-order') {
-            joinOrder(button.dataset.order || '', Number(button.dataset.remaining));
-        } else if (action === 'update-order-status') {
-            updateOrderStatus(button.dataset.order || '', button.dataset.status || '');
-        } else if (action === 'set-order-price') {
-            setOrderPrice(button.dataset.order || '');
-        } else if (action === 'edit-delivery-details') {
-            editOrderDeliveryDetails(button.dataset.order || '');
-        } else if (action === 'select-order-shipping') {
-            selectOrderShipping(button.dataset.order || '');
-        } else if (action === 'checkout-order') {
-            checkoutOrder(button.dataset.order || '', button);
-        } else if (action === 'review-vendor-order') {
-            createVendorOrderReview(button.dataset.order || '');
-        } else if (action === 'decide-order-quote') {
-            decideOrderQuote(button.dataset.order || '', button.dataset.decision || '');
-        } else if (action === 'refresh-order-payment') {
-            refreshOrderPayment(button.dataset.order || '', button);
-        } else if (action === 'open-order-chat') {
-            openOrderChat(button.dataset.order || '');
-        } else if (action === 'refresh-order-chat') {
-            if (activeChatOrderId) {
-                chatRequestController?.abort();
-                chatRequestController = null;
-                loadOrderMessages(activeChatOrderId);
-            }
-        } else if (action === 'pay-order-from-chat') {
-            checkoutOrder(button.dataset.order || '', button);
-        } else if (action === 'refresh-vendor-income') {
-            loadVendorIncome();
-        } else if (action === 'load-more-income') {
-            loadVendorIncome(true);
-        } else if (action === 'rfq') {
-            createRfq(button.dataset.vendor || '', button.dataset.vendorUserId || '');
-        } else if (action === 'product-detail') {
-            openProductDetail(button);
-        } else if (action === 'product-request-quote') {
-            if (activeProductContext) {
-                const { vendor, vendorUserId, listing } = activeProductContext;
-                if (productDialog instanceof HTMLDialogElement) {
-                    productDialog.close();
-                }
-                activeProductContext = null;
-                createRfq(vendor, vendorUserId, listing);
-            }
-        } else if (action === 'create-rfq') {
-            createRfq();
-        } else if (action === 'join-group') {
-            joinGroup(button.dataset.group || '');
-        } else if (action === 'create-group') {
-            createOrder('patungan');
-        } else if (action === 'add-listing') {
-            createListing();
-        } else if (action === 'edit-vendor-listing') {
-            const listing = vendorListings.find((item) => String(item.id) === button.dataset.listingReference);
-            if (!listing || listing.status !== 'active') {
-                showToast('Katalog aktif tidak ditemukan. Muat ulang halaman dan coba lagi.');
-            } else {
-                createListing(listing);
-            }
-        } else if (action === 'submit-vendor-listing') {
-            submitVendorListingFromCard(button);
-        } else if (action === 'retry-vendor-listings') {
-            loadVendorListings();
-        } else if (action === 'respond-rfq') {
-            createVendorQuote(button.dataset.rfq || 'rfq-demo-1');
-        } else if (action === 'quote-detail') {
-            openInfo(
-                `Respons dari ${button.dataset.vendor || 'vendor demo'}`,
-                'Harga dan kapasitas yang ditampilkan bersifat indikatif dan belum dikonfirmasi. Hubungi vendor secara langsung pada produk nyata untuk menyepakati spesifikasi, pajak, pengiriman, dan syarat pembayaran.',
-                'bi-chat-square-text',
-            );
-        } else if (action === 'vendor-detail') {
-            const vendorUserId = button.dataset.vendorUserId;
-            const vendorName = button.dataset.vendor || 'Vendor';
-            if (vendorUserId) {
-                openVendorProfileModal(vendorUserId, vendorName);
-            } else {
-                openInfo(
-                    vendorName,
-                    button.dataset.vendorDescription || 'Informasi vendor terverifikasi.',
-                    'bi-box-seam',
-                );
-            }
-        } else if (action === 'retry-vendor-catalog') {
-            loadVendorCatalog();
-        } else if (action === 'use-current-location') {
-            if (authenticatedRole !== 'umkm') {
-                showToast('Masuk ke akun UMKM untuk mencari vendor nyata berdasarkan jarak.');
-            } else if (!navigator.geolocation) {
-                showToast('Peramban ini tidak mendukung akses lokasi.');
-            } else {
-                button.disabled = true;
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        vendorOrigin = {
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                        };
-                        const distance = document.querySelector('[data-vendor-filter="distance"]');
-                        if (distance instanceof HTMLSelectElement && !distance.value) {
-                            distance.value = '50';
-                        }
-                        button.disabled = false;
-                        updateVendorFilters();
-                    },
-                    (error) => {
-                        button.disabled = false;
-                        console.error('Navora could not access the current location.', error);
-                        showToast(error.code === error.PERMISSION_DENIED
-                            ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk memakai filter jarak.'
-                            : 'Lokasi tidak dapat diperoleh. Periksa izin dan coba lagi.');
-                    },
-                    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-                );
-            }
-        } else if (action === 'verify-profile') {
-            openModal({
-                title: 'Status profil vendor demo',
-                description: state.verificationRequested
-                    ? 'Permintaan simulasi sudah tercatat di browser. Ini tidak berarti dokumen atau identitas bisnis telah diperiksa.'
-                    : 'Prototipe belum memiliki proses unggah atau pemeriksaan dokumen. Kamu bisa menandai bahwa profil demo siap ditinjau.',
-                icon: 'bi-patch-check',
-                submit: state.verificationRequested ? 'Tutup' : 'Tandai siap ditinjau',
-                onSubmit: () => {
-                    state.verificationRequested = true;
-                    saveState();
-                    setText('[data-verification-summary]', 'Demo dikirim');
-                    showToast('Status demo diperbarui. Tidak ada dokumen yang ditinjau.');
-                    return true;
-                },
-            });
-        } else if (action === 'program-interest') {
-            const name = button.dataset.program || 'program demo';
-            const alreadyInterested = state.interests.includes(name);
-            if (!alreadyInterested) {
-                state.interests.push(name);
-                saveState();
-            }
-            showToast(alreadyInterested ? 'Minat pada program ini sudah tersimpan lokal.' : 'Minat program dicatat lokal. Belum ada pendaftaran nyata.');
-            button.textContent = alreadyInterested ? 'Minat tersimpan' : 'Minat dicatat di demo';
-            button.disabled = true;
-        } else if (action === 'edit-profile') {
-            createProfileEdit();
-        }
-    };
-
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-
-        if (!(target instanceof Element)) {
-            return;
-        }
-
-        const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
-        if (target.closest('[data-close-product-dialog]') && productDialog instanceof HTMLDialogElement) {
-            productDialog.close();
-            return;
-        }
-
-        const vendorProfileDialog = document.querySelector('[data-vendor-profile-dialog]');
-        if (target.closest('[data-close-vendor-profile-dialog]') && vendorProfileDialog instanceof HTMLDialogElement) {
-            vendorProfileDialog.close();
-            return;
-        }
-
-        if (target.closest('[data-notifications-toggle]') && notificationPopup instanceof HTMLDialogElement) {
-            notificationPopup.showModal();
-            return;
-        }
-
-        if (target.closest('[data-close-ad-notifications]') && notificationPopup instanceof HTMLDialogElement) {
-            notificationPopup.close();
-            return;
-        }
-
-        const dismissBtn = target.closest('[data-dismiss-notification]');
-        if (dismissBtn instanceof HTMLButtonElement) {
-            const noticeId = dismissBtn.dataset.dismissNotification;
-            const template = document.body.dataset.vendorDismissAdNoticeTemplate;
-            if (noticeId && template) {
-                dismissBtn.disabled = true;
-                const url = template.replace('__NOTICE__', encodeURIComponent(noticeId));
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                    },
-                    credentials: 'same-origin',
-                }).then(async (res) => {
-                    if (res.ok) {
-                        const row = document.querySelector(`[data-notification-row="${noticeId}"]`);
-                        row?.remove();
-                        const remaining = document.querySelectorAll('[data-notification-row]').length;
-                        const badge = document.querySelector('.navora-notification-count');
-                        if (badge) {
-                            if (remaining > 0) {
-                                badge.textContent = String(remaining);
+                                    if (rev.image_url) {
+                                        const img = document.createElement('img');
+                                        img.src = rev.image_url;
+                                        img.alt = 'Foto ulasan pembeli';
+                                        img.onclick = () => window.open(rev.image_url, '_blank', 'noopener,noreferrer');
+                                        revCard.appendChild(img);
+                                    }
+                                    reviewsContainer.appendChild(revCard);
+                                });
                             } else {
-                                badge.remove();
+                                reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan dari pembeli.</p>';
                             }
                         }
-                        if (remaining === 0) {
-                            const list = document.querySelector('.ad-notifications-popup-list');
-                            if (list) {
-                                list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                    }).catch(() => {
+                        if (reviewsContainer) {
+                            reviewsContainer.innerHTML = '<p class="text-muted" style="font-size: 0.85rem;">Belum ada ulasan.</p>';
+                        }
+                    });
+                }
+
+                dialog.showModal();
+            };
+
+            const handleAction = (button) => {
+                const action = button.dataset.action;
+
+                if (action === 'load-more-orders') {
+                    loadOrders(true);
+                } else if (action === 'create-order') {
+                    createOrder(button.dataset.orderType || 'langsung');
+                } else if (action === 'join-order') {
+                    joinOrder(button.dataset.order || '', Number(button.dataset.remaining));
+                } else if (action === 'update-order-status') {
+                    updateOrderStatus(button.dataset.order || '', button.dataset.status || '');
+                } else if (action === 'set-order-price') {
+                    setOrderPrice(button.dataset.order || '');
+                } else if (action === 'edit-delivery-details') {
+                    editOrderDeliveryDetails(button.dataset.order || '');
+                } else if (action === 'select-order-shipping') {
+                    selectOrderShipping(button.dataset.order || '');
+                } else if (action === 'checkout-order') {
+                    checkoutOrder(button.dataset.order || '', button);
+                } else if (action === 'review-vendor-order') {
+                    createVendorOrderReview(button.dataset.order || '');
+                } else if (action === 'decide-order-quote') {
+                    decideOrderQuote(button.dataset.order || '', button.dataset.decision || '');
+                } else if (action === 'refresh-order-payment') {
+                    refreshOrderPayment(button.dataset.order || '', button);
+                } else if (action === 'open-order-chat') {
+                    openOrderChat(button.dataset.order || '');
+                } else if (action === 'refresh-order-chat') {
+                    if (activeChatOrderId) {
+                        chatRequestController?.abort();
+                        chatRequestController = null;
+                        loadOrderMessages(activeChatOrderId);
+                    }
+                } else if (action === 'pay-order-from-chat') {
+                    checkoutOrder(button.dataset.order || '', button);
+                } else if (action === 'refresh-vendor-income') {
+                    loadVendorIncome();
+                } else if (action === 'load-more-income') {
+                    loadVendorIncome(true);
+                } else if (action === 'rfq') {
+                    createRfq(button.dataset.vendor || '', button.dataset.vendorUserId || '');
+                } else if (action === 'product-detail') {
+                    openProductDetail(button);
+                } else if (action === 'product-request-quote') {
+                    if (activeProductContext) {
+                        const { vendor, vendorUserId, listing } = activeProductContext;
+                        if (productDialog instanceof HTMLDialogElement) {
+                            productDialog.close();
+                        }
+                        activeProductContext = null;
+                        createRfq(vendor, vendorUserId, listing);
+                    }
+                } else if (action === 'create-rfq') {
+                    createRfq();
+                } else if (action === 'join-group') {
+                    joinGroup(button.dataset.group || '');
+                } else if (action === 'create-group') {
+                    createOrder('patungan');
+                } else if (action === 'add-listing') {
+                    createListing();
+                } else if (action === 'edit-vendor-listing') {
+                    const listing = vendorListings.find((item) => String(item.id) === button.dataset.listingReference);
+                    if (!listing || listing.status !== 'active') {
+                        showToast('Katalog aktif tidak ditemukan. Muat ulang halaman dan coba lagi.');
+                    } else {
+                        createListing(listing);
+                    }
+                } else if (action === 'submit-vendor-listing') {
+                    submitVendorListingFromCard(button);
+                } else if (action === 'retry-vendor-listings') {
+                    loadVendorListings();
+                } else if (action === 'respond-rfq') {
+                    createVendorQuote(button.dataset.rfq || 'rfq-demo-1');
+                } else if (action === 'quote-detail') {
+                    openInfo(
+                        `Respons dari ${button.dataset.vendor || 'vendor demo'}`,
+                        'Harga dan kapasitas yang ditampilkan bersifat indikatif dan belum dikonfirmasi. Hubungi vendor secara langsung pada produk nyata untuk menyepakati spesifikasi, pajak, pengiriman, dan syarat pembayaran.',
+                        'bi-chat-square-text',
+                    );
+                } else if (action === 'vendor-detail') {
+                    const vendorUserId = button.dataset.vendorUserId;
+                    const vendorName = button.dataset.vendor || 'Vendor';
+                    if (vendorUserId) {
+                        openVendorProfileModal(vendorUserId, vendorName);
+                    } else {
+                        openInfo(
+                            vendorName,
+                            button.dataset.vendorDescription || 'Informasi vendor terverifikasi.',
+                            'bi-box-seam',
+                        );
+                    }
+                } else if (action === 'retry-vendor-catalog') {
+                    loadVendorCatalog();
+                } else if (action === 'use-current-location') {
+                    if (authenticatedRole !== 'umkm') {
+                        showToast('Masuk ke akun UMKM untuk mencari vendor nyata berdasarkan jarak.');
+                    } else if (!navigator.geolocation) {
+                        showToast('Peramban ini tidak mendukung akses lokasi.');
+                    } else {
+                        button.disabled = true;
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                vendorOrigin = {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude,
+                                };
+                                const distance = document.querySelector('[data-vendor-filter="distance"]');
+                                if (distance instanceof HTMLSelectElement && !distance.value) {
+                                    distance.value = '50';
+                                }
+                                button.disabled = false;
+                                updateVendorFilters();
+                            },
+                            (error) => {
+                                button.disabled = false;
+                                console.error('Navora could not access the current location.', error);
+                                showToast(error.code === error.PERMISSION_DENIED
+                                    ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk memakai filter jarak.'
+                                    : 'Lokasi tidak dapat diperoleh. Periksa izin dan coba lagi.');
+                            },
+                            { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+                        );
+                    }
+                } else if (action === 'verify-profile') {
+                    openModal({
+                        title: 'Status profil vendor demo',
+                        description: state.verificationRequested
+                            ? 'Permintaan simulasi sudah tercatat di browser. Ini tidak berarti dokumen atau identitas bisnis telah diperiksa.'
+                            : 'Prototipe belum memiliki proses unggah atau pemeriksaan dokumen. Kamu bisa menandai bahwa profil demo siap ditinjau.',
+                        icon: 'bi-patch-check',
+                        submit: state.verificationRequested ? 'Tutup' : 'Tandai siap ditinjau',
+                        onSubmit: () => {
+                            state.verificationRequested = true;
+                            saveState();
+                            setText('[data-verification-summary]', 'Demo dikirim');
+                            showToast('Status demo diperbarui. Tidak ada dokumen yang ditinjau.');
+                            return true;
+                        },
+                    });
+                } else if (action === 'program-interest') {
+                    const name = button.dataset.program || 'program demo';
+                    const alreadyInterested = state.interests.includes(name);
+                    if (!alreadyInterested) {
+                        state.interests.push(name);
+                        saveState();
+                    }
+                    showToast(alreadyInterested ? 'Minat pada program ini sudah tersimpan lokal.' : 'Minat program dicatat lokal. Belum ada pendaftaran nyata.');
+                    button.textContent = alreadyInterested ? 'Minat tersimpan' : 'Minat dicatat di demo';
+                    button.disabled = true;
+                } else if (action === 'edit-profile') {
+                    createProfileEdit();
+                }
+            };
+
+            document.addEventListener('click', (event) => {
+                const target = event.target;
+
+                if (!(target instanceof Element)) {
+                    return;
+                }
+
+                const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
+                if (target.closest('[data-close-product-dialog]') && productDialog instanceof HTMLDialogElement) {
+                    productDialog.close();
+                    return;
+                }
+
+                const vendorProfileDialog = document.querySelector('[data-vendor-profile-dialog]');
+                if (target.closest('[data-close-vendor-profile-dialog]') && vendorProfileDialog instanceof HTMLDialogElement) {
+                    vendorProfileDialog.close();
+                    return;
+                }
+
+                if (target.closest('[data-notifications-toggle]') && notificationPopup instanceof HTMLDialogElement) {
+                    notificationPopup.showModal();
+                    return;
+                }
+
+                if (target.closest('[data-close-ad-notifications]') && notificationPopup instanceof HTMLDialogElement) {
+                    notificationPopup.close();
+                    return;
+                }
+
+                const dismissBtn = target.closest('[data-dismiss-notification]');
+                if (dismissBtn instanceof HTMLButtonElement) {
+                    const noticeId = dismissBtn.dataset.dismissNotification;
+                    const template = document.body.dataset.vendorDismissAdNoticeTemplate;
+                    if (noticeId && template) {
+                        dismissBtn.disabled = true;
+                        const url = template.replace('__NOTICE__', encodeURIComponent(noticeId));
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                            credentials: 'same-origin',
+                        }).then(async (res) => {
+                            if (res.ok) {
+                                const row = document.querySelector(`[data-notification-row="${noticeId}"]`);
+                                row?.remove();
+                                const remaining = document.querySelectorAll('[data-notification-row]').length;
+                                const badge = document.querySelector('.navora-notification-count');
+                                if (badge) {
+                                    if (remaining > 0) {
+                                        badge.textContent = String(remaining);
+                                    } else {
+                                        badge.remove();
+                                    }
+                                }
+                                if (remaining === 0) {
+                                    const list = document.querySelector('.ad-notifications-popup-list');
+                                    if (list) {
+                                        list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                                    }
+                                    document.querySelector('[data-dismiss-all-notifications]')?.remove();
+                                }
+                            } else {
+                                dismissBtn.disabled = false;
                             }
-                            document.querySelector('[data-dismiss-all-notifications]')?.remove();
+                        }).catch(() => {
+                            dismissBtn.disabled = false;
+                        });
+                    }
+                    return;
+                }
+
+                const dismissAllBtn = target.closest('[data-dismiss-all-notifications]');
+                if (dismissAllBtn instanceof HTMLButtonElement) {
+                    const url = document.body.dataset.vendorDismissAllAdNoticesUrl;
+                    if (url) {
+                        dismissAllBtn.disabled = true;
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                            credentials: 'same-origin',
+                        }).then(async (res) => {
+                            if (res.ok) {
+                                document.querySelectorAll('[data-notification-row]').forEach((el) => el.remove());
+                                document.querySelector('.navora-notification-count')?.remove();
+                                dismissAllBtn.remove();
+                                const list = document.querySelector('.ad-notifications-popup-list');
+                                if (list) {
+                                    list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                                }
+                            } else {
+                                dismissAllBtn.disabled = false;
+                            }
+                        }).catch(() => {
+                            dismissAllBtn.disabled = false;
+                        });
+                    }
+                    return;
+                }
+
+                if (target.closest('[data-notification-item]')) {
+                    if (notificationPopup instanceof HTMLDialogElement && notificationPopup.open) {
+                        notificationPopup.close();
+                    }
+                    showPage('advertisements');
+                    return;
+                }
+
+                const tab = target.closest('[data-page]');
+
+                if (tab instanceof HTMLButtonElement) {
+                    showPage(tab.dataset.page || 'overview');
+                    return;
+                }
+
+                const pageLink = target.closest('[data-open-page]');
+
+                if (pageLink instanceof HTMLElement) {
+                    showPage(pageLink.dataset.openPage || 'overview');
+                    return;
+                }
+
+                if (target.closest('[data-close-floating-chat]')) {
+                    const chatBox = document.querySelector('[data-floating-chat-box]');
+                    if (chatBox) {
+                        chatBox.classList.add('is-collapsed');
+                    }
+                    return;
+                }
+
+                if (target.closest('[data-toggle-floating-chat]')) {
+                    const chatBox = document.querySelector('[data-floating-chat-box]');
+                    if (chatBox) {
+                        if (chatBox.classList.contains('is-collapsed') && !activeChatOrderId) {
+                            const firstOrderWithChat = [...orderListData, ...groupOrderListData][0];
+                            if (firstOrderWithChat) {
+                                openOrderChat(firstOrderWithChat.id);
+                                return;
+                            }
+                        }
+                        chatBox.classList.toggle('is-collapsed');
+                    }
+                    return;
+                }
+
+                const actionButton = target.closest('[data-action]');
+
+                if (actionButton instanceof HTMLElement) {
+                    handleAction(actionButton);
+                    return;
+                }
+
+                if (target.closest('[data-close-modal]') && !orderSubmissionInProgress) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('submit', (event) => {
+                const form = event.target;
+
+                if (form instanceof HTMLFormElement && form.matches('[data-order-chat-form]')) {
+                    event.preventDefault();
+                    submitOrderMessage(form);
+                    return;
+                }
+
+                if (form instanceof HTMLFormElement
+                    && form.dataset.confirmSubmit
+                    && !window.confirm(form.dataset.confirmSubmit)) {
+                    event.preventDefault();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                const target = event.target;
+                if (target instanceof HTMLTextAreaElement && target.id === 'order-chat-message') {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        const form = target.closest('form');
+                        if (form instanceof HTMLFormElement) {
+                            submitOrderMessage(form);
+                        }
+                    }
+                }
+            });
+
+            document.addEventListener('change', (event) => {
+                const target = event.target;
+                if (target instanceof HTMLInputElement && target.matches('[data-chat-image-input]')) {
+                    const form = target.closest('form');
+                    const previewWrap = form?.querySelector('[data-chat-image-preview]');
+                    const previewName = form?.querySelector('[data-chat-image-name]');
+                    if (target.files && target.files.length > 0 && target.files[0]) {
+                        const file = target.files[0];
+                        if (previewWrap instanceof HTMLElement) {
+                            previewWrap.hidden = false;
+                        }
+                        if (previewName instanceof HTMLElement) {
+                            previewName.textContent = file.name;
                         }
                     } else {
-                        dismissBtn.disabled = false;
-                    }
-                }).catch(() => {
-                    dismissBtn.disabled = false;
-                });
-            }
-            return;
-        }
-
-        const dismissAllBtn = target.closest('[data-dismiss-all-notifications]');
-        if (dismissAllBtn instanceof HTMLButtonElement) {
-            const url = document.body.dataset.vendorDismissAllAdNoticesUrl;
-            if (url) {
-                dismissAllBtn.disabled = true;
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                    },
-                    credentials: 'same-origin',
-                }).then(async (res) => {
-                    if (res.ok) {
-                        document.querySelectorAll('[data-notification-row]').forEach((el) => el.remove());
-                        document.querySelector('.navora-notification-count')?.remove();
-                        dismissAllBtn.remove();
-                        const list = document.querySelector('.ad-notifications-popup-list');
-                        if (list) {
-                            list.innerHTML = '<p class="ad-notification-popup-empty">Tidak ada notifikasi baru.</p>';
+                        if (previewWrap instanceof HTMLElement) {
+                            previewWrap.hidden = true;
                         }
-                    } else {
-                        dismissAllBtn.disabled = false;
                     }
-                }).catch(() => {
-                    dismissAllBtn.disabled = false;
-                });
-            }
-            return;
-        }
+                }
+            });
 
-        if (target.closest('[data-notification-item]')) {
-            if (notificationPopup instanceof HTMLDialogElement && notificationPopup.open) {
-                notificationPopup.close();
-            }
-            showPage('advertisements');
-            return;
-        }
+            document.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                if (target.closest('[data-chat-image-remove]')) {
+                    const form = target.closest('form');
+                    const input = form?.querySelector('[data-chat-image-input]');
+                    const previewWrap = form?.querySelector('[data-chat-image-preview]');
+                    const previewName = form?.querySelector('[data-chat-image-name]');
+                    if (input instanceof HTMLInputElement) {
+                        input.value = '';
+                    }
+                    if (previewWrap instanceof HTMLElement) {
+                        previewWrap.hidden = true;
+                    }
+                    if (previewName instanceof HTMLElement) {
+                        previewName.textContent = '';
+                    }
+                }
+            });
 
-        const tab = target.closest('[data-page]');
+            modalForm?.addEventListener('submit', (event) => {
+                event.preventDefault();
 
-        if (tab instanceof HTMLButtonElement) {
-            showPage(tab.dataset.page || 'overview');
-            return;
-        }
+                if (!activeModalHandler || orderSubmissionInProgress || !modalForm.reportValidity()) {
+                    return;
+                }
 
-        const pageLink = target.closest('[data-open-page]');
+                const formData = new FormData(modalForm);
+                const shouldClose = activeModalHandler(readFormValues(formData), formData);
 
-        if (pageLink instanceof HTMLElement) {
-            showPage(pageLink.dataset.openPage || 'overview');
-            return;
-        }
+                if (shouldClose !== false) {
+                    closeModal();
+                }
+            });
 
-        if (target.closest('[data-close-floating-chat]')) {
-            const chatBox = document.querySelector('[data-floating-chat-box]');
-            if (chatBox) {
-                chatBox.classList.add('is-collapsed');
-            }
-            return;
-        }
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal && !modal.hidden && !orderSubmissionInProgress) {
+                    closeModal();
+                }
 
-        if (target.closest('[data-toggle-floating-chat]')) {
-            const chatBox = document.querySelector('[data-floating-chat-box]');
-            if (chatBox) {
-                if (chatBox.classList.contains('is-collapsed') && !activeChatOrderId) {
-                    const firstOrderWithChat = [...orderListData, ...groupOrderListData][0];
-                    if (firstOrderWithChat) {
-                        openOrderChat(firstOrderWithChat.id);
+                if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                    const target = event.target;
+
+                    if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
                         return;
                     }
+
+                    event.preventDefault();
+                    document.querySelector('[data-global-search]')?.focus();
                 }
-                chatBox.classList.toggle('is-collapsed');
-            }
-            return;
-        }
+            });
 
-        const actionButton = target.closest('[data-action]');
+            document.querySelector('[data-role-select]')?.addEventListener('change', (event) => {
+                if (knownRoles.includes(authenticatedRole || '')) {
+                    return;
+                }
 
-        if (actionButton instanceof HTMLElement) {
-            handleAction(actionButton);
-            return;
-        }
+                const select = event.currentTarget;
+                state.role = select.value;
+                saveState();
+                updateRoleContent();
+                showPage('overview');
+            });
 
-        if (target.closest('[data-close-modal]') && !orderSubmissionInProgress) {
-            closeModal();
-        }
-    });
+            document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
+                filter.addEventListener('input', updateVendorFilters);
+                filter.addEventListener('change', updateVendorFilters);
+            });
 
-    document.addEventListener('submit', (event) => {
-        const form = event.target;
+            document.querySelector('[data-vendor-sort]')?.addEventListener('change', sortVendorCards);
 
-        if (form instanceof HTMLFormElement && form.matches('[data-order-chat-form]')) {
-            event.preventDefault();
-            submitOrderMessage(form);
-            return;
-        }
+            document.querySelector('[data-reset-filters]')?.addEventListener('click', () => {
+                document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
+                    if (filter instanceof HTMLInputElement && filter.type === 'checkbox') {
+                        filter.checked = false;
+                    } else {
+                        filter.value = '';
+                    }
+                });
+                updateVendorFilters();
+                showToast('Filter vendor direset.');
+            });
 
-        if (form instanceof HTMLFormElement
-            && form.dataset.confirmSubmit
-            && !window.confirm(form.dataset.confirmSubmit)) {
-            event.preventDefault();
-        }
-    });
+            document.querySelector('[data-global-search]')?.addEventListener('input', (event) => {
+                const searchInput = event.currentTarget;
+                const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
 
-    document.addEventListener('keydown', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLTextAreaElement && target.id === 'order-chat-message') {
-            if (event.key === 'Enter' && !event.shiftKey) {
+                if (vendorSearch instanceof HTMLInputElement) {
+                    vendorSearch.value = searchInput.value;
+                    updateVendorFilters();
+                }
+            });
+
+            document.querySelector('[data-global-search]')?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && state.role === 'umkm') {
+                    event.preventDefault();
+                    showPage('vendors');
+                }
+            });
+
+            document.querySelector('[data-assistant-form]')?.addEventListener('submit', (event) => {
                 event.preventDefault();
-                const form = target.closest('form');
-                if (form instanceof HTMLFormElement) {
-                    submitOrderMessage(form);
+                const form = event.currentTarget;
+
+                if (!(form instanceof HTMLFormElement) || !form.reportValidity()) {
+                    return;
+                }
+
+                showAssistantResult(Object.fromEntries(new FormData(form).entries()));
+            });
+
+            document.querySelectorAll('[data-group-card]').forEach(updateGroupCard);
+            renderMiniVendors();
+            renderStoredListings();
+            renderStoredGroups();
+            updateGroupCards();
+            renderStoredRfqs();
+
+            const requestedRole = urlParams.get('role');
+
+            if (!authenticatedRole && knownRoles.includes(requestedRole || '')) {
+                state.role = requestedRole;
+            }
+            updateRoleContent();
+            if (authenticatedRole === 'vendor') {
+                loadVendorListings();
+            }
+            if (authenticatedUserId && ['umkm', 'vendor'].includes(authenticatedRole)) {
+                loadOrders();
+            }
+
+            const requestedPage = urlParams.get('tab') || urlParams.get('page');
+            const requestedSearch = urlParams.get('q');
+
+            if (requestedSearch) {
+                const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
+                const globalSearch = document.querySelector('[data-global-search]');
+
+                if (vendorSearch instanceof HTMLInputElement) {
+                    vendorSearch.value = requestedSearch;
+                }
+
+                if (globalSearch instanceof HTMLInputElement) {
+                    globalSearch.value = requestedSearch;
+                }
+
+                updateVendorFilters();
+            }
+
+            if (requestedPage && knownPages.includes(requestedPage)) {
+                showPage(requestedPage);
+            } else if (requestedSearch && state.role === 'umkm') {
+                showPage('vendors');
+            }
+
+            const latestAdvertisementNotice = document.body.dataset.latestAdNotice;
+            const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
+            if (latestAdvertisementNotice && notificationPopup instanceof HTMLDialogElement) {
+                const seenKey = `navora-last-ad-notification:${authenticatedUserId}`;
+                try {
+                    if (window.sessionStorage.getItem(seenKey) !== latestAdvertisementNotice
+                        && requestedPage !== 'notifications') {
+                        notificationPopup.showModal();
+                        window.sessionStorage.setItem(seenKey, latestAdvertisementNotice);
+                    }
+                } catch (error) {
+                    console.error('Navora could not remember the last advertisement notification.', error);
                 }
             }
-        }
-    });
-
-    document.addEventListener('change', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement && target.matches('[data-chat-image-input]')) {
-            const form = target.closest('form');
-            const previewWrap = form?.querySelector('[data-chat-image-preview]');
-            const previewName = form?.querySelector('[data-chat-image-name]');
-            if (target.files && target.files.length > 0 && target.files[0]) {
-                const file = target.files[0];
-                if (previewWrap instanceof HTMLElement) {
-                    previewWrap.hidden = false;
-                }
-                if (previewName instanceof HTMLElement) {
-                    previewName.textContent = file.name;
-                }
-            } else {
-                if (previewWrap instanceof HTMLElement) {
-                    previewWrap.hidden = true;
-                }
-            }
-        }
-    });
-
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-            return;
-        }
-        if (target.closest('[data-chat-image-remove]')) {
-            const form = target.closest('form');
-            const input = form?.querySelector('[data-chat-image-input]');
-            const previewWrap = form?.querySelector('[data-chat-image-preview]');
-            const previewName = form?.querySelector('[data-chat-image-name]');
-            if (input instanceof HTMLInputElement) {
-                input.value = '';
-            }
-            if (previewWrap instanceof HTMLElement) {
-                previewWrap.hidden = true;
-            }
-            if (previewName instanceof HTMLElement) {
-                previewName.textContent = '';
-            }
-        }
-    });
-
-    modalForm?.addEventListener('submit', (event) => {
-        event.preventDefault();
-
-        if (!activeModalHandler || orderSubmissionInProgress || !modalForm.reportValidity()) {
-            return;
-        }
-
-        const formData = new FormData(modalForm);
-        const shouldClose = activeModalHandler(readFormValues(formData), formData);
-
-        if (shouldClose !== false) {
-            closeModal();
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && modal && !modal.hidden && !orderSubmissionInProgress) {
-            closeModal();
-        }
-
-        if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-            const target = event.target;
-
-            if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
-                return;
-            }
-
-            event.preventDefault();
-            document.querySelector('[data-global-search]')?.focus();
-        }
-    });
-
-    document.querySelector('[data-role-select]')?.addEventListener('change', (event) => {
-        if (knownRoles.includes(authenticatedRole || '')) {
-            return;
-        }
-
-        const select = event.currentTarget;
-        state.role = select.value;
-        saveState();
-        updateRoleContent();
-        showPage('overview');
-    });
-
-    document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
-        filter.addEventListener('input', updateVendorFilters);
-        filter.addEventListener('change', updateVendorFilters);
-    });
-
-    document.querySelector('[data-vendor-sort]')?.addEventListener('change', sortVendorCards);
-
-    document.querySelector('[data-reset-filters]')?.addEventListener('click', () => {
-        document.querySelectorAll('[data-vendor-filter]').forEach((filter) => {
-            if (filter instanceof HTMLInputElement && filter.type === 'checkbox') {
-                filter.checked = false;
-            } else {
-                filter.value = '';
-            }
-        });
-        updateVendorFilters();
-        showToast('Filter vendor direset.');
-    });
-
-    document.querySelector('[data-global-search]')?.addEventListener('input', (event) => {
-        const searchInput = event.currentTarget;
-        const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
-
-        if (vendorSearch instanceof HTMLInputElement) {
-            vendorSearch.value = searchInput.value;
-            updateVendorFilters();
-        }
-    });
-
-    document.querySelector('[data-global-search]')?.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && state.role === 'umkm') {
-            event.preventDefault();
-            showPage('vendors');
-        }
-    });
-
-    document.querySelector('[data-assistant-form]')?.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-
-        if (!(form instanceof HTMLFormElement) || !form.reportValidity()) {
-            return;
-        }
-
-        showAssistantResult(Object.fromEntries(new FormData(form).entries()));
-    });
-
-    document.querySelectorAll('[data-group-card]').forEach(updateGroupCard);
-    renderMiniVendors();
-    renderStoredListings();
-    renderStoredGroups();
-    updateGroupCards();
-    renderStoredRfqs();
-
-    const requestedRole = urlParams.get('role');
-
-    if (!authenticatedRole && knownRoles.includes(requestedRole || '')) {
-        state.role = requestedRole;
-    }
-    updateRoleContent();
-    if (authenticatedRole === 'vendor') {
-        loadVendorListings();
-    }
-    if (authenticatedUserId && ['umkm', 'vendor'].includes(authenticatedRole)) {
-        loadOrders();
-    }
-
-    const requestedPage = urlParams.get('tab') || urlParams.get('page');
-    const requestedSearch = urlParams.get('q');
-
-    if (requestedSearch) {
-        const vendorSearch = document.querySelector('[data-vendor-filter="search"]');
-        const globalSearch = document.querySelector('[data-global-search]');
-
-        if (vendorSearch instanceof HTMLInputElement) {
-            vendorSearch.value = requestedSearch;
-        }
-
-        if (globalSearch instanceof HTMLInputElement) {
-            globalSearch.value = requestedSearch;
-        }
-
-        updateVendorFilters();
-    }
-
-    if (requestedPage && knownPages.includes(requestedPage)) {
-        showPage(requestedPage);
-    } else if (requestedSearch && state.role === 'umkm') {
-        showPage('vendors');
-    }
-
-    const latestAdvertisementNotice = document.body.dataset.latestAdNotice;
-    const notificationPopup = document.querySelector('[data-ad-notifications-popup]');
-    if (latestAdvertisementNotice && notificationPopup instanceof HTMLDialogElement) {
-        const seenKey = `navora-last-ad-notification:${authenticatedUserId}`;
-        try {
-            if (window.sessionStorage.getItem(seenKey) !== latestAdvertisementNotice
-                && requestedPage !== 'notifications') {
-                notificationPopup.showModal();
-                window.sessionStorage.setItem(seenKey, latestAdvertisementNotice);
-            }
-        } catch (error) {
-            console.error('Navora could not remember the last advertisement notification.', error);
-        }
-    }
-})();
+        })();

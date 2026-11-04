@@ -309,18 +309,80 @@
             </section>
 
             <section class="navora-page-panel" data-page-panel="assistant" role="tabpanel" hidden>
-                <div class="navora-page-title-row"><div><div class="navora-breadcrumb"><span>Bantuan</span><i class="bi bi-chevron-right"></i><span>Asisten kemasan</span></div><h1>Ceritakan produk yang kamu buat</h1><p>Dapatkan ide awal untuk dibicarakan kembali dengan vendor.</p></div><span class="navora-ai-demo-chip"><i class="bi bi-stars"></i> SIMULASI, BUKAN AI LANGSUNG</span></div>
+                <div class="navora-page-title-row">
+                    <div>
+                        <div class="navora-breadcrumb"><span>Bantuan</span><i class="bi bi-chevron-right"></i><span>Asisten kemasan cerdas</span></div>
+                        <h1>Konsultasi Spesifikasi & Estimasi Kemasan</h1>
+                        <p>Dapatkan rekomendasi teknis material, ketebalan barier, estimasi harga pabrik, serta regulasi BPOM untuk produkmu.</p>
+                    </div>
+                    <span class="navora-ai-demo-chip" style="background: #e8f5e9; color: #1b5e20; border-color: #a5d6a7;"><i class="bi bi-stars"></i> ASISTEN CERDAS NAVORA</span>
+                </div>
                 <div class="navora-assistant-layout">
-                    <form class="navora-panel navora-assistant-form" data-assistant-form>
-                        <span class="navora-panel-kicker">PANDUAN AWAL</span><h2>Mulai dari kebutuhanmu</h2>
-                        <label class="navora-form-label" for="product-name">Produk yang akan dikemas</label><input class="form-control navora-form-control" id="product-name" name="product" required placeholder="Contoh: kopi bubuk, sambal, sabun cair">
-                        <div class="navora-form-row"><div><label class="navora-form-label" for="product-size">Ukuran isi produk</label><input class="form-control navora-form-control" id="product-size" name="size" placeholder="Contoh: 200 gram"></div><div><label class="navora-form-label" for="product-volume">Perkiraan kebutuhan</label><select class="form-select navora-form-control" id="product-volume" name="volume"><option value="small">Di bawah 1.000 pcs</option><option value="medium">1.000–5.000 pcs</option><option value="large">Di atas 5.000 pcs</option></select></div></div>
-                        <label class="navora-form-label" for="product-preference">Preferensi (opsional)</label><textarea class="form-control navora-form-control" id="product-preference" name="preference" rows="3" placeholder="Contoh: bisa ditutup ulang, tampilan natural"></textarea>
-                        <button class="btn navora-app-primary" type="submit"><i class="bi bi-stars"></i> Buat ide awal</button>
-                        <p class="navora-form-disclaimer"><i class="bi bi-info-circle"></i> Hasil memakai aturan demo di browser, bukan AI generatif. Bukan saran keamanan pangan, regulasi, atau jaminan kecocokan material.</p>
+                    <form class="navora-panel navora-assistant-form" data-assistant-form data-recommend-url="{{ route('packaging-assistant.recommend') }}">
+                        @csrf
+                        <span class="navora-panel-kicker">ANALISIS KEMASAN</span>
+                        <h2>Spesifikasi Produkmu</h2>
+                        
+                        <label class="navora-form-label" for="product-name">Produk yang akan dikemas <span class="text-danger">*</span></label>
+                        <input class="form-control navora-form-control" id="product-name" name="product" required placeholder="Contoh: Kopi Robusta Bubuk, Sambal Bawang, Keripik Pisang">
+
+                        <div class="navora-form-row">
+                            <div>
+                                <label class="navora-form-label" for="product-category">Kategori Utama</label>
+                                <select class="form-select navora-form-control" id="product-category" name="category">
+                                    <option value="">Otomatis Deteksi</option>
+                                    <option value="Kopi / Minuman Bubuk">Kopi / Minuman Bubuk</option>
+                                    <option value="Makanan Kering / Camilan">Makanan Kering / Camilan</option>
+                                    <option value="Cairan / Saus / Minyak">Cairan / Saus / Minyak</option>
+                                    <option value="Frozen Food / Daging">Frozen Food / Makanan Beku</option>
+                                    <option value="Skincare / Kosmetik">Skincare / Kosmetik</option>
+                                    <option value="Fesyen & Kriya Retail">Fesyen & Kriya Retail</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="navora-form-label" for="product-priority">Fokus Utama</label>
+                                <select class="form-select navora-form-control" id="product-priority" name="priority">
+                                    <option value="budget">Ekonomis & Ramah Modal (Budget)</option>
+                                    <option value="quality">Kualitas Premium & Awet Maksimal</option>
+                                    <option value="eco">Ramah Lingkungan (Eco-Friendly)</option>
+                                    <option value="shelf_life">Tahan Simpan Panjang (Kedap Udara)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="navora-form-row">
+                            <div>
+                                <label class="navora-form-label" for="product-size">Ukuran / Berat Bersih</label>
+                                <input class="form-control navora-form-control" id="product-size" name="size" placeholder="Contoh: 150 gram, 250 ml, 1 liter">
+                            </div>
+                            <div>
+                                <label class="navora-form-label" for="product-volume">Volume Pesanan Awal</label>
+                                <select class="form-select navora-form-control" id="product-volume" name="volume">
+                                    <option value="small">Di bawah 1.000 pcs (Skala Uji Coba)</option>
+                                    <option value="medium" selected>1.000–5.000 pcs (Skala Bertumbuh)</option>
+                                    <option value="large">Di atas 5.000 pcs (Skala Produksi Massal)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label class="navora-form-label" for="product-preference">Preferensi / Keinginan Khusus (opsional)</label>
+                        <textarea class="form-control navora-form-control" id="product-preference" name="preference" rows="2" placeholder="Contoh: mau ada jendela transparan (window), bisa ditutup zipper, warna doff matte"></textarea>
+                        
+                        <button class="btn navora-app-primary mt-3" type="submit" data-assistant-submit-btn>
+                            <i class="bi bi-stars"></i> Analisis & Berikan Rekomendasi
+                        </button>
+                        
+                        <p class="navora-form-disclaimer mt-2">
+                            <i class="bi bi-shield-check"></i> Memberikan arahan teknis bahan, metode cetak, estimasi biaya pabrik, dan panduan label BPOM/Halal.
+                        </p>
                     </form>
+
                     <section class="navora-panel navora-assistant-result" data-assistant-result aria-live="polite">
-                        <div class="navora-assistant-placeholder"><span><i class="bi bi-lightbulb"></i></span><h2>Ide kemasanmu akan muncul di sini</h2><p>Isi jenis produk dan kebutuhanmu untuk mendapat arahan diskusi dengan vendor.</p></div>
+                        <div class="navora-assistant-placeholder">
+                            <span><i class="bi bi-stars"></i></span>
+                            <h2>Hasil Konsultasi Kemasan Cerdas</h2>
+                            <p>Masukkan nama produk dan kebutuhanmu di formulir sebelah kiri untuk melihat rekomendasi format, bahan food-grade, perkiraan harga cetak, dan vendor yang relevan.</p>
+                        </div>
                     </section>
                 </div>
             </section>

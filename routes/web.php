@@ -16,6 +16,7 @@ use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\MidtransNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderMessageController;
+use App\Http\Controllers\PackagingAssistantController;
 use App\Http\Controllers\RajaOngkirController;
 use App\Http\Controllers\VendorAdvertisementController;
 use App\Http\Controllers\VendorCatalogController;
@@ -32,6 +33,9 @@ Route::get('/masukan', [FeedbackController::class, 'create'])->name('feedback.cr
 Route::post('/masukan', [FeedbackController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('feedback.store');
+
+Route::post('/asisten-kemasan/analisis', [PackagingAssistantController::class, 'recommend'])
+    ->name('packaging-assistant.recommend');
 
 Route::get('/', function () {
     return view('home');
