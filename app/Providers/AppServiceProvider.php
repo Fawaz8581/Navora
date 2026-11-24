@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\AdCampaign;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View as ViewInstance;
@@ -22,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('app.env') === 'production' || request()->server('HTTP_X_FORWARDED_PROTO') === 'https') {
+            URL::forceScheme('https');
+        }
+
         View::composer(['home', 'workspace', 'auth.partials.layout'], function (ViewInstance $view): void {
             $findActiveCampaign = fn (array $placements): ?AdCampaign => AdCampaign::query()
                 ->where('status', AdCampaign::STATUS_ACTIVE)
