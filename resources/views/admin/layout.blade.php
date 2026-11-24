@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="@yield('meta-description', 'Dashboard admin Navora.')">
     <title>@yield('title') — Admin Navora</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -18,8 +20,8 @@
     <header class="navora-admin-header">
         <div class="navora-admin-top">
             <a class="navora-admin-brand" href="{{ route('admin.dashboard') }}" aria-label="Navora, dashboard admin">
-                <span class="auth-brand-icon"><i class="bi bi-box-seam"></i></span>
-                <span>Navora<span class="auth-brand-dot">.</span><small>ADMIN</small></span>
+                <img src="{{ asset('images/navora-logo.png') }}" alt="Navora Logo" class="navora-brand-img" height="34">
+                <small>ADMIN</small>
             </a>
             <div class="navora-admin-account">
                 <span><strong>{{ Auth::user()->name }}</strong><small>Administrator</small></span>

@@ -97,6 +97,14 @@ body.navora-app-body {
     font-size: 20px;
     font-weight: 800;
     letter-spacing: -.06em;
+    text-decoration: none;
+}
+
+.navora-app-brand .navora-brand-img {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+    display: block;
 }
 
 .navora-app-brand:hover {

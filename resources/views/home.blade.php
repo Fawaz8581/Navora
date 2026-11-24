@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Navora membantu UMKM menemukan vendor kemasan, membandingkan penawaran, dan memenuhi MOQ lewat patungan.">
     <title>Navora — Kemasan yang tepat, mulai dari skala UMKM</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -24,7 +28,7 @@
         <nav class="navbar navbar-expand-xl navora-navbar sticky-top" aria-label="Navigasi utama">
             <div class="container">
                 <a class="navbar-brand navora-wordmark" href="{{ route('workspace') }}" aria-label="Ruang kerja Navora">
-                    <span class="navora-logo"><i class="bi bi-box-seam"></i></span>Navora<span class="navora-wordmark-dot">.</span>
+                    <img src="{{ asset('images/navora-logo.png') }}" alt="Navora Logo" class="navora-brand-img" height="36">
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navoraHomeNav" aria-controls="navoraHomeNav" aria-expanded="false" aria-label="Buka navigasi">
                     <span class="navbar-toggler-icon"></span>

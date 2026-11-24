@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Checkout Pesanan — Navora</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -29,8 +31,8 @@
     <a class="navora-skip-link" href="#checkout-content">Lewati ke konten utama</a>
     <header class="navora-checkout-header">
         <a class="navora-app-brand" href="{{ route('workspace') }}">
-            <span class="navora-app-logo"><i class="bi bi-box-seam"></i></span>
-            <span>Navora<span class="navora-brand-dot">.</span><small>CHECKOUT PESANAN</small></span>
+            <img src="{{ asset('images/navora-logo.png') }}" alt="Navora Logo" class="navora-brand-img" height="34">
+            <small>CHECKOUT PESANAN</small>
         </a>
         <a class="btn navora-app-outline" href="{{ route('workspace') }}"><i class="bi bi-arrow-left"></i> Kembali ke pesanan</a>
     </header>

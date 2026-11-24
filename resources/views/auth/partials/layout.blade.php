@@ -6,6 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="@yield('meta-description', 'Masuk atau buat akun Navora untuk menjelajahi marketplace kemasan UMKM.')">
     <title>@yield('title') — Navora</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -19,8 +21,7 @@
         <section class="auth-panel">
             <header class="auth-header">
                 <a class="auth-brand" href="{{ route('home') }}" aria-label="Navora beranda">
-                    <span class="auth-brand-icon"><i class="bi bi-box-seam"></i></span>
-                    <span>Navora<span class="auth-brand-dot">.</span></span>
+                    <img src="{{ asset('images/navora-logo.png') }}" alt="Navora Logo" class="navora-brand-img" height="34">
                 </a>
                 <a class="auth-back-link" href="{{ route('home') }}"><i class="bi bi-arrow-left"></i> Beranda</a>
             </header>

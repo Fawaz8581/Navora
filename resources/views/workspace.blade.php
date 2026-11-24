@@ -6,6 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="Demo marketplace Navora untuk mencari vendor kemasan, membandingkan penawaran, dan bergabung dalam patungan MOQ.">
     <title>Ruang Navora — Marketplace kemasan UMKM</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png').'?v='.filemtime(public_path('favicon.png')) }}">
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico').'?v='.filemtime(public_path('favicon.ico')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -54,8 +56,8 @@
         <header class="navora-app-header">
             <div class="navora-app-top container-fluid">
                 <a class="navora-app-brand" href="{{ route('home') }}">
-                    <span class="navora-app-logo"><i class="bi bi-box-seam"></i></span>
-                    <span>Navora<span class="navora-brand-dot">.</span><small>MARKETPLACE UMKM</small></span>
+                    <img src="{{ asset('images/navora-logo.png') }}" alt="Navora Logo" class="navora-brand-img" height="34">
+                    <small>MARKETPLACE UMKM</small>
                 </a>
                 <div class="navora-header-search">
                     <i class="bi bi-search"></i>
